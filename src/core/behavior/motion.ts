@@ -1,25 +1,5 @@
 import type { Point } from '../geometry';
 
-/**
- * "Arrive" steering on one axis: accelerate toward the target at up to `maxSpeed`,
- * slowing down inside `slowRadius`. Velocity changes by at most `accel * dt`, which
- * is what gives movement its ease-in and ease-out.
- */
-export function steer(
-  position: number,
-  velocity: number,
-  target: number,
-  maxSpeed: number,
-  accel: number,
-  dt: number,
-  slowRadius = 120,
-): number {
-  const distance = target - position;
-  const desiredSpeed = maxSpeed * Math.min(1, Math.abs(distance) / slowRadius);
-  const desired = Math.sign(distance) * desiredSpeed;
-  return approach(velocity, desired, accel * dt);
-}
-
 /** Moves `value` toward `target` by at most `maxDelta`. */
 export function approach(value: number, target: number, maxDelta: number): number {
   const delta = target - value;
@@ -53,13 +33,17 @@ export function easeInOutSine(t: number): number {
   return -(Math.cos(Math.PI * t) - 1) / 2;
 }
 
-export function cubicBezier(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
+/** Shrinks a vector's length toward zero by at most `maxDelta`, keeping its direction. */
+export function brake2d(v: Point, maxDelta: number): Point {
+  const length = Math.hypot(v.x, v.y);
+  if (length <= maxDelta) return { x: 0, y: 0 };
+  const k = (length - maxDelta) / length;
+  return { x: v.x * k, y: v.y * k };
+}
+
+export function quadraticBezier(p0: Point, p1: Point, p2: Point, t: number): Point {
   const u = 1 - t;
-  const a = u * u * u;
-  const b = 3 * u * u * t;
-  const c = 3 * u * t * t;
-  const d = t * t * t;
-  return { x: a * p0.x + b * p1.x + c * p2.x + d * p3.x, y: a * p0.y + b * p1.y + c * p2.y + d * p3.y };
+  return { x: u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x, y: u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y };
 }
 
 /** Deterministic random numbers for tests and reproducible behaviour. */

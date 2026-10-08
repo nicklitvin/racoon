@@ -3,22 +3,22 @@ import type { Settings } from '../../shared/settings';
 import { CursorActivityTracker } from '../core/activity/cursor';
 import { TypingActivityTracker } from '../core/activity/typing';
 import { Animator } from '../core/animator';
-import { Brain, DEFAULT_TUNING, type PetSnapshot, type WorldInput } from '../core/behavior/brain';
+import { Brain, type PetSnapshot, type WorldInput } from '../core/behavior/brain';
+import { DEFAULT_CONFIG } from '../core/behavior/config';
 import { ClickThroughController } from '../core/clickThrough';
 import type { Host } from '../host';
-import { activeSheet, renderFrame } from '../sprites';
+import { ANIMATIONS, createSvgRaccoon, type RaccoonRenderer } from '../sprites';
 
 export interface PetElements {
   /** Clip box covering the work area: hides whatever is past the edges or below the floor. */
   stage: HTMLElement;
   /** Positioned by the raccoon's feet. */
   pet: HTMLElement;
-  /** Holds the frame text; mirrored to face left. */
+  /** Holds the drawing; mirrored to face left. */
   sprite: HTMLElement;
   emote: HTMLElement;
 }
 
-const BASE_FONT_PX = 16;
 /** Longest gap between ticks while nothing moves. Brain timers have this granularity. */
 const MAX_REST_MS = 250;
 /** Pointer travel that turns a press into a drag rather than a click. */
@@ -38,15 +38,15 @@ interface DragState {
  */
 export class PetRuntime {
   private readonly brain: Brain;
-  private readonly animator = new Animator(activeSheet);
+  private readonly animator = new Animator(ANIMATIONS);
+  private readonly renderer: RaccoonRenderer = createSvgRaccoon();
   private readonly cursorTracker = new CursorActivityTracker();
   private readonly typingTracker = new TypingActivityTracker();
   private readonly clickThrough: ClickThroughController;
 
   private cursor: Point | null = null;
   private size = { width: 0, height: 0 };
-  private measuredKey = '';
-  private lastText = '';
+  private lastDrawn = '';
   private lastTransform = '';
   private lastEmote = '';
   private lastFacing = 0;
@@ -67,9 +67,9 @@ export class PetRuntime {
     private settings: Settings,
   ) {
     this.clickThrough = new ClickThroughController((on) => host.setInteractive(on));
+    els.sprite.replaceChildren(this.renderer.element);
     this.applyLayout();
     this.applySettings();
-    this.measure();
     this.brain = new Brain(this.worldInput(performance.now()));
     this.brain.setSpeed(settings.speed);
   }
@@ -142,7 +142,7 @@ export class PetRuntime {
     if (p) this.updateHover(p);
     else this.clickThrough.pointerLeft();
     // While resting we tick slowly; wake up early only when the cursor matters right now.
-    if (this.isResting() && p && (this.cursorTracker.isFrantic(now) || this.isNearPet(p, DEFAULT_TUNING.fleeRadius * 1.5))) {
+    if (this.isResting() && p && (this.cursorTracker.isFrantic(now) || this.isNearPet(p, DEFAULT_CONFIG.reactions.fleeRadius * 1.5))) {
       this.wake();
     }
   }
@@ -269,12 +269,17 @@ export class PetRuntime {
 
   private render(snap: PetSnapshot): void {
     const { pet, sprite, emote } = this.els;
-    const text = renderFrame(activeSheet, this.animator.frame, this.animator.eyes);
-    if (text !== this.lastText) {
-      sprite.textContent = text;
-      this.lastText = text;
+    const frame = {
+      animation: this.animator.animation,
+      timeMs: this.animator.time,
+      keystrokes: this.animator.keystrokes,
+      eyes: this.animator.eyes,
+    };
+    const key = `${frame.animation}|${frame.timeMs}|${frame.keystrokes}|${frame.eyes}`;
+    if (key !== this.lastDrawn) {
+      this.renderer.draw(frame);
+      this.lastDrawn = key;
     }
-    this.measure();
 
     const wa = this.display.workArea;
     const x = Math.round((snap.position.x - wa.x) * 10) / 10;
@@ -295,19 +300,6 @@ export class PetRuntime {
     }
   }
 
-  /** Re-measures the sprite only when its box can have changed (new animation or size). */
-  private measure(): void {
-    const key = `${this.animator.animation}@${this.settings.size}`;
-    if (key === this.measuredKey && this.size.width > 0) return;
-    if (!this.lastText) {
-      const text = renderFrame(activeSheet, this.animator.frame, this.animator.eyes);
-      this.els.sprite.textContent = text;
-      this.lastText = text;
-    }
-    this.size = { width: this.els.sprite.offsetWidth, height: this.els.sprite.offsetHeight };
-    this.measuredKey = key;
-  }
-
   private applyLayout(): void {
     const { stage } = this.els;
     const wa = this.display.workArea;
@@ -318,15 +310,16 @@ export class PetRuntime {
   }
 
   private applySettings(): void {
-    this.els.sprite.style.fontSize = `${BASE_FONT_PX * this.settings.size}px`;
+    const { baseSize } = this.renderer;
+    this.renderer.setScale(this.settings.size);
+    this.size = { width: baseSize.width * this.settings.size, height: baseSize.height * this.settings.size };
     this.cursorTracker.setSensitivity(this.settings.sensitivity);
     this.typingTracker.setSensitivity(this.settings.sensitivity);
-    this.measuredKey = '';
   }
 
-  /** The visible part of the raccoon: the sprite box clipped to the stage. */
+  /** The visible part of the raccoon: the drawn figure clipped to the stage. */
   private hitRect(): Rect | null {
-    const r = this.els.pet.getBoundingClientRect();
+    const r = this.renderer.figure.getBoundingClientRect();
     if (r.width === 0) return null;
     const wa = this.display.workArea;
     const left = Math.max(r.left, wa.x);

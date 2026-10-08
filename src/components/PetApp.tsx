@@ -19,7 +19,7 @@ export function PetApp({ host }: PetAppProps) {
   const [panelOpen, setPanelOpen] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const petRef = useRef<HTMLDivElement>(null);
-  const spriteRef = useRef<HTMLPreElement>(null);
+  const spriteRef = useRef<HTMLDivElement>(null);
   const emoteRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<PetRuntime | null>(null);
 
@@ -85,7 +85,7 @@ export function PetApp({ host }: PetAppProps) {
         {ready && (
           <div className="pet" ref={petRef}>
             <div className="emote" ref={emoteRef} aria-hidden="true" />
-            <pre className="sprite" ref={spriteRef} aria-label="raccoon" />
+            <div className="sprite" ref={spriteRef} />
           </div>
         )}
       </div>

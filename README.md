@@ -1,6 +1,6 @@
 # Racoon
 
-A raccoon that lives on your screen. It wanders along the bottom of your screen, floats across it, grooms and yawns, and naps when nothing is happening. Shake your mouse and it jumps out and chases the cursor, pounces when the cursor stops, then sits looking confused. Get the cursor too close and it may run off or hide behind the edge of the screen. If you opt in, it also comes to watch you type, peeking up over the bottom edge with its eyes following your rhythm.
+A raccoon that lives on your screen. It wanders all over your screen, sits down to groom and yawn, and naps when nothing is happening. Shake your mouse and it jumps out and chases the cursor, pounces when the cursor stops, then sits looking confused. Get the cursor too close and it may run off or hide behind the edge of the screen. If you opt in, it also comes to watch you type, peeking up over the bottom edge with its eyes following your rhythm.
 
 It runs two ways from one codebase:
 
@@ -61,17 +61,20 @@ shared/                   Used by both the main process and the page
   settings.ts             Settings type, defaults, ranges and validation
 src/                      The page (React). Runs in Electron and in a browser
   core/                   Plain TypeScript: no React, no DOM, no Electron. All unit-tested
-    behavior/brain.ts     The behaviour state machine and movement physics
+    behavior/brain.ts     The behaviour state machine and movement
+    behavior/config.ts    Tuning for every behaviour (wander timings, speeds, thresholds)
     behavior/motion.ts    Steering, easing, Bezier paths, seeded random numbers
     activity/cursor.ts    Rolling-window cursor speed, path length, erratic-ness
     activity/typing.ts    Rolling-window typing rate (timestamps only)
-    animator.ts           Picks the frame and handles blinking
+    animator.ts           Keeps each animation's clock and handles blinking
     clickThrough.ts       Decides when the overlay should capture the mouse
     geometry.ts           Small geometry helpers
-  sprites/                Art, as data
-    types.ts              The sprite sheet format
-    asciiRaccoon.ts       The ASCII raccoon: every animation as plain frame arrays
-    render.ts             Pads frames and draws eyes
+  sprites/                The art
+    types.ts              Animation names, timing specs and the RaccoonRenderer interface
+    animations.ts         Timing for every animation (fps, length, loop, eyes)
+    rig.ts                The skeleton: joint positions and the kinematics poses use
+    pose.ts               Every animation as a pure function of time -> pose
+    svgRaccoon.ts         The SVG renderer: builds the drawing once, applies poses
   runtime/petRuntime.ts   Connects core logic to the DOM; runs the animation loop
   host/                   "Where am I running?": Electron bridge or browser fallback
   components/             React: the pet page and the settings panel
@@ -93,10 +96,11 @@ Two rules keep this portable and testable: **`src/core` never imports React, the
 
 ### Behaviour
 
-`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, float, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek, dragged** and **falling**.
+`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek** and **dragged**.
 
-- **Idle:** every few seconds it picks something to do: wander along the floor, float across the screen on a Bezier arc, sit and groom or yawn, or just look around. After about 3 calm minutes it yawns and falls asleep.
-- **Organic movement:** all movement goes through velocity with limited acceleration ("arrive" steering), so it eases in and out. Walks vary a little in speed and distance, floats bob gently, and gravity handles falls and jumps. Nothing ever teleports; the tests check this on every simulated frame.
+- **Wandering:** the whole work area is the raccoon's world; there is no floor and no gravity. After each pause it picks something to do: walk to a random point anywhere on screen, sit and groom or yawn, or just turn round and look about. After about 3 calm minutes it yawns and falls asleep. Dropping it after a drag leaves it exactly where you let go.
+- **Organic movement:** walks follow a gently curved path with ease-in-out speed, and each walk varies a little in distance, curve and top speed. Everything else (chasing, fleeing, pouncing) goes through velocity with limited acceleration ("arrive" steering). Nothing ever teleports; the tests check this on every simulated frame.
+- **Tuning:** all timings and distances live in `DEFAULT_CONFIG` in `src/core/behavior/config.ts`, grouped by behaviour. For wandering: `wander.walkDistance`, `pauseMs`, `speedJitter`, `curve`, `sitChance`, `sitMs`, `lookAroundChance` and `sleepAfterMs`. These are developer settings, compiled in; they aren't in the user's `settings.json`.
 - **Deterministic:** time only advances when `update(dt, world)` is called, and randomness is injected, so the tests replay exact scenarios.
 
 ### Reactions to the cursor
@@ -109,9 +113,9 @@ When typing has been steady for a few seconds, the raccoon goes to the bottom ed
 
 ### Performance
 
-The page doesn't re-render React per frame; the runtime writes a CSS transform and swaps frame text only when they change. While the raccoon moves it updates at the display's refresh rate (60 fps). While it rests (sitting, sleeping, idling, watching) it drops to a slow timer of at most 4 ticks per second, driven by when the next frame or blink is due. Cursor polling only sends updates when the cursor actually moves.
+The page doesn't re-render React per frame; the runtime writes a CSS transform, and the SVG renderer only touches the attributes that changed. While the raccoon moves it updates at the display's refresh rate (60 fps). While it rests (sitting, sleeping, idling, watching) it drops to a slow timer of at most 4 ticks per second, and resting animations only change pose 4–10 times a second. Cursor polling only sends updates when the cursor actually moves.
 
-Measured on the development machine (Windows 10, 12 cores): about **0.3% of one core while resting** (~0.03% of total CPU), and 6–10% of one core while walking or floating (~0.5–0.8% of total CPU). Almost all of the moving cost is the GPU compositing a full-screen transparent window.
+Measured on the development machine (Windows 10, 12 cores): about **0.3% of one core while resting** (~0.03% of total CPU), and 6–10% of one core while walking (~0.5–0.8% of total CPU). Almost all of the moving cost is the GPU compositing a full-screen transparent window.
 
 ## Privacy: keyboard reactions
 
@@ -134,40 +138,25 @@ In the browser build, the page only counts key presses made while its tab is foc
 
 ## Adding or changing animations
 
-All art lives in `src/sprites/asciiRaccoon.ts` as plain frame arrays. A frame is a list of text rows; frames face right and are mirrored automatically when the raccoon faces left.
+The raccoon is inline SVG, drawn by `createSvgRaccoon()` in `src/sprites/svgRaccoon.ts`. It's built from simple shapes hung off a small skeleton (`src/sprites/rig.ts`): hip, shoulders, neck, tail root and four legs. An animation is a pure function from time to a `Pose` (body pitch and bounce, leg angles, head and tail angles, where the eyes look, ears, mouth) in `src/sprites/pose.ts`; the renderer turns a pose into SVG transforms. The drawing faces right and is mirrored when the raccoon faces left. Colours are CSS variables (`--r-fur`, `--r-dark`, ...) in `src/styles.css`.
 
-```ts
-const wave = [
-  art(String.raw`
-   /\___/\  o
-  ( =@ @= )/
-   \  v  /
-`),
-  art(String.raw`
-   /\___/\
-  ( =@ @= )--o
-   \  v  /
-`),
-];
-```
+To add an animation:
 
-- `@` marks an eye. The renderer swaps it for the right glyph (`o` open, `-` closed or blinking, `O` wide), so blinking needs no extra frames.
-- Rows don't need trailing spaces. Frames of one animation are padded to the same size and bottom-aligned, so the feet stay put.
-- `String.raw` keeps backslashes literal.
+1. Add the name to `ANIMATION_NAMES` in `src/sprites/types.ts`.
+2. Give it timing in `src/sprites/animations.ts`:
+   ```ts
+   wave: { fps: 30, durationMs: 800, loop: true, eyes: 'open' },
+   ```
+   - `fps`: how often the pose is redrawn. Keep it low (4–10) for resting animations so they stay cheap.
+   - `loop: false` holds the final pose.
+   - `eyes`: `'open'` (blinks now and then), `'closed'` or `'wide'`.
+   - `driver: 'keystrokes'`: driven by key presses instead of time (used by `peek`).
+3. Add a `case` to `poseFor()` in `src/sprites/pose.ts`. Start from `standing()` or `sitting(t)` and change what moves. `plantedLeg()` sizes a leg so its paw just reaches the ground.
+4. Pick it in `Brain.snapshot()` (`src/core/behavior/brain.ts`).
 
-Then register it in the sheet with its timing:
+TypeScript points out anything missing. `npm test` checks every pose for bad numbers, keeps it inside the drawing's box, and checks that standing and sitting paws stay on the ground.
 
-```ts
-wave: { frames: wave, fps: 4, loop: true, eyes: 'open' },
-```
-
-- `eyes`: `'open'` (blinks now and then), `'closed'` or `'wide'`.
-- `loop: false` holds the last frame.
-- `driver: 'keystrokes'` advances one frame per key press instead of by time (used by `peek`).
-
-To use a **new** animation name, add it to `ANIMATION_NAMES` in `src/sprites/types.ts` and pick it in `Brain.snapshot()` (`src/core/behavior/brain.ts`). TypeScript will point out anything missing. `npm test` checks that every animation has frames and that every frame has two eyes.
-
-**Switching art style:** behaviour code only ever names animations. To swap in pixel art, write another `SpriteSheet` and point `activeSheet` in `src/sprites/index.ts` at it. For image frames, replace the text drawing in `PetRuntime.render()` with an `<img>` or canvas draw; nothing in `src/core` changes.
+**Another art style:** behaviour code only ever names animations, and the page only talks to the `RaccoonRenderer` interface (`src/sprites/types.ts`). To swap the art, write another renderer and create it in `PetRuntime` instead of `createSvgRaccoon()`; nothing in `src/core` changes.
 
 ## Building and packaging
 
@@ -206,15 +195,15 @@ To distribute to others:
 
 `npm run build:web` produces a static site in `dist/`, and `vercel.json` is ready: import the GitHub repo in Vercel and deploy with no extra settings. The install step skips downloading Electron, since the web build doesn't need it.
 
-In the browser, the page is the raccoon's whole world. Wandering, floating, chasing, pouncing, fleeing, hiding, dragging and settings all work. Click-through isn't possible in a page, and typing reactions only count key presses inside the tab. Settings are kept in `localStorage`.
+In the browser, the page is the raccoon's whole world. Wandering, chasing, pouncing, fleeing, hiding, dragging and settings all work. Click-through isn't possible in a page, and typing reactions only count key presses inside the tab. Settings are kept in `localStorage`.
 
 ## Testing checklist
 
 1. `npm run dev`. The raccoon appears at the bottom of the screen with no window around it. Click and type in the apps behind it: nothing is blocked and focus doesn't move.
-2. Leave it alone for a minute: it wanders, floats, sits, grooms and yawns. Leave it for about 3 minutes and it falls asleep ("z Z").
+2. Leave it alone for a minute: it walks all over the screen (not just along the bottom) with smooth starts and stops, sits, grooms and yawns. Leave it for about 3 minutes and it falls asleep ("z Z").
 3. Shake the mouse hard for a couple of seconds: "!", then it chases the cursor. Stop: it pounces, then sits with "?".
 4. Move the cursor slowly onto it: it often runs away; near a screen edge it hides behind the edge and peeks back out.
-5. Drag it up and let go: it dangles, then falls to the floor. Click it: it startles.
+5. Drag it and let go: it dangles while held and stays where you drop it. Click it: it startles.
 6. Settings (double-click it): change size and speed and watch them apply live. Turn on "React to typing" and type steadily for a few seconds: it peeks over the bottom edge and its eyes follow your typing. Stop typing: it comes back out after about 5 seconds.
 7. Change display scaling or resolution: it stays on screen.
 8. Quit from the tray icon.

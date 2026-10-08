@@ -1,7 +1,7 @@
 /**
- * Sprite data model. Behaviour code only ever names an animation ("walk", "sleep", ...);
- * how that animation looks is entirely up to the sprite sheet, so the ASCII art can be
- * swapped for another style without touching any logic.
+ * Sprite model. Behaviour code only ever names an animation ("walk", "sleep", ...);
+ * how that animation looks is up to the renderer, so the art can change without
+ * touching any logic.
  */
 
 export const ANIMATION_NAMES = [
@@ -9,7 +9,6 @@ export const ANIMATION_NAMES = [
   'walk',
   'run',
   'jump',
-  'float',
   'sit',
   'groom',
   'yawn',
@@ -23,34 +22,51 @@ export const ANIMATION_NAMES = [
 
 export type AnimationName = (typeof ANIMATION_NAMES)[number];
 
-/** How the eye markers in a frame are drawn. "open" eyes blink now and then. */
+/** How the eyes are drawn. "open" eyes blink now and then. */
 export type EyeStyle = 'open' | 'closed' | 'wide';
 
 /**
- * What advances the frames:
- * - "time": `fps` frames per second.
- * - "keystrokes": one frame per key press (used by "peek", so the eyes follow your typing).
+ * What moves the animation along:
+ * - "time": the clock.
+ * - "keystrokes": key presses (used by "peek", so the eyes follow your typing).
  */
 export type FrameDriver = 'time' | 'keystrokes';
 
-/** One frame is a list of text rows, drawn top to bottom. */
-export type Frame = readonly string[];
-
-export interface Animation {
-  frames: readonly Frame[];
+export interface AnimationSpec {
+  /**
+   * How many times per second the pose is redrawn. Resting animations use a low rate,
+   * so an idle raccoon costs almost no CPU.
+   */
   fps: number;
-  /** Non-looping animations hold their last frame. */
+  /** Length of one cycle; a non-looping animation holds its final pose. */
+  durationMs: number;
   loop: boolean;
   eyes: EyeStyle;
   driver?: FrameDriver;
 }
 
-export interface SpriteSheet {
-  name: string;
-  /** Character in frame rows that marks where an eye goes. */
-  eyeMarker: string;
-  /** Glyph drawn for each eye style, plus "blink" for a closed open-eye. */
-  eyeGlyphs: Record<EyeStyle | 'blink', string>;
-  /** All frames are drawn facing right; the renderer mirrors them to face left. */
-  animations: Record<AnimationName, Animation>;
+/** One moment of an animation: everything a renderer needs to draw the raccoon. */
+export interface RaccoonFrame {
+  animation: AnimationName;
+  /** Time into the animation, already stepped to the animation's fps. */
+  timeMs: number;
+  /** Key presses seen while this animation played (keystroke-driven animations only). */
+  keystrokes: number;
+  eyes: EyeStyle | 'blink';
+}
+
+/**
+ * Draws the raccoon. Implementations face right; the page mirrors the element to face left.
+ * The drawing's feet are at the bottom centre of `element`.
+ */
+export interface RaccoonRenderer {
+  /** Root element to put in the page. */
+  readonly element: Element;
+  /** The drawn figure, without empty space around it; used for hit-testing. */
+  readonly figure: Element;
+  /** Size of `element` in px at scale 1. */
+  readonly baseSize: { width: number; height: number };
+  setScale(scale: number): void;
+  /** Cheap to call every tick: only touches what changed. */
+  draw(frame: RaccoonFrame): void;
 }

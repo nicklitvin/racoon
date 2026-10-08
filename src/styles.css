@@ -3,6 +3,18 @@
   --halo: rgba(255, 255, 255, 0.92);
   --emote: #b4492b;
 
+  /* The raccoon's own colours. The same in every theme; the halo keeps him readable. */
+  --r-fur: #8d9199;
+  --r-fur-light: #b8bbc1;
+  --r-dark: #2e3036;
+  --r-leg: #3a3d44;
+  --r-leg-far: #26282d;
+  --r-light: #f3f1ea;
+  --r-ear-inner: #6b5656;
+  --r-eye: #f7f5ee;
+  --r-pupil: #141417;
+  --r-mouth: #7a3434;
+
   --bg: #f6f4ef;
   --surface: #ffffff;
   --text: #24232a;
@@ -115,28 +127,78 @@ html[data-host='web'][data-theme='dark'] {
   position: absolute;
   left: 0;
   top: 0;
-  pointer-events: auto;
-  cursor: grab;
+  /* Only the drawn raccoon takes the pointer, not the empty corners of its box. */
+  pointer-events: none;
   touch-action: none;
   will-change: transform;
 }
 
-.pet:active {
+.sprite {
+  line-height: 0;
+}
+
+.raccoon {
+  display: block;
+  overflow: visible;
+  /* A light halo keeps him readable on dark and busy backgrounds. */
+  filter: drop-shadow(0 0 1.5px var(--halo));
+}
+
+.raccoon-figure {
+  pointer-events: visiblePainted;
+  cursor: grab;
+}
+
+.raccoon-figure:active {
   cursor: grabbing;
 }
 
-.sprite {
-  margin: 0;
-  font-family: 'Cascadia Mono', Consolas, Menlo, 'DejaVu Sans Mono', monospace;
-  font-size: 16px;
-  line-height: 1.05;
-  font-weight: 700;
-  color: var(--fur);
-  /* A light halo keeps the art readable on dark and busy backgrounds. */
-  text-shadow:
-    0 0 2px var(--halo),
-    0 0 4px var(--halo);
-  white-space: pre;
+.r-fur {
+  fill: var(--r-fur);
+}
+
+.r-fur-light {
+  fill: var(--r-fur-light);
+}
+
+.r-dark {
+  fill: var(--r-dark);
+}
+
+.r-leg {
+  fill: var(--r-leg);
+}
+
+.r-leg-far {
+  fill: var(--r-leg-far);
+}
+
+.r-light,
+.r-glint {
+  fill: var(--r-light);
+}
+
+.r-ear-inner {
+  fill: var(--r-ear-inner);
+}
+
+.r-eye {
+  fill: var(--r-eye);
+}
+
+.r-pupil {
+  fill: var(--r-pupil);
+}
+
+.r-mouth {
+  fill: var(--r-mouth);
+}
+
+.r-lid {
+  fill: none;
+  stroke: var(--r-light);
+  stroke-width: 1.1;
+  stroke-linecap: round;
 }
 
 .sprite.facing-left {
@@ -145,7 +207,8 @@ html[data-host='web'][data-theme='dark'] {
 
 .emote {
   position: absolute;
-  bottom: 100%;
+  /* The drawing's box has headroom for standing up; this sits just above a standing head. */
+  bottom: 72%;
   left: 50%;
   transform: translateX(-50%);
   font: 700 1.2em/1 'Cascadia Mono', Consolas, Menlo, monospace;

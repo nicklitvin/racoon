@@ -1,28 +1,20 @@
 import type { AnimationName } from '../../sprites/types';
 import { clamp, type Point, type Rect } from '../geometry';
-import { approach, cubicBezier, easeInOutSine, steer, steer2d } from './motion';
+import { DEFAULT_CONFIG, pick, type BehaviorConfig } from './config';
+import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d } from './motion';
 
 /** Top-level states of the behaviour state machine. */
-export type Mode = 'idle' | 'walk' | 'float' | 'sit' | 'sleep' | 'react';
+export type Mode = 'idle' | 'walk' | 'sit' | 'sleep' | 'react';
 
 /** What the raccoon is reacting to, while in the "react" mode. */
-export type Reaction =
-  | 'surprised'
-  | 'chase'
-  | 'pounce'
-  | 'confused'
-  | 'flee'
-  | 'hide'
-  | 'peek'
-  | 'dragged'
-  | 'falling';
+export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged';
 
 /** Little symbol drawn above the raccoon's head. */
 export type Emote = '' | '!' | '?' | 'z';
 
 /** Everything the brain knows about the outside world, refreshed every tick. */
 export interface WorldInput {
-  /** Where the raccoon may roam; the bottom edge is the floor. */
+  /** Where the raccoon may roam. He can walk anywhere inside it; peeking happens at its bottom edge. */
   bounds: Rect;
   /** Current sprite size in px. */
   size: { width: number; height: number };
@@ -51,68 +43,46 @@ export interface PetSnapshot {
   resting: boolean;
 }
 
-export interface Tuning {
-  walkSpeed: number;
-  runSpeed: number;
-  chaseSpeed: number;
-  floatSpeed: number;
-  accel: number;
-  runAccel: number;
-  chaseAccel: number;
-  gravity: number;
-  hopImpulse: number;
-  sleepAfterMs: number;
-  fleeRadius: number;
-  fleeChance: number;
-  pounceAfterStillMs: number;
-  chaseMaxMs: number;
-}
-
-export const DEFAULT_TUNING: Tuning = {
-  walkSpeed: 85,
-  runSpeed: 340,
-  chaseSpeed: 650,
-  floatSpeed: 170,
-  accel: 380,
-  runAccel: 1500,
-  chaseAccel: 2600,
-  gravity: 2400,
-  hopImpulse: 620,
-  sleepAfterMs: 3 * 60_000,
-  fleeRadius: 90,
-  fleeChance: 0.6,
-  pounceAfterStillMs: 450,
-  chaseMaxMs: 25_000,
-};
-
 type State =
   | { mode: 'idle'; until: number }
-  | { mode: 'walk'; targetX: number; maxSpeed: number }
-  | { mode: 'float'; path: [Point, Point, Point, Point]; elapsed: number; duration: number }
+  | { mode: 'walk'; from: Point; via: Point; to: Point; elapsed: number; duration: number }
   | { mode: 'sit'; activity: 'rest' | 'groom' | 'yawn'; until: number; then: 'idle' | 'sleep' }
   | { mode: 'sleep' }
   | { mode: 'react'; reaction: 'surprised'; until: number; next: 'chase' | 'idle' }
   | { mode: 'react'; reaction: 'chase'; until: number }
-  | { mode: 'react'; reaction: 'pounce' }
+  | { mode: 'react'; reaction: 'pounce'; target: Point; until: number }
   | { mode: 'react'; reaction: 'confused'; until: number }
-  | { mode: 'react'; reaction: 'flee'; targetX: number }
+  | { mode: 'react'; reaction: 'flee'; target: Point }
   | { mode: 'react'; reaction: 'hide'; edge: -1 | 1; phase: 'in' | 'wait' | 'out'; targetX: number; until: number; giveUpAt: number }
   | { mode: 'react'; reaction: 'peek'; phase: 'approach' | 'sink' | 'watch' | 'rise'; sink: number }
-  | { mode: 'react'; reaction: 'dragged' }
-  | { mode: 'react'; reaction: 'falling'; then: 'idle' | 'confused' };
+  | { mode: 'react'; reaction: 'dragged' };
 
 const SUBSTEP_S = 1 / 60;
 const MAX_FRAME_MS = 1000;
+/** How much of the sprite drops below the bottom edge while peeking. */
+export const PEEK_SINK = 0.45;
+/** Peak speed of an ease-in-out-sine move is this many times its average speed. */
+const EASE_PEAK = Math.PI / 2;
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+const length = (v: Point) => Math.hypot(v.x, v.y);
+
+/** Limits for the feet position that keep the whole sprite inside the bounds. */
+interface Area {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
 
 /**
- * The raccoon's behaviour: a state machine plus a little physics. Pure TypeScript:
+ * The raccoon's behaviour: a state machine plus a little motion. Pure TypeScript:
  * no DOM, no timers, no Electron. Time only moves when `update` is called, and all
  * randomness comes from the injected `random`, so tests are fully deterministic.
  *
- * Movement is always velocity-based with limited acceleration, so the raccoon eases
- * in and out and never teleports.
+ * He roams the whole screen; there is no floor and no gravity. Walks follow gently
+ * curved paths with eased speed, and everything else is velocity-based with limited
+ * acceleration, so he never teleports.
  */
 export class Brain {
   private state: State;
@@ -122,7 +92,6 @@ export class Brain {
   private now = 0;
   private calmMs = 0;
   private cursorWasNear = false;
-  private justLanded = false;
   private speedScale = 1;
   private dragTarget: Point | null = null;
   private input: WorldInput;
@@ -130,7 +99,7 @@ export class Brain {
   constructor(
     initial: WorldInput,
     private readonly random: () => number = Math.random,
-    private readonly tuning: Tuning = DEFAULT_TUNING,
+    private readonly config: BehaviorConfig = DEFAULT_CONFIG,
   ) {
     this.input = initial;
     const b = initial.bounds;
@@ -165,16 +134,15 @@ export class Brain {
 
   dragTo(feet: Point): void {
     if (this.reaction !== 'dragged') return;
-    this.dragTarget = this.clampToBounds(feet, false);
+    this.dragTarget = this.clampToArea(feet);
   }
 
+  /** Lets go: he settles exactly where he was dropped. */
   release(): void {
     if (this.reaction !== 'dragged') return;
-    const speed = Math.hypot(this.vel.x, this.vel.y);
-    const max = 1800;
-    if (speed > max) this.vel = { x: (this.vel.x / speed) * max, y: (this.vel.y / speed) * max };
     this.dragTarget = null;
-    this.state = { mode: 'react', reaction: 'falling', then: 'idle' };
+    this.vel = { x: 0, y: 0 };
+    this.idle(1000, 2500);
   }
 
   /** A click on the raccoon. */
@@ -185,12 +153,8 @@ export class Brain {
 
   // ---- Simulation --------------------------------------------------------------------
 
-  private get floor(): number {
+  private get bottom(): number {
     return this.input.bounds.y + this.input.bounds.height;
-  }
-
-  private get onGround(): boolean {
-    return this.pos.y >= this.floor - 0.5;
   }
 
   private get center(): Point {
@@ -201,9 +165,14 @@ export class Brain {
     return this.state.mode === 'react' ? this.state.reaction : null;
   }
 
-  private get xLimits(): [number, number] {
+  private get area(): Area {
     const { bounds, size } = this.input;
-    return [bounds.x + size.width / 2, bounds.x + bounds.width - size.width / 2];
+    return {
+      minX: bounds.x + size.width / 2,
+      maxX: bounds.x + bounds.width - size.width / 2,
+      minY: bounds.y + size.height,
+      maxY: this.bottom,
+    };
   }
 
   private step(dt: number): void {
@@ -232,9 +201,9 @@ export class Brain {
       return;
     }
 
-    const near = cursor !== null && dist(cursor, this.center) < this.tuning.fleeRadius;
+    const near = cursor !== null && dist(cursor, this.center) < this.config.reactions.fleeRadius;
     const skittish = s.mode === 'idle' || s.mode === 'walk' || s.mode === 'sit';
-    if (near && !this.cursorWasNear && skittish && this.random() < this.tuning.fleeChance) this.flee(cursor);
+    if (near && !this.cursorWasNear && skittish && this.random() < this.config.reactions.fleeChance) this.flee(cursor);
     this.cursorWasNear = near;
 
     if (s.mode === 'react') this.calmMs = 0;
@@ -243,32 +212,25 @@ export class Brain {
 
   private think(dt: number): void {
     const s = this.state;
-    const t = this.tuning;
+    const m = this.config.motion;
     const k = this.speedScale;
     const { cursor, size } = this.input;
 
     switch (s.mode) {
       case 'idle':
         this.brake(dt);
-        if (this.now >= s.until && this.onGround) this.decide();
+        if (this.now >= s.until) this.decide();
         return;
 
-      case 'walk':
-        this.vel.x = steer(this.pos.x, this.vel.x, s.targetX, s.maxSpeed * k, t.accel * k, dt, 60);
-        if (Math.abs(s.targetX - this.pos.x) < 3 && Math.abs(this.vel.x) < 8) this.idle(3000, 8000);
-        return;
-
-      case 'float': {
+      case 'walk': {
         s.elapsed += dt * 1000;
         const progress = Math.min(1, s.elapsed / s.duration);
-        const p = cubicBezier(...s.path, easeInOutSine(progress));
-        // Gentle bob that fades out at both ends, so it starts and lands smoothly.
-        p.y += Math.sin((s.elapsed / 1000) * Math.PI * 1.6) * 6 * Math.sin(Math.PI * progress);
-        this.vel = { x: (p.x - this.pos.x) / dt, y: (p.y - this.pos.y) / dt };
-        this.pos = p;
+        const next = quadraticBezier(s.from, s.via, s.to, easeInOutSine(progress));
+        this.vel = { x: (next.x - this.pos.x) / dt, y: (next.y - this.pos.y) / dt };
+        this.pos = next;
         if (progress >= 1) {
           this.vel = { x: 0, y: 0 };
-          this.idle(3000, 7000);
+          this.pause();
         }
         return;
       }
@@ -277,7 +239,7 @@ export class Brain {
         this.brake(dt);
         if (this.now >= s.until) {
           if (s.then === 'sleep') this.state = { mode: 'sleep' };
-          else this.idle(2000, 5000);
+          else this.pause();
         }
         return;
 
@@ -293,23 +255,25 @@ export class Brain {
       case 'surprised':
         this.brake(dt);
         if (this.now < s.until) return;
-        if (s.next === 'chase') this.state = { mode: 'react', reaction: 'chase', until: this.now + t.chaseMaxMs };
-        else if (this.onGround) this.idle(1000, 2500);
+        if (s.next === 'chase') this.state = { mode: 'react', reaction: 'chase', until: this.now + this.config.reactions.chaseMaxMs };
+        else this.idle(1000, 2500);
         return;
 
       case 'chase': {
         if (!cursor || this.now >= s.until) {
-          this.state = { mode: 'react', reaction: 'falling', then: 'confused' };
+          this.confused();
           return;
         }
-        const target = { x: cursor.x, y: cursor.y + size.height * 0.45 };
-        this.vel = steer2d(this.pos, this.vel, target, t.chaseSpeed * k, t.chaseAccel * k, dt, 80);
-        if (this.input.cursorStillMs >= t.pounceAfterStillMs) this.pounce(cursor);
+        this.vel = steer2d(this.pos, this.vel, this.pounceTarget(cursor), m.chaseSpeed * k, m.chaseAccel * k, dt, 80);
+        if (this.input.cursorStillMs >= this.config.reactions.pounceAfterStillMs) {
+          this.state = { mode: 'react', reaction: 'pounce', target: this.pounceTarget(cursor), until: this.now + 900 };
+        }
         return;
       }
 
       case 'pounce':
-        if (this.justLanded) this.confused();
+        this.vel = steer2d(this.pos, this.vel, s.target, m.pounceSpeed * k, m.chaseAccel * 1.6 * k, dt, 40);
+        if ((dist(this.pos, s.target) < 4 && length(this.vel) < 30) || this.now >= s.until) this.confused();
         return;
 
       case 'confused':
@@ -318,8 +282,8 @@ export class Brain {
         return;
 
       case 'flee':
-        this.vel.x = steer(this.pos.x, this.vel.x, s.targetX, t.runSpeed * k, t.runAccel * k, dt, 50);
-        if (Math.abs(s.targetX - this.pos.x) < 4 && Math.abs(this.vel.x) < 10) {
+        this.vel = steer2d(this.pos, this.vel, s.target, m.runSpeed * k, m.runAccel * k, dt, 50);
+        if (dist(s.target, this.pos) < 4 && length(this.vel) < 10) {
           this.idle(1500, 3000);
           if (cursor) this.facing = cursor.x < this.pos.x ? -1 : 1;
         }
@@ -327,10 +291,11 @@ export class Brain {
 
       case 'hide': {
         if (s.phase === 'in' || s.phase === 'out') {
-          const speed = s.phase === 'in' ? t.runSpeed : t.walkSpeed;
-          const accel = s.phase === 'in' ? t.runAccel : t.accel;
-          this.vel.x = steer(this.pos.x, this.vel.x, s.targetX, speed * k, accel * k, dt, 50);
-          if (Math.abs(s.targetX - this.pos.x) < 4 && Math.abs(this.vel.x) < 10) {
+          const speed = s.phase === 'in' ? m.runSpeed : m.walkSpeed;
+          const accel = s.phase === 'in' ? m.runAccel : m.accel;
+          const target = { x: s.targetX, y: this.pos.y };
+          this.vel = steer2d(this.pos, this.vel, target, speed * k, accel * k, dt, 50);
+          if (Math.abs(s.targetX - this.pos.x) < 4 && length(this.vel) < 10) {
             if (s.phase === 'out') {
               this.idle(1000, 2500);
             } else {
@@ -344,7 +309,7 @@ export class Brain {
         this.brake(dt);
         const cursorClose = cursor !== null && dist(cursor, this.center) < 220;
         if ((this.now >= s.until && !cursorClose) || this.now >= s.giveUpAt) {
-          const [minX, maxX] = this.xLimits;
+          const { minX, maxX } = this.area;
           const step = size.width * 0.3 + this.random() * 150;
           s.phase = 'out';
           s.targetX = clamp(s.edge < 0 ? minX + step : maxX - step, minX, maxX);
@@ -353,10 +318,12 @@ export class Brain {
       }
 
       case 'peek': {
-        const depth = size.height * 0.5;
+        const depth = size.height * PEEK_SINK;
         if (s.phase === 'approach') {
-          this.brake(dt);
-          if (this.onGround && Math.abs(this.vel.x) < 5) s.phase = 'sink';
+          // Head for the bottom edge, straight down from wherever he is.
+          const target = { x: clamp(this.pos.x, this.area.minX, this.area.maxX), y: this.bottom };
+          this.vel = steer2d(this.pos, this.vel, target, m.walkSpeed * 2 * k, m.accel * 2 * k, dt, 60);
+          if (dist(this.pos, target) < 3 && length(this.vel) < 8) s.phase = 'sink';
           return;
         }
         if (!this.input.typingActive && s.phase !== 'rise') s.phase = 'rise';
@@ -369,7 +336,7 @@ export class Brain {
           s.sink = approach(s.sink, 0, 140 * dt);
           if (s.sink <= 0) this.idle(800, 2000);
         }
-        this.pos.y = this.floor + s.sink;
+        this.pos = { x: this.pos.x, y: this.bottom + s.sink };
         this.vel = { x: 0, y: 0 };
         return;
       }
@@ -381,68 +348,34 @@ export class Brain {
         this.pos = { ...this.dragTarget };
         return;
       }
-
-      case 'falling':
-        if (this.justLanded || (this.onGround && this.vel.y === 0)) {
-          if (s.then === 'confused') this.confused();
-          else this.idle(1000, 2500);
-        }
-        return;
     }
   }
 
   private integrate(dt: number): void {
     const s = this.state;
-    this.justLanded = false;
+    // Walks, drags and peeks place him directly; everything else moves by velocity.
+    if (s.mode === 'walk') return;
+    if (s.mode === 'react' && (s.reaction === 'dragged' || (s.reaction === 'peek' && s.phase !== 'approach'))) return;
 
-    const flying = s.mode === 'float' || (s.mode === 'react' && (s.reaction === 'chase' || s.reaction === 'dragged'));
-    const peeking = s.mode === 'react' && s.reaction === 'peek' && s.phase !== 'approach';
-
-    if (peeking) return;
-    if (flying) {
-      if (s.mode === 'react' && s.reaction === 'chase') {
-        this.pos.x += this.vel.x * dt;
-        this.pos.y += this.vel.y * dt;
-      }
-      this.pos = this.clampToBounds(this.pos, false);
-      return;
-    }
-
-    const wasAirborne = this.pos.y < this.floor - 0.5;
-    this.vel.y += this.tuning.gravity * dt;
-    this.pos.x += this.vel.x * dt;
-    this.pos.y += this.vel.y * dt;
-    if (this.pos.y >= this.floor) {
-      this.pos.y = this.floor;
-      if (this.vel.y > 0) this.vel.y = 0;
-      if (wasAirborne) {
-        this.justLanded = true;
-        this.vel.x *= 0.4;
-      }
-    }
-
+    this.pos = { x: this.pos.x + this.vel.x * dt, y: this.pos.y + this.vel.y * dt };
     const hiding = s.mode === 'react' && s.reaction === 'hide';
-    const clamped = this.clampToBounds(this.pos, hiding);
+    const clamped = this.clampToArea(this.pos, hiding);
     if (clamped.x !== this.pos.x) this.vel.x = 0;
-    if (clamped.y !== this.pos.y && this.vel.y < 0) this.vel.y = 0;
+    if (clamped.y !== this.pos.y) this.vel.y = 0;
     this.pos = clamped;
   }
 
   /** Keeps the whole sprite inside the bounds, or allows half of it past the sides while hiding. */
-  private clampToBounds(p: Point, allowSides: boolean): Point {
-    const { bounds, size } = this.input;
-    const [minX, maxX] = this.xLimits;
-    const slack = allowSides ? size.width * 0.5 : 0;
-    return {
-      x: clamp(p.x, minX - slack, maxX + slack),
-      y: clamp(p.y, bounds.y + size.height, this.floor),
-    };
+  private clampToArea(p: Point, allowSides = false): Point {
+    const { minX, maxX, minY, maxY } = this.area;
+    const slack = allowSides ? this.input.size.width * 0.5 : 0;
+    return { x: clamp(p.x, minX - slack, maxX + slack), y: clamp(p.y, minY, maxY) };
   }
 
   private updateFacing(): void {
     const s = this.state;
     const { cursor, bounds } = this.input;
-    if (s.mode === 'react' && s.reaction === 'chase' && cursor) {
+    if (s.mode === 'react' && (s.reaction === 'chase' || s.reaction === 'pounce') && cursor) {
       if (Math.abs(cursor.x - this.pos.x) > 4) this.facing = cursor.x < this.pos.x ? -1 : 1;
       return;
     }
@@ -450,13 +383,17 @@ export class Brain {
       this.facing = this.pos.x < bounds.x + bounds.width / 2 ? 1 : -1;
       return;
     }
-    if (s.mode === 'react' && s.reaction === 'peek') return;
+    if (s.mode === 'react' && s.reaction === 'peek' && s.phase !== 'approach') return;
     if (Math.abs(this.vel.x) > 12) this.facing = this.vel.x < 0 ? -1 : 1;
   }
 
   private brake(dt: number): void {
-    const accel = this.onGround ? this.tuning.runAccel : this.tuning.accel * 0.3;
-    this.vel.x = approach(this.vel.x, 0, accel * dt);
+    this.vel = brake2d(this.vel, this.config.motion.runAccel * dt);
+  }
+
+  /** Where his feet go so that the cursor ends up in the middle of him. */
+  private pounceTarget(cursor: Point): Point {
+    return this.clampToArea({ x: cursor.x, y: cursor.y + this.input.size.height * 0.45 });
   }
 
   // ---- Transitions -----------------------------------------------------------------
@@ -465,71 +402,70 @@ export class Brain {
     this.state = { mode: 'idle', until: this.now + minMs + this.random() * (maxMs - minMs) };
   }
 
+  /** A pause between activities, per the wander config. */
+  private pause(): void {
+    const { min, max } = this.config.wander.pauseMs;
+    this.idle(min, max);
+  }
+
   private decide(): void {
-    if (this.calmMs >= this.tuning.sleepAfterMs) {
+    const w = this.config.wander;
+    if (this.calmMs >= w.sleepAfterMs) {
       this.state = { mode: 'sit', activity: 'yawn', until: this.now + 2200, then: 'sleep' };
       return;
     }
     const r = this.random();
-    if (r < 0.38) this.startWalk();
-    else if (r < 0.5) this.startFloat();
-    else if (r < 0.8) {
-      const pick = this.random();
-      const activity = pick < 0.45 ? 'groom' : pick < 0.6 ? 'yawn' : 'rest';
-      const duration = activity === 'yawn' ? 2200 : 3000 + this.random() * 4000;
+    if (r < w.sitChance) {
+      const roll = this.random();
+      const activity = roll < 0.45 ? 'groom' : roll < 0.6 ? 'yawn' : 'rest';
+      const duration = activity === 'yawn' ? 2200 : pick(w.sitMs, this.random);
       this.state = { mode: 'sit', activity, until: this.now + duration, then: 'idle' };
+    } else if (r < w.sitChance + w.lookAroundChance) {
+      this.facing = this.facing === 1 ? -1 : 1;
+      this.pause();
     } else {
-      if (this.random() < 0.5) this.facing = this.facing === 1 ? -1 : 1;
-      this.idle(4000, 9000);
+      this.startWalk();
     }
   }
 
+  /**
+   * Picks a random point some distance away, anywhere on screen, and sets off along
+   * a gently curved path to it. The path's control point is kept inside the roaming
+   * area, so the whole curve stays on screen.
+   */
   private startWalk(): void {
-    const [minX, maxX] = this.xLimits;
-    const distance = 120 + this.random() * 380;
-    let dir = this.random() < 0.5 ? -1 : 1;
-    if (this.pos.x + dir * distance < minX || this.pos.x + dir * distance > maxX) dir = -dir;
-    const targetX = clamp(this.pos.x + dir * distance, minX, maxX);
-    const maxSpeed = this.tuning.walkSpeed * (0.85 + this.random() * 0.3);
-    this.state = { mode: 'walk', targetX, maxSpeed };
-  }
-
-  private startFloat(): void {
-    const { bounds, size } = this.input;
-    const [minX, maxX] = this.xLimits;
-    const targetX = minX + this.random() * Math.max(0, maxX - minX);
-    const maxRise = Math.max(0, bounds.height - size.height - 10);
-    const rise = Math.min(maxRise, 140 + this.random() * 260);
-    if (rise < 40) {
-      this.startWalk();
+    const w = this.config.wander;
+    const area = this.area;
+    let to = this.pos;
+    let distance = 0;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const angle = this.random() * Math.PI * 2;
+      distance = pick(w.walkDistance, this.random);
+      to = { x: this.pos.x + Math.cos(angle) * distance, y: this.pos.y + Math.sin(angle) * distance };
+      if (to.x >= area.minX && to.x <= area.maxX && to.y >= area.minY && to.y <= area.maxY) break;
+    }
+    to = this.clampToArea(to);
+    distance = dist(this.pos, to);
+    if (distance < w.walkDistance.min / 2) {
+      // Not enough room to go anywhere worthwhile (tiny screen).
+      this.pause();
       return;
     }
-    const from = { ...this.pos };
-    const to = { x: targetX, y: this.floor };
-    const dx = to.x - from.x;
-    const path: [Point, Point, Point, Point] = [
-      from,
-      { x: from.x + dx * 0.25, y: this.floor - rise },
-      { x: from.x + dx * 0.75, y: this.floor - rise },
-      to,
-    ];
-    const duration = Math.max(2500, ((Math.abs(dx) + rise * 1.6) / (this.tuning.floatSpeed * this.speedScale)) * 1000);
-    this.state = { mode: 'float', path, elapsed: 0, duration };
+
+    const bow = (this.random() * 2 - 1) * w.curve * distance;
+    const normal = { x: -(to.y - this.pos.y) / distance, y: (to.x - this.pos.x) / distance };
+    const via = this.clampToArea({
+      x: (this.pos.x + to.x) / 2 + normal.x * bow,
+      y: (this.pos.y + to.y) / 2 + normal.y * bow,
+    });
+    const topSpeed = this.config.motion.walkSpeed * (1 + (this.random() * 2 - 1) * w.speedJitter) * this.speedScale;
+    const duration = (distance / (topSpeed / EASE_PEAK)) * 1000;
+    this.state = { mode: 'walk', from: { ...this.pos }, via, to, elapsed: 0, duration };
   }
 
   private surprise(next: 'chase' | 'idle'): void {
-    if (this.onGround) this.vel.y = -this.tuning.hopImpulse;
     this.calmMs = 0;
     this.state = { mode: 'react', reaction: 'surprised', until: this.now + 450, next };
-  }
-
-  private pounce(cursor: Point): void {
-    const target = { x: cursor.x, y: cursor.y + this.input.size.height / 2 };
-    const dx = target.x - this.pos.x;
-    const dy = target.y - this.pos.y;
-    const time = clamp(Math.hypot(dx, dy) / 900, 0.3, 0.6);
-    this.vel = { x: dx / time, y: dy / time - 0.5 * this.tuning.gravity * time };
-    this.state = { mode: 'react', reaction: 'pounce' };
   }
 
   private confused(): void {
@@ -537,12 +473,15 @@ export class Brain {
   }
 
   private flee(cursor: Point): void {
-    const [minX, maxX] = this.xLimits;
-    const dir = this.center.x >= cursor.x ? 1 : -1;
-    const targetX = this.pos.x + dir * (220 + this.random() * 260);
-    const margin = this.input.size.width * 0.5;
-    if (targetX < minX + margin || targetX > maxX - margin) {
-      const edge = dir < 0 ? -1 : 1;
+    const center = this.center;
+    const away = { x: center.x - cursor.x, y: center.y - cursor.y };
+    const awayLength = length(away) || 1;
+    const run = 220 + this.random() * 260;
+    const target = this.clampToArea({ x: this.pos.x + (away.x / awayLength) * run, y: this.pos.y + (away.y / awayLength) * run });
+    if (dist(target, this.pos) < run * 0.5) {
+      // Cornered: duck behind the side edge he was running towards.
+      const { minX, maxX } = this.area;
+      const edge = away.x < 0 ? -1 : 1;
       const offscreen = this.input.size.width * 0.3;
       this.state = {
         mode: 'react',
@@ -555,28 +494,24 @@ export class Brain {
       };
       return;
     }
-    this.state = { mode: 'react', reaction: 'flee', targetX };
+    this.state = { mode: 'react', reaction: 'flee', target };
   }
 
   // ---- Output ------------------------------------------------------------------------
 
   private snapshot(): PetSnapshot {
     const s = this.state;
-    const airborne = !this.onGround && Math.abs(this.vel.y) > 40;
-    const moving = Math.abs(this.vel.x) > 1 || Math.abs(this.vel.y) > 1;
+    const speed = length(this.vel);
     let animation: AnimationName;
     let emote: Emote = '';
     let phase: string | null = null;
 
     switch (s.mode) {
       case 'idle':
-        animation = Math.abs(this.vel.x) > 25 ? 'walk' : 'idle';
+        animation = speed > 25 ? 'walk' : 'idle';
         break;
       case 'walk':
-        animation = Math.abs(this.vel.x) > this.tuning.walkSpeed * 1.5 ? 'run' : 'walk';
-        break;
-      case 'float':
-        animation = 'float';
+        animation = speed > this.config.motion.walkSpeed * 1.5 ? 'run' : speed < 8 ? 'idle' : 'walk';
         break;
       case 'sit':
         animation = s.activity === 'rest' ? 'sit' : s.activity;
@@ -610,18 +545,14 @@ export class Brain {
             break;
           case 'peek':
             phase = s.phase;
-            animation = s.phase === 'approach' ? (Math.abs(this.vel.x) > 25 ? 'walk' : 'idle') : 'peek';
+            animation = s.phase !== 'approach' ? 'peek' : speed > this.config.motion.walkSpeed * 1.5 ? 'run' : speed > 25 ? 'walk' : 'idle';
             break;
           case 'dragged':
-          case 'falling':
             animation = 'dangle';
             break;
         }
         break;
     }
-
-    const groundBased = s.mode === 'idle' || s.mode === 'walk' || s.mode === 'sit' || s.mode === 'sleep';
-    if (groundBased && airborne) animation = 'jump';
 
     const settled =
       s.mode === 'idle' ||
@@ -639,7 +570,7 @@ export class Brain {
       phase,
       animation,
       emote,
-      resting: settled && !moving && (this.onGround || (s.mode === 'react' && s.reaction === 'peek')),
+      resting: settled && speed <= 1,
     };
   }
 }
