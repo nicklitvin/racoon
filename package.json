@@ -1,0 +1,34 @@
+{
+  "name": "racoon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A raccoon desktop pet that wanders your screen and reacts to your activity.",
+  "author": "Nick Litvinov",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite",
+    "build:web": "vite build",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build": "npm run build:web && npm run build:electron",
+    "start": "npm run build && electron .",
+    "preview:web": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.7.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
+  }
+}

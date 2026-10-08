@@ -1,0 +1,65 @@
+:root {
+  --fur: #3d3d48;
+  --halo: rgba(255, 255, 255, 0.9);
+  --web-bg-top: #dfe9f3;
+  --web-bg-bottom: #b9c9a7;
+  --web-hint: #4a5a46;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Desktop overlay: fully transparent so only the raccoon is visible. */
+body {
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Browser build: give the raccoon a little world to live in. */
+html[data-host='web'] body {
+  background: linear-gradient(var(--web-bg-top), var(--web-bg-bottom));
+}
+
+.pet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+}
+
+.pet.dragging {
+  cursor: grabbing;
+}
+
+.sprite {
+  margin: 0;
+  font-family: 'Cascadia Mono', Consolas, Menlo, 'DejaVu Sans Mono', monospace;
+  font-size: 16px;
+  line-height: 1.05;
+  font-weight: 700;
+  color: var(--fur);
+  /* A light halo keeps the art readable on dark and busy backgrounds. */
+  text-shadow:
+    0 0 2px var(--halo),
+    0 0 4px var(--halo);
+  white-space: pre;
+}
+
+.web-hint {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  margin: 0;
+  font: 14px system-ui, sans-serif;
+  color: var(--web-hint);
+}
