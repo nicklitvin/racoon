@@ -62,7 +62,10 @@ function webHost(): Host {
         on('pointermove', (e) => listener({ x: e.clientX, y: e.clientY } satisfies Point)),
         on('pointerdown', (e) => listener({ x: e.clientX, y: e.clientY })),
       ];
-      const leave = () => listener(null);
+      // A lifted finger also "leaves" the page; keep its last spot so he pounces where it stopped.
+      const leave = (e: PointerEvent) => {
+        if (e.pointerType !== 'touch') listener(null);
+      };
       document.documentElement.addEventListener('pointerleave', leave);
       return () => {
         offs.forEach((off) => off());

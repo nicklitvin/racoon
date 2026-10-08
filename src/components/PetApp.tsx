@@ -74,7 +74,7 @@ export function PetApp({ host }: PetAppProps) {
       {web && (
         <div className="web-chrome">
           <p className="web-hint">
-            Meet the raccoon. Drag it, click it, or shake your mouse to start a chase.
+            Meet the raccoon. Drag it, tap it, or swipe your finger (or shake your mouse) fast to start a chase.
           </p>
           <button type="button" className="gear" onClick={() => setPanelOpen((o) => !o)} aria-label="Settings">
             ⚙

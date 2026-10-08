@@ -1,5 +1,5 @@
 import type { DisplayInfo, Point, Rect } from '../../shared/ipc';
-import type { Settings } from '../../shared/settings';
+import type { RaccoonType, Settings } from '../../shared/settings';
 import { CursorActivityTracker } from '../core/activity/cursor';
 import { TypingActivityTracker } from '../core/activity/typing';
 import { Animator } from '../core/animator';
@@ -7,7 +7,7 @@ import { Brain, type PetSnapshot, type WorldInput } from '../core/behavior/brain
 import { DEFAULT_CONFIG } from '../core/behavior/config';
 import { ClickThroughController } from '../core/clickThrough';
 import type { Host } from '../host';
-import { ANIMATIONS, createSvgRaccoon, type RaccoonRenderer } from '../sprites';
+import { ANIMATIONS, RACCOON_STYLES, type RaccoonRenderer } from '../sprites';
 
 export interface PetElements {
   /** Clip box covering the work area: hides whatever is past the edges or below the floor. */
@@ -23,6 +23,13 @@ export interface PetElements {
 const MAX_REST_MS = 250;
 /** Pointer travel that turns a press into a drag rather than a click. */
 const DRAG_THRESHOLD_PX = 4;
+/**
+ * Screen size (longer side, px) that activity thresholds are tuned for. Smaller screens,
+ * like phones, get proportionally more sensitive so a finger swipe counts as "fast".
+ */
+const REFERENCE_SCREEN_PX = 1600;
+/** Raccoon scale on screens much narrower than a desktop. */
+const SMALL_SCREEN_SCALE = 0.8;
 
 interface DragState {
   pointerId: number;
@@ -39,7 +46,8 @@ interface DragState {
 export class PetRuntime {
   private readonly brain: Brain;
   private readonly animator = new Animator(ANIMATIONS);
-  private readonly renderer: RaccoonRenderer = createSvgRaccoon();
+  private renderer!: RaccoonRenderer;
+  private rendererType: RaccoonType | null = null;
   private readonly cursorTracker = new CursorActivityTracker();
   private readonly typingTracker = new TypingActivityTracker();
   private readonly clickThrough: ClickThroughController;
@@ -67,11 +75,9 @@ export class PetRuntime {
     private settings: Settings,
   ) {
     this.clickThrough = new ClickThroughController((on) => host.setInteractive(on));
-    els.sprite.replaceChildren(this.renderer.element);
-    this.applyLayout();
     this.applySettings();
+    this.applyLayout();
     this.brain = new Brain(this.worldInput(performance.now()));
-    this.brain.setSpeed(settings.speed);
   }
 
   start(): void {
@@ -128,7 +134,6 @@ export class PetRuntime {
   setSettings(settings: Settings): void {
     this.settings = settings;
     this.applySettings();
-    this.brain.setSpeed(settings.speed);
     this.syncKeyboardSubscription();
     this.wake();
   }
@@ -307,14 +312,28 @@ export class PetRuntime {
     stage.style.top = `${wa.y}px`;
     stage.style.width = `${wa.width}px`;
     stage.style.height = `${wa.height}px`;
+
+    const longest = Math.max(wa.width, wa.height);
+    this.cursorTracker.setSensitivity(Math.min(3, Math.max(1, REFERENCE_SCREEN_PX / longest)));
+    this.applyScale();
   }
 
-  private applySettings(): void {
+  private applyScale(): void {
+    const scale = this.display.workArea.width < 600 ? SMALL_SCREEN_SCALE : 1;
     const { baseSize } = this.renderer;
-    this.renderer.setScale(this.settings.size);
-    this.size = { width: baseSize.width * this.settings.size, height: baseSize.height * this.settings.size };
-    this.cursorTracker.setSensitivity(this.settings.sensitivity);
-    this.typingTracker.setSensitivity(this.settings.sensitivity);
+    this.renderer.setScale(scale);
+    this.size = { width: baseSize.width * scale, height: baseSize.height * scale };
+  }
+
+  /** Swaps in the drawing for the chosen raccoon type. Behaviour carries on untouched. */
+  private applySettings(): void {
+    const type = this.settings.raccoonType;
+    if (type === this.rendererType) return;
+    this.renderer = RACCOON_STYLES[type].create();
+    this.rendererType = type;
+    this.els.sprite.replaceChildren(this.renderer.element);
+    this.lastDrawn = '';
+    this.applyScale();
   }
 
   /** The visible part of the raccoon: the drawn figure clipped to the stage. */

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { SETTING_RANGES, type KeyboardStatus, type Settings } from '../../shared/settings';
+import { RACCOON_TYPES, type KeyboardStatus, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
+import { RACCOON_STYLES } from '../sprites';
 
 interface SettingsPanelProps {
   host: Host;
@@ -27,34 +28,26 @@ function useHostState(host: Host) {
   return { settings, keyboard };
 }
 
-interface SliderProps {
-  id: keyof typeof SETTING_RANGES;
-  label: string;
-  hint: string;
-  value: number;
-  onChange: (value: number) => void;
-  format?: (value: number) => string;
+interface TypePickerProps {
+  value: RaccoonType;
+  onChange: (value: RaccoonType) => void;
 }
 
-function Slider({ id, label, hint, value, onChange, format = (v) => `${v.toFixed(1)}×` }: SliderProps) {
-  const range = SETTING_RANGES[id];
+function TypePicker({ value, onChange }: TypePickerProps) {
   return (
-    <div className="field">
-      <div className="field-row">
-        <label htmlFor={id}>{label}</label>
-        <output htmlFor={id}>{format(value)}</output>
-      </div>
-      <input
-        id={id}
-        type="range"
-        min={range.min}
-        max={range.max}
-        step={range.step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-      <p className="hint">{hint}</p>
-    </div>
+    <fieldset className="field type-picker">
+      <legend>Raccoon type</legend>
+      {RACCOON_TYPES.map((type) => {
+        const style = RACCOON_STYLES[type];
+        return (
+          <label key={type} className={type === value ? 'type-option selected' : 'type-option'}>
+            <input type="radio" name="raccoonType" checked={type === value} onChange={() => onChange(type)} />
+            <span className="type-name">{style.label}</span>
+            <span className="type-description">{style.description}</span>
+          </label>
+        );
+      })}
+    </fieldset>
   );
 }
 
@@ -77,90 +70,68 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
         )}
       </header>
 
-      <Slider
-        id="sensitivity"
-        label="Activity sensitivity"
-        hint="How easily fast mouse movement and typing set the raccoon off."
-        value={settings.sensitivity}
-        onChange={(sensitivity) => update({ sensitivity })}
-      />
-      <Slider
-        id="size"
-        label="Size"
-        hint="How big the raccoon is drawn."
-        value={settings.size}
-        onChange={(size) => update({ size })}
-      />
-      <Slider
-        id="speed"
-        label="Speed"
-        hint="How fast it walks, runs and floats."
-        value={settings.speed}
-        onChange={(speed) => update({ speed })}
-      />
+      <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
 
-      <div className="field">
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={settings.keyboardReactions}
-            onChange={(e) => update({ keyboardReactions: e.target.checked })}
-          />
-          <span>React to typing</span>
-        </label>
-        <div className="privacy">
-          <p>
-            <strong>What this measures:</strong> only <em>that</em> a key was pressed, and when. Racoon counts key presses
-            over the last few seconds to work out your typing rate. When you type steadily, the raccoon peeks up from the
-            bottom of the screen and watches.
-          </p>
-          <p>
-            <strong>What it never does:</strong> it never reads which keys or characters you press, and never records,
-            stores, logs or sends them anywhere. Timestamps older than a few seconds are thrown away. Nothing leaves
-            your computer.
-          </p>
-          <p>
-            {desktop
-              ? 'Counting works system-wide while this is on, and stops completely when you switch it off.'
-              : 'In the browser this only counts key presses while this tab is focused.'}
-          </p>
-        </div>
-        {blocked && (
-          <div className="notice" role="status">
-            <p>{keyboard.message}</p>
-            {keyboard.access === 'denied' && (
-              <div className="notice-actions">
-                <button type="button" onClick={() => host.openKeyboardPrivacySettings()}>
-                  Open System Settings
-                </button>
-                <button type="button" onClick={() => void host.recheckKeyboardAccess()}>
-                  Check again
-                </button>
+      {/* Everything else is desktop-only: the web gear just picks the raccoon. */}
+      {desktop && (
+        <>
+          <div className="field">
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={settings.keyboardReactions}
+                onChange={(e) => update({ keyboardReactions: e.target.checked })}
+              />
+              <span>React to typing</span>
+            </label>
+            <div className="privacy">
+              <p>
+                <strong>What this measures:</strong> only <em>that</em> a key was pressed, and when. Racoon counts key presses
+                over the last few seconds to work out your typing rate. When you type steadily, the raccoon peeks up from the
+                bottom of the screen and watches.
+              </p>
+              <p>
+                <strong>What it never does:</strong> it never reads which keys or characters you press, and never records,
+                stores, logs or sends them anywhere. Timestamps older than a few seconds are thrown away. Nothing leaves
+                your computer.
+              </p>
+              <p>Counting works system-wide while this is on, and stops completely when you switch it off.</p>
+            </div>
+            {blocked && (
+              <div className="notice" role="status">
+                <p>{keyboard.message}</p>
+                {keyboard.access === 'denied' && (
+                  <div className="notice-actions">
+                    <button type="button" onClick={() => host.openKeyboardPrivacySettings()}>
+                      Open System Settings
+                    </button>
+                    <button type="button" onClick={() => void host.recheckKeyboardAccess()}>
+                      Check again
+                    </button>
+                  </div>
+                )}
               </div>
             )}
+            {settings.keyboardReactions && keyboard?.listening && <p className="hint ok">Counting key presses.</p>}
           </div>
-        )}
-        {settings.keyboardReactions && keyboard?.listening && <p className="hint ok">Counting key presses.</p>}
-      </div>
-
-      {desktop && (
-        <div className="field">
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={settings.launchAtLogin}
-              onChange={(e) => update({ launchAtLogin: e.target.checked })}
-            />
-            <span>Start when I log in</span>
-          </label>
-          <p className="hint">Applies to the installed app, not to development builds.</p>
-        </div>
+          <div className="field">
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={settings.launchAtLogin}
+                onChange={(e) => update({ launchAtLogin: e.target.checked })}
+              />
+              <span>Start when I log in</span>
+            </label>
+            <p className="hint">Applies to the installed app, not to development builds.</p>
+          </div>
+        </>
       )}
 
       <p className="hint footer">
         {desktop
           ? 'Tip: drag the raccoon to move it, click to startle it, double-click for these settings.'
-          : 'Tip: drag the raccoon, click it, or wave your mouse around wildly.'}
+          : 'Tip: drag the raccoon, tap it, or swipe your finger (or mouse) around fast.'}
       </p>
     </section>
   );

@@ -1,14 +1,7 @@
 import { poseFor } from './pose';
 import { legRoot, legRotation, RIG, type LegName } from './rig';
+import { n, PX_PER_UNIT, svgWriter } from './svg';
 import type { RaccoonFrame, RaccoonRenderer } from './types';
-
-const SVG_NS = 'http://www.w3.org/2000/svg';
-/** Screen px per drawing unit at size 1. */
-const PX_PER_UNIT = 1.125;
-
-type Attrs = Record<string, string | number>;
-
-const n = (value: number) => (Math.round(value * 100) / 100).toString();
 
 /** Ring segments of the tail, root to tip, in tail coordinates (the tail points left and up). */
 const TAIL_RINGS: [x: number, y: number, r: number, cls: string][] = [
@@ -27,30 +20,16 @@ const EYES = [
 ];
 
 /**
- * The raccoon drawn as inline SVG. The shapes are built once; each draw only updates
+ * The "classic" raccoon drawn as inline SVG. The shapes are built once; each draw only updates
  * transforms and a few attributes from the current pose, and skips anything unchanged.
  * Colours come from CSS classes (see styles.css), so themes can restyle him.
  */
 export function createSvgRaccoon(doc: Document = document): RaccoonRenderer {
-  const make = (tag: string, attrs: Attrs, parent?: Element): SVGElement => {
-    const el = doc.createElementNS(SVG_NS, tag) as SVGElement;
-    for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, String(value));
-    parent?.appendChild(el);
-    return el;
-  };
-
-  const written = new Map<Element, Map<string, string>>();
-  const set = (el: Element, name: string, value: string) => {
-    let attrs = written.get(el);
-    if (!attrs) written.set(el, (attrs = new Map()));
-    if (attrs.get(name) === value) return;
-    attrs.set(name, value);
-    el.setAttribute(name, value);
-  };
+  const { make, set } = svgWriter(doc);
 
   const { view } = RIG;
   const svg = make('svg', {
-    class: 'raccoon',
+    class: 'raccoon raccoon-classic',
     viewBox: `${view.x} ${view.y} ${view.width} ${view.height}`,
     role: 'img',
     'aria-label': 'raccoon',
