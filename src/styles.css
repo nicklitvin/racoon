@@ -1,9 +1,62 @@
 :root {
-  --fur: #3d3d48;
-  --halo: rgba(255, 255, 255, 0.9);
+  --fur: #34343e;
+  --halo: rgba(255, 255, 255, 0.92);
+  --emote: #b4492b;
+
+  --bg: #f6f4ef;
+  --surface: #ffffff;
+  --text: #24232a;
+  --muted: #615f6b;
+  --border: #dcd8ce;
+  --accent: #5b6b3a;
+  --accent-text: #ffffff;
+  --notice-bg: #fff4e0;
+  --notice-border: #e8c27a;
+  --ok: #3f7a3a;
+
   --web-bg-top: #dfe9f3;
   --web-bg-bottom: #b9c9a7;
-  --web-hint: #4a5a46;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #1c1c21;
+    --surface: #26262d;
+    --text: #ecebf0;
+    --muted: #a9a7b3;
+    --border: #3a3a44;
+    --accent: #a3b86c;
+    --accent-text: #1c1c21;
+    --notice-bg: #3a2f1c;
+    --notice-border: #8a6a2c;
+    --ok: #8fc486;
+    --web-bg-top: #1f2733;
+    --web-bg-bottom: #2c3a24;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #1c1c21;
+  --surface: #26262d;
+  --text: #ecebf0;
+  --muted: #a9a7b3;
+  --border: #3a3a44;
+  --accent: #a3b86c;
+  --accent-text: #1c1c21;
+  --notice-bg: #3a2f1c;
+  --notice-border: #8a6a2c;
+  --ok: #8fc486;
+  --web-bg-top: #1f2733;
+  --web-bg-bottom: #2c3a24;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html,
@@ -12,31 +65,63 @@ body,
   margin: 0;
   width: 100%;
   height: 100%;
-  overflow: hidden;
 }
 
-/* Desktop overlay: fully transparent so only the raccoon is visible. */
 body {
+  font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--text);
+}
+
+/* ---- Pet overlay -------------------------------------------------------------------- */
+
+/* Desktop overlay: fully transparent so only the raccoon is visible. */
+html[data-view='pet'],
+html[data-view='pet'] body {
+  overflow: hidden;
   background: transparent;
   user-select: none;
   -webkit-user-select: none;
 }
 
 /* Browser build: give the raccoon a little world to live in. */
-html[data-host='web'] body {
+html[data-host='web'][data-view='pet'] body {
   background: linear-gradient(var(--web-bg-top), var(--web-bg-bottom));
+}
+
+/* On the known-dark web background, light fur with a dark halo reads better.
+   The desktop overlay keeps dark fur and a light halo, which works on any wallpaper. */
+@media (prefers-color-scheme: dark) {
+  html[data-host='web']:not([data-theme='light']) {
+    --fur: #e4e1d6;
+    --halo: rgba(0, 0, 0, 0.75);
+    --emote: #f0a07a;
+  }
+}
+
+html[data-host='web'][data-theme='dark'] {
+  --fur: #e4e1d6;
+  --halo: rgba(0, 0, 0, 0.75);
+  --emote: #f0a07a;
+}
+
+/* The work area. Clips the raccoon when it hides past an edge or peeks over the floor. */
+.stage {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .pet {
   position: absolute;
   left: 0;
   top: 0;
+  pointer-events: auto;
   cursor: grab;
   touch-action: none;
   will-change: transform;
 }
 
-.pet.dragging {
+.pet:active {
   cursor: grabbing;
 }
 
@@ -54,12 +139,223 @@ html[data-host='web'] body {
   white-space: pre;
 }
 
-.web-hint {
+.sprite.facing-left {
+  transform: scaleX(-1);
+}
+
+.emote {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 700 1.2em/1 'Cascadia Mono', Consolas, Menlo, monospace;
+  color: var(--emote);
+  text-shadow: 0 0 3px var(--halo);
+  white-space: pre;
+  pointer-events: none;
+}
+
+.emote[data-emote='z'] {
+  color: var(--fur);
+  animation: drift 2.4s ease-in-out infinite;
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(-30%, -6px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emote[data-emote='z'] {
+    animation: none;
+  }
+}
+
+/* ---- Web page chrome ---------------------------------------------------------------- */
+
+.web-chrome {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.web-hint {
   margin: 0;
-  font: 14px system-ui, sans-serif;
-  color: var(--web-hint);
+  max-width: 46ch;
+  color: var(--text);
+  opacity: 0.8;
+}
+
+.gear,
+.icon-button {
+  pointer-events: auto;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.panel-overlay {
+  position: absolute;
+  top: 64px;
+  right: 16px;
+  left: 16px;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.panel-overlay .settings {
+  pointer-events: auto;
+  width: min(420px, 100%);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+/* ---- Settings ----------------------------------------------------------------------- */
+
+html[data-view='settings'] body {
+  background: var(--bg);
+}
+
+.settings {
+  padding: 20px;
+  background: var(--surface);
+}
+
+html[data-view='settings'] .settings {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.settings h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.field {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.field label {
+  font-weight: 600;
+}
+
+.field output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.field input[type='range'] {
+  width: 100%;
+  margin: 8px 0 2px;
+  accent-color: var(--accent);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.hint {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.hint.ok {
+  color: var(--ok);
+}
+
+.hint.footer {
+  margin-top: 14px;
+}
+
+.privacy {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.privacy p {
+  margin: 6px 0;
+}
+
+.privacy strong {
+  color: var(--text);
+}
+
+.notice {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--notice-border);
+  border-radius: 8px;
+  background: var(--notice-bg);
+}
+
+.notice p {
+  margin: 0;
+}
+
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.notice-actions button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }

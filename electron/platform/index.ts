@@ -7,6 +7,17 @@ const genericPlatform: PlatformAdapter = {
   configureWindow(win) {
     win.setAlwaysOnTop(true);
   },
+  trayClickOpensSettings: false,
+  presentWindow(_app, win) {
+    win.show();
+    win.focus();
+  },
+  keyboardAccess: {
+    check: () => 'granted',
+    request: () => 'granted',
+    deniedMessage: '',
+    openSettings() {},
+  },
 };
 
 export const platform: PlatformAdapter =

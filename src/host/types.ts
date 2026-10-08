@@ -1,16 +1,12 @@
-import type { DisplayInfo } from '../../shared/ipc';
+import type { DisplayInfo, HostBridge, Point } from '../../shared/ipc';
+import type { KeyboardStatus, Settings } from '../../shared/settings';
 
-export type { DisplayInfo };
+export type { DisplayInfo, KeyboardStatus, Point, Settings };
 
 /**
  * What the renderer needs from wherever it's running: the Electron overlay
  * window on the desktop, or a plain browser tab (the Vercel build).
  */
-export interface Host {
+export interface Host extends HostBridge {
   kind: 'electron' | 'web';
-  platform: string;
-  getDisplay(): Promise<DisplayInfo>;
-  onDisplayChanged(listener: (display: DisplayInfo) => void): () => void;
-  /** Capture the mouse (true) or let clicks pass through to windows below (false). */
-  setInteractive(interactive: boolean): void;
 }

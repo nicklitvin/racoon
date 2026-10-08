@@ -9,4 +9,16 @@ export const windowsPlatform: PlatformAdapter = {
     // 'screen-saver' keeps the pet above normal always-on-top windows such as the taskbar.
     win.setAlwaysOnTop(true, 'screen-saver');
   },
+  trayClickOpensSettings: true,
+  presentWindow(_app, win) {
+    win.show();
+    win.focus();
+  },
+  keyboardAccess: {
+    // Windows has no permission gate for a low-level keyboard hook.
+    check: () => 'granted',
+    request: () => 'granted',
+    deniedMessage: '',
+    openSettings() {},
+  },
 };
