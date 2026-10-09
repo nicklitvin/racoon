@@ -6,6 +6,7 @@ import { Animator } from '../core/animator';
 import { Brain, type PetSnapshot, type WorldInput } from '../core/behavior/brain';
 import { DEFAULT_CONFIG } from '../core/behavior/config';
 import { ClickThroughController } from '../core/clickThrough';
+import { isTurning, targetHeading, turnTowards } from '../core/heading';
 import type { Host } from '../host';
 import { ANIMATIONS, RACCOON_STYLES, type RaccoonRenderer } from '../sprites';
 
@@ -53,11 +54,17 @@ export class PetRuntime {
   private readonly clickThrough: ClickThroughController;
 
   private cursor: Point | null = null;
+  /** Brain-facing size: the part of the drawing above the feet. */
   private size = { width: 0, height: 0 };
+  /** How far the drawing reaches below the feet, in px. */
+  private belowFeet = 0;
   private lastDrawn = '';
   private lastTransform = '';
   private lastEmote = '';
   private lastFacing = 0;
+  /** Ground direction for renderers that turn themselves; starts three-quarters towards you. */
+  private heading = 0.6;
+  private headingTarget = 0.6;
   private snap: PetSnapshot | null = null;
 
   private rafId = 0;
@@ -227,6 +234,8 @@ export class PetRuntime {
     this.snap = snap;
     this.animator.play(snap.animation);
     this.animator.update(dt);
+    this.headingTarget = targetHeading(this.heading, snap);
+    this.heading = turnTowards(this.heading, this.headingTarget, dt);
     this.render(snap);
     if (this.cursor) this.updateHover(this.cursor);
     this.schedule();
@@ -255,13 +264,16 @@ export class PetRuntime {
   }
 
   private isResting(): boolean {
-    return !this.drag && (this.snap?.resting ?? false);
+    const turning = this.renderer.turnsItself && isTurning(this.heading, this.headingTarget);
+    return !this.drag && !turning && (this.snap?.resting ?? false);
   }
 
   private worldInput(now: number): WorldInput {
     const keyboard = this.settings.keyboardReactions;
+    const wa = this.display.workArea;
     return {
-      bounds: this.display.workArea,
+      // Drawings that reach below the feet (a top-down raccoon facing you) stop short of the bottom edge.
+      bounds: { ...wa, height: wa.height - this.belowFeet },
       size: this.size,
       cursor: this.cursor,
       cursorExcited: this.cursorTracker.isExcited(now),
@@ -279,8 +291,10 @@ export class PetRuntime {
       timeMs: this.animator.time,
       keystrokes: this.animator.keystrokes,
       eyes: this.animator.eyes,
+      heading: this.heading,
     };
-    const key = `${frame.animation}|${frame.timeMs}|${frame.keystrokes}|${frame.eyes}`;
+    const turns = this.renderer.turnsItself === true;
+    const key = `${frame.animation}|${frame.timeMs}|${frame.keystrokes}|${frame.eyes}|${turns ? this.heading.toFixed(3) : ''}`;
     if (key !== this.lastDrawn) {
       this.renderer.draw(frame);
       this.lastDrawn = key;
@@ -289,14 +303,16 @@ export class PetRuntime {
     const wa = this.display.workArea;
     const x = Math.round((snap.position.x - wa.x) * 10) / 10;
     const y = Math.round((snap.position.y - wa.y) * 10) / 10;
-    const transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)`;
+    const anchor = this.renderer.anchor ?? { x: 0.5, y: 1 };
+    const transform = `translate3d(${x}px, ${y}px, 0) translate(${-anchor.x * 100}%, ${-anchor.y * 100}%)`;
     if (transform !== this.lastTransform) {
       pet.style.transform = transform;
       this.lastTransform = transform;
     }
-    if (snap.facing !== this.lastFacing) {
-      sprite.classList.toggle('facing-left', snap.facing < 0);
-      this.lastFacing = snap.facing;
+    const facing = turns ? 1 : snap.facing;
+    if (facing !== this.lastFacing) {
+      sprite.classList.toggle('facing-left', facing < 0);
+      this.lastFacing = facing;
     }
     if (snap.emote !== this.lastEmote) {
       emote.textContent = snap.emote === 'z' ? 'z Z' : snap.emote;
@@ -320,9 +336,11 @@ export class PetRuntime {
 
   private applyScale(): void {
     const scale = this.display.workArea.width < 600 ? SMALL_SCREEN_SCALE : 1;
-    const { baseSize } = this.renderer;
+    const { baseSize, anchor = { x: 0.5, y: 1 } } = this.renderer;
     this.renderer.setScale(scale);
-    this.size = { width: baseSize.width * scale, height: baseSize.height * scale };
+    const height = baseSize.height * scale;
+    this.size = { width: baseSize.width * scale, height: height * anchor.y };
+    this.belowFeet = height * (1 - anchor.y);
   }
 
   /** Swaps in the drawing for the chosen raccoon type. Behaviour carries on untouched. */
@@ -333,6 +351,8 @@ export class PetRuntime {
     this.rendererType = type;
     this.els.sprite.replaceChildren(this.renderer.element);
     this.lastDrawn = '';
+    this.lastFacing = 0;
+    this.lastTransform = '';
     this.applyScale();
   }
 

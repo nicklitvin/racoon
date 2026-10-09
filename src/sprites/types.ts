@@ -53,11 +53,17 @@ export interface RaccoonFrame {
   /** Key presses seen while this animation played (keystroke-driven animations only). */
   keystrokes: number;
   eyes: EyeStyle | 'blink';
+  /**
+   * Direction he faces on the ground, in radians, screen axes: 0 = right, PI/2 = down
+   * the screen (towards you). Only used by renderers that turn themselves.
+   */
+  heading?: number;
 }
 
 /**
- * Draws the raccoon. Implementations face right; the page mirrors the element to face left.
- * The drawing's feet are at the bottom centre of `element`.
+ * Draws the raccoon. Side-view implementations face right and the page mirrors the
+ * element to face left; those with `turnsItself` draw any `frame.heading` instead.
+ * The feet are at `anchor` within `element` (bottom centre if not given).
  */
 export interface RaccoonRenderer {
   /** Root element to put in the page. */
@@ -66,6 +72,10 @@ export interface RaccoonRenderer {
   readonly figure: Element;
   /** Size of `element` in px at scale 1. */
   readonly baseSize: { width: number; height: number };
+  /** Where the feet are, as fractions of the element's width and height. */
+  readonly anchor?: { x: number; y: number };
+  /** Draws `frame.heading` itself, so the page must not mirror it. */
+  readonly turnsItself?: boolean;
   setScale(scale: number): void;
   /** Cheap to call every tick: only touches what changed. */
   draw(frame: RaccoonFrame): void;

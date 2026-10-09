@@ -1,7 +1,7 @@
 // User settings, shared by the Electron main process (which stores them) and the renderer.
 
 /** The art styles the raccoon can be drawn in. The first one is the default. */
-export const RACCOON_TYPES = ['cartoon', 'plush', 'classic'] as const;
+export const RACCOON_TYPES = ['arena', 'cartoon', 'plush', 'classic'] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
 export interface Settings {

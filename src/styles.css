@@ -274,6 +274,33 @@ html[data-host='web'][data-theme='dark'] {
   opacity: 0.8;
 }
 
+/* ---- Arena raccoon: 3D-looking, seen from above ---- */
+
+.raccoon-arena {
+  --r3-outline: #2a2430;
+  /* The thick outline does the halo's job. */
+  filter: none;
+}
+
+.r3-outline {
+  fill: var(--r3-outline);
+}
+
+.r3-leg,
+.r3-stick-edge {
+  stroke-linecap: round;
+}
+
+.r3-leg {
+  stroke: var(--r-leg);
+  stroke-width: 7.5;
+}
+
+.r3-stick-edge {
+  stroke: var(--r3-outline);
+  stroke-width: 11;
+}
+
 .sprite.facing-left {
   transform: scaleX(-1);
 }

@@ -15,8 +15,8 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ keyboardReactions: true }).keyboardReactions).toBe(true);
   });
 
-  it('accepts every raccoon type, defaulting to the cartoon one', () => {
-    expect(DEFAULT_SETTINGS.raccoonType).toBe('cartoon');
+  it('accepts every raccoon type, defaulting to the 3D one', () => {
+    expect(DEFAULT_SETTINGS.raccoonType).toBe('arena');
     for (const type of RACCOON_TYPES) expect(normalizeSettings({ raccoonType: type }).raccoonType).toBe(type);
   });
 
