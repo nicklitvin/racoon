@@ -130,8 +130,8 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
 
       <p className="hint footer">
         {desktop
-          ? 'Tip: drag the raccoon to move it, click to startle it, double-click for these settings.'
-          : 'Tip: drag the raccoon, tap it, or swipe your finger (or mouse) around fast.'}
+          ? 'Tip: drag the raccoon to move it, click to pet it. Settings live in the tray menu.'
+          : 'Tip: drag the raccoon, tap to pet it, or swipe your finger (or mouse) around fast.'}
       </p>
     </section>
   );

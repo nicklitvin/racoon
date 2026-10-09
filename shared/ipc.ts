@@ -16,7 +16,6 @@ export const IPC = {
   keyboardStatusChanged: 'racoon:keyboard-status-changed',
   recheckKeyboardAccess: 'racoon:recheck-keyboard-access',
   openKeyboardPrivacySettings: 'racoon:open-keyboard-privacy-settings',
-  openSettings: 'racoon:open-settings',
 } as const;
 
 export interface Point {
@@ -59,5 +58,4 @@ export interface HostBridge {
   onKeyboardStatusChanged(listener: (status: KeyboardStatus) => void): Unsubscribe;
   recheckKeyboardAccess(): Promise<KeyboardStatus>;
   openKeyboardPrivacySettings(): void;
-  openSettings(): void;
 }

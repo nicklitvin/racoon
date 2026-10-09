@@ -318,6 +318,33 @@ html[data-host='web'][data-theme='dark'] {
   pointer-events: none;
 }
 
+.heart {
+  position: absolute;
+  left: 50%;
+  font-size: 18px;
+  line-height: 1;
+  color: #ff5a7a;
+  text-shadow: 0 0 2px var(--halo);
+  pointer-events: none;
+  opacity: 0;
+  animation: heart-float 1.1s ease-out both;
+}
+
+@keyframes heart-float {
+  0% {
+    transform: translate(-50%, 0) scale(0.4);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(calc(-50% + var(--dx) * 0.3), -8px) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--dx)), -46px) scale(0.9);
+    opacity: 0;
+  }
+}
+
 .emote[data-emote='z'] {
   color: var(--fur);
   animation: drift 2.4s ease-in-out infinite;
@@ -335,9 +362,25 @@ html[data-host='web'][data-theme='dark'] {
   }
 }
 
+@keyframes heart-fade {
+  0%,
+  100% {
+    transform: translate(calc(-50% + var(--dx)), -20px);
+    opacity: 0;
+  }
+  30% {
+    transform: translate(calc(-50% + var(--dx)), -20px);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .emote[data-emote='z'] {
     animation: none;
+  }
+
+  .heart {
+    animation-name: heart-fade;
   }
 }
 
@@ -350,17 +393,9 @@ html[data-host='web'][data-theme='dark'] {
   right: 0;
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-end;
   padding: 16px;
   pointer-events: none;
-}
-
-.web-hint {
-  margin: 0;
-  max-width: 46ch;
-  color: var(--text);
-  opacity: 0.8;
 }
 
 .gear,

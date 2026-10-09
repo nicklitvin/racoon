@@ -281,7 +281,6 @@ function registerIpc() {
     return keyboardStatus;
   });
   ipcMain.on(IPC.openKeyboardPrivacySettings, () => platform.keyboardAccess.openSettings());
-  ipcMain.on(IPC.openSettings, openSettingsWindow);
 }
 
 // ---- Startup ---------------------------------------------------------------------------

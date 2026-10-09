@@ -103,18 +103,15 @@ export class PetRuntime {
     const down = (e: PointerEvent) => this.onPointerDown(e);
     const move = (e: PointerEvent) => this.onPointerMove(e);
     const up = (e: PointerEvent) => this.onPointerUp(e);
-    const dbl = () => this.host.openSettings();
     pet.addEventListener('pointerdown', down);
     pet.addEventListener('pointermove', move);
     pet.addEventListener('pointerup', up);
     pet.addEventListener('pointercancel', up);
-    pet.addEventListener('dblclick', dbl);
     this.cleanups.push(() => {
       pet.removeEventListener('pointerdown', down);
       pet.removeEventListener('pointermove', move);
       pet.removeEventListener('pointerup', up);
       pet.removeEventListener('pointercancel', up);
-      pet.removeEventListener('dblclick', dbl);
     });
 
     this.syncKeyboardSubscription();
@@ -203,8 +200,12 @@ export class PetRuntime {
     const drag = this.drag;
     if (!drag || e.pointerId !== drag.pointerId) return;
     this.drag = null;
-    if (drag.moved) this.brain.release();
-    else this.brain.poke();
+    if (drag.moved) {
+      this.brain.release();
+    } else {
+      this.brain.poke();
+      this.spawnHearts();
+    }
     this.wake();
     const rect = this.hitRect();
     if (rect) this.clickThrough.dragEnded({ x: e.clientX, y: e.clientY }, rect);
@@ -354,6 +355,24 @@ export class PetRuntime {
     this.lastFacing = 0;
     this.lastTransform = '';
     this.applyScale();
+  }
+
+  /** A few hearts that float up from his head and fade; each removes itself when done. */
+  private spawnHearts(): void {
+    const { pet } = this.els;
+    const anchorY = this.renderer.anchor?.y ?? 1;
+    for (let i = 0; i < 3; i++) {
+      const heart = document.createElement('span');
+      heart.className = 'heart';
+      heart.textContent = '❤';
+      heart.setAttribute('aria-hidden', 'true');
+      // Just above his head: his head sits about two-thirds of the way up from his feet.
+      heart.style.bottom = `${(1 - anchorY) * 100 + anchorY * 55}%`;
+      heart.style.setProperty('--dx', `${(i - 1) * 22 + (Math.random() * 10 - 5)}px`);
+      heart.style.animationDelay = `${i * 110}ms`;
+      heart.addEventListener('animationend', () => heart.remove(), { once: true });
+      pet.append(heart);
+    }
   }
 
   /** The visible part of the raccoon: the drawn figure clipped to the stage. */

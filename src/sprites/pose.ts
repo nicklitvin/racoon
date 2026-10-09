@@ -179,6 +179,16 @@ export function poseFor(animation: AnimationName, t: number, keystrokes = 0): Po
       return pose;
     }
 
+    case 'happy': {
+      // Being petted: sits, eyes shut, leans his head up into the pat and wags.
+      const pose = sitting(t);
+      pose.head.angle -= 12 - 6 * wave(t, 1200);
+      pose.tail.angle = 48 + 16 * wave(t, 400);
+      pose.ears = 0.45;
+      pose.breathe = 1 + 0.03 * wave(t, 600);
+      return pose;
+    }
+
     case 'dangle': {
       // Held by the scruff: body hanging, legs dangling straight down, gently swinging.
       const pose = standing();

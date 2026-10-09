@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DisplayInfo } from '../../shared/ipc';
 import type { Settings } from '../../shared/settings';
-import { onOpenSettingsRequest, type Host } from '../host';
+import type { Host } from '../host';
 import { PetRuntime } from '../runtime/petRuntime';
 import { SettingsPanel } from './SettingsPanel';
 
@@ -29,12 +29,10 @@ export function PetApp({ host }: PetAppProps) {
     void host.getSettings().then((s) => alive && setSettings(s));
     const offDisplay = host.onDisplayChanged(setDisplay);
     const offSettings = host.onSettingsChanged(setSettings);
-    const offOpen = onOpenSettingsRequest(() => setPanelOpen(true));
     return () => {
       alive = false;
       offDisplay();
       offSettings();
-      offOpen();
     };
   }, [host]);
 
@@ -73,9 +71,6 @@ export function PetApp({ host }: PetAppProps) {
     <>
       {web && (
         <div className="web-chrome">
-          <p className="web-hint">
-            Meet the raccoon. Drag it, tap it, or swipe your finger (or shake your mouse) fast to start a chase.
-          </p>
           <button type="button" className="gear" onClick={() => setPanelOpen((o) => !o)} aria-label="Settings">
             ⚙
           </button>

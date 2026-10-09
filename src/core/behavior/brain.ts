@@ -7,10 +7,10 @@ import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d } from './mo
 export type Mode = 'idle' | 'walk' | 'sit' | 'sleep' | 'react';
 
 /** What the raccoon is reacting to, while in the "react" mode. */
-export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged';
+export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged' | 'petted';
 
-/** Little symbol drawn above the raccoon's head. */
-export type Emote = '' | '!' | '?' | 'z';
+/** Little symbol drawn above the raccoon's head. Only sleep shows one. */
+export type Emote = '' | 'z';
 
 /** Everything the brain knows about the outside world, refreshed every tick. */
 export interface WorldInput {
@@ -55,7 +55,8 @@ type State =
   | { mode: 'react'; reaction: 'flee'; target: Point }
   | { mode: 'react'; reaction: 'hide'; edge: -1 | 1; phase: 'in' | 'wait' | 'out'; targetX: number; until: number; giveUpAt: number }
   | { mode: 'react'; reaction: 'peek'; phase: 'approach' | 'sink' | 'watch' | 'rise'; sink: number }
-  | { mode: 'react'; reaction: 'dragged' };
+  | { mode: 'react'; reaction: 'dragged' }
+  | { mode: 'react'; reaction: 'petted'; until: number };
 
 const SUBSTEP_S = 1 / 60;
 const MAX_FRAME_MS = 1000;
@@ -63,6 +64,8 @@ const MAX_FRAME_MS = 1000;
 export const PEEK_SINK = 0.45;
 /** Peak speed of an ease-in-out-sine move is this many times its average speed. */
 const EASE_PEAK = Math.PI / 2;
+/** How long one pat keeps him happy; each further pat restarts it. */
+const PETTED_MS = 1600;
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const length = (v: Point) => Math.hypot(v.x, v.y);
@@ -145,10 +148,11 @@ export class Brain {
     this.idle(1000, 2500);
   }
 
-  /** A click on the raccoon. */
+  /** A click or tap on the raccoon: a pat. He sits and enjoys it. */
   poke(): void {
     if (this.reaction === 'dragged') return;
-    this.surprise('idle');
+    this.calmMs = 0;
+    this.state = { mode: 'react', reaction: 'petted', until: this.now + PETTED_MS };
   }
 
   // ---- Simulation --------------------------------------------------------------------
@@ -279,6 +283,11 @@ export class Brain {
       case 'confused':
         this.brake(dt);
         if (this.now >= s.until) this.idle(1000, 2500);
+        return;
+
+      case 'petted':
+        this.brake(dt);
+        if (this.now >= s.until) this.idle(1500, 3000);
         return;
 
       case 'flee':
@@ -524,7 +533,6 @@ export class Brain {
         switch (s.reaction) {
           case 'surprised':
             animation = 'surprised';
-            emote = '!';
             break;
           case 'chase':
             animation = 'chase';
@@ -534,7 +542,6 @@ export class Brain {
             break;
           case 'confused':
             animation = 'confused';
-            emote = '?';
             break;
           case 'flee':
             animation = 'run';
@@ -549,6 +556,9 @@ export class Brain {
             break;
           case 'dragged':
             animation = 'dangle';
+            break;
+          case 'petted':
+            animation = 'happy';
             break;
         }
         break;

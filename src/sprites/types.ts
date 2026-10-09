@@ -18,6 +18,7 @@ export const ANIMATION_NAMES = [
   'surprised',
   'confused',
   'dangle',
+  'happy',
 ] as const;
 
 export type AnimationName = (typeof ANIMATION_NAMES)[number];

@@ -18,4 +18,5 @@ export const ANIMATIONS: Record<AnimationName, AnimationSpec> = {
   surprised: { fps: 30, durationMs: 450, loop: false, eyes: 'wide' },
   confused: { fps: 4, durationMs: 1800, loop: true, eyes: 'open' },
   dangle: { fps: 30, durationMs: 1400, loop: true, eyes: 'open' },
+  happy: { fps: 30, durationMs: 1200, loop: true, eyes: 'closed' },
 };

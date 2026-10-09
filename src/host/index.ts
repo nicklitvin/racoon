@@ -9,7 +9,6 @@ declare global {
 }
 
 const SETTINGS_KEY = 'racoon.settings';
-const OPEN_SETTINGS_EVENT = 'racoon:open-settings';
 
 function electronHost(bridge: HostBridge): Host {
   return { ...bridge, kind: 'electron' };
@@ -99,20 +98,11 @@ function webHost(): Host {
     },
     recheckKeyboardAccess: () => Promise.resolve(status()),
     openKeyboardPrivacySettings() {},
-    openSettings() {
-      window.dispatchEvent(new Event(OPEN_SETTINGS_EVENT));
-    },
   };
 }
 
 export function getHost(): Host {
   return window.racoonHost ? electronHost(window.racoonHost) : webHost();
-}
-
-/** Web only: the pet page listens for this to open its in-page settings panel. */
-export function onOpenSettingsRequest(listener: () => void): () => void {
-  window.addEventListener(OPEN_SETTINGS_EVENT, listener);
-  return () => window.removeEventListener(OPEN_SETTINGS_EVENT, listener);
 }
 
 export type { Host };

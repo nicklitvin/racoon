@@ -181,7 +181,7 @@ describe('Brain: cursor reactions', () => {
     const brain = makeBrain();
     const [first] = run(brain, STEP, excited());
     expect(first!.reaction).toBe('surprised');
-    expect(first!.emote).toBe('!');
+    expect(first!.emote).toBe('');
     const { snap } = runUntil(brain, (s) => s.reaction === 'chase', excited());
     const startDist = Math.hypot(snap.position.x - 400, snap.position.y - 300);
     const later = run(brain, 1500, excited()).at(-1)!;
@@ -196,7 +196,7 @@ describe('Brain: cursor reactions', () => {
     const stopped = world({ cursor: { x: 400, y: 300 }, cursorStillMs: 1000 });
     runUntil(brain, (s) => s.reaction === 'pounce', stopped);
     const { snap: confused } = runUntil(brain, (s) => s.reaction === 'confused', stopped);
-    expect(confused.emote).toBe('?');
+    expect(confused.emote).toBe('');
     // Landed on the cursor, wherever it is: the cursor is in the middle of him.
     expect(Math.abs(confused.position.x - 400)).toBeLessThan(10);
     expect(Math.abs(confused.position.y - size.height / 2 - 300)).toBeLessThan(15);
@@ -302,12 +302,18 @@ describe('Brain: dragging and the world changing', () => {
     expect(inBounds(held!)).toBe(true);
   });
 
-  it('a click startles it', () => {
+  it('a click pets it: happy for a moment, longer with more pats, then back to normal', () => {
     const brain = makeBrain();
     brain.poke();
     const [snap] = run(brain, STEP);
-    expect(snap!.reaction).toBe('surprised');
-    expect(snap!.emote).toBe('!');
+    expect(snap!.reaction).toBe('petted');
+    expect(snap!.animation).toBe('happy');
+    expect(snap!.emote).toBe('');
+    run(brain, 1200);
+    brain.poke();
+    expect(run(brain, 1200).at(-1)!.reaction).toBe('petted');
+    const { snap: after } = runUntil(brain, (s) => s.reaction !== 'petted');
+    expect(after.mode).toBe('idle');
   });
 
   it('stays on screen when the display shrinks', () => {

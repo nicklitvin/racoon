@@ -26,7 +26,6 @@ const bridge: HostBridge = {
   onKeyboardStatusChanged: (listener) => subscribe(IPC.keyboardStatusChanged, listener),
   recheckKeyboardAccess: () => ipcRenderer.invoke(IPC.recheckKeyboardAccess),
   openKeyboardPrivacySettings: () => ipcRenderer.send(IPC.openKeyboardPrivacySettings),
-  openSettings: () => ipcRenderer.send(IPC.openSettings),
 };
 
 contextBridge.exposeInMainWorld('racoonHost', bridge);
