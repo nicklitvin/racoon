@@ -14,6 +14,14 @@ function electronHost(bridge: HostBridge): Host {
   return { ...bridge, kind: 'electron' };
 }
 
+/**
+ * In a tab, typing reactions are always on: the page only hears key presses while it has
+ * focus (no system-wide hook), and never looks at which key it was.
+ */
+function webSettings(raw: unknown): Settings {
+  return { ...normalizeSettings(raw), keyboardReactions: true };
+}
+
 function on<K extends keyof WindowEventMap>(type: K, handler: (e: WindowEventMap[K]) => void): () => void {
   window.addEventListener(type, handler);
   return () => window.removeEventListener(type, handler);
@@ -33,9 +41,9 @@ function webHost(): Host {
 
   const loadSettings = (): Settings => {
     try {
-      return normalizeSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null'));
+      return webSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null'));
     } catch {
-      return normalizeSettings(undefined);
+      return webSettings(undefined);
     }
   };
 
@@ -77,7 +85,7 @@ function webHost(): Host {
     },
     getSettings: () => Promise.resolve(settings),
     updateSettings(patch) {
-      settings = normalizeSettings({ ...settings, ...patch });
+      settings = webSettings({ ...settings, ...patch });
       try {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
       } catch {

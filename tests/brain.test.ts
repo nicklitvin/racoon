@@ -263,6 +263,18 @@ describe('Brain: typing reactions', () => {
     expect(back.position.y).toBeCloseTo(bottom, 0);
   });
 
+  it('peeks past the real edge even when his drawing reaches below his feet', () => {
+    // A top-down raccoon: 60px of drawing below the feet, so he normally stays 60px up.
+    const brain = makeBrain(9);
+    const roomy = (typingActive: boolean) => world({ typingActive, footroom: 60, peekDepth: 40 });
+    const wandering = run(brain, 20_000, roomy(false));
+    expect(Math.max(...wandering.map((s) => s.position.y))).toBeLessThanOrEqual(bottom - 60 + 0.5);
+    const { snap } = runUntil(brain, (s) => s.phase === 'watch', roomy(true));
+    expect(snap.position.y).toBeCloseTo(bottom + 40, 0);
+    const { snap: back } = runUntil(brain, (s) => s.mode !== 'react', roomy(false));
+    expect(back.position.y).toBeCloseTo(bottom - 60, 0);
+  });
+
   it('walks down to the bottom edge from anywhere on screen to watch', () => {
     const brain = makeBrain(11);
     place(brain, { x: 400, y: 300 });

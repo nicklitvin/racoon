@@ -26,6 +26,13 @@ export interface WorldInput {
   cursorStillMs: number;
   /** The user is in a sustained stretch of typing (opt-in feature). */
   typingActive: boolean;
+  /**
+   * How far the drawing reaches below his feet, in px (a top-down raccoon facing you).
+   * He walks no closer than this to the bottom edge, so nothing gets clipped.
+   */
+  footroom?: number;
+  /** How far his feet go past the bottom edge while peeking. Defaults to PEEK_SINK of his height. */
+  peekDepth?: number;
 }
 
 export interface PetSnapshot {
@@ -175,7 +182,7 @@ export class Brain {
       minX: bounds.x + size.width / 2,
       maxX: bounds.x + bounds.width - size.width / 2,
       minY: bounds.y + size.height,
-      maxY: this.bottom,
+      maxY: this.bottom - (this.input.footroom ?? 0),
     };
   }
 
@@ -327,10 +334,12 @@ export class Brain {
       }
 
       case 'peek': {
-        const depth = size.height * PEEK_SINK;
+        // Measured from the lowest spot he can stand on, so it ends up past the real edge.
+        const floor = this.area.maxY;
+        const depth = (this.input.footroom ?? 0) + (this.input.peekDepth ?? size.height * PEEK_SINK);
         if (s.phase === 'approach') {
           // Head for the bottom edge, straight down from wherever he is.
-          const target = { x: clamp(this.pos.x, this.area.minX, this.area.maxX), y: this.bottom };
+          const target = { x: clamp(this.pos.x, this.area.minX, this.area.maxX), y: floor };
           this.vel = steer2d(this.pos, this.vel, target, m.walkSpeed * 2 * k, m.accel * 2 * k, dt, 60);
           if (dist(this.pos, target) < 3 && length(this.vel) < 8) s.phase = 'sink';
           return;
@@ -345,7 +354,7 @@ export class Brain {
           s.sink = approach(s.sink, 0, 140 * dt);
           if (s.sink <= 0) this.idle(800, 2000);
         }
-        this.pos = { x: this.pos.x, y: this.bottom + s.sink };
+        this.pos = { x: this.pos.x, y: floor + s.sink };
         this.vel = { x: 0, y: 0 };
         return;
       }

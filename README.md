@@ -132,7 +132,7 @@ How the code guarantees it:
 - `src/core/activity/typing.ts` accepts nothing but a timestamp, keeps only the last 5 seconds of timestamps, and clears them when the feature is switched off.
 - The native hook is loaded on first use and stopped when you turn the feature off, hide the raccoon, or quit. Settings are saved locally in `settings.json` in the app's user-data folder, and the app makes no network requests.
 
-In the browser build, the page only counts key presses made while its tab is focused.
+In the browser build, typing reactions are always on, since there's no system-wide hook: the page only counts key presses made while its tab is focused, and never reads which key.
 
 **macOS:** listening for key presses system-wide needs the Accessibility permission (macOS may also list Racoon under Input Monitoring). The system prompt is shown **at most once**, right after you switch the feature on. If access is denied, the settings panel explains what to do, with buttons to open System Settings and to check again. It never re-prompts by itself, and everything else keeps working.
 
@@ -195,7 +195,7 @@ To distribute to others:
 
 `npm run build:web` produces a static site in `dist/`, and `vercel.json` is ready: import the GitHub repo in Vercel and deploy with no extra settings. The install step skips downloading Electron, since the web build doesn't need it.
 
-In the browser, the page is the raccoon's whole world. Wandering, chasing, pouncing, fleeing, hiding, dragging and settings all work. Click-through isn't possible in a page, and typing reactions only count key presses inside the tab. Settings are kept in `localStorage`.
+In the browser, the page is the raccoon's whole world. Wandering, chasing, pouncing, fleeing, hiding, dragging and settings all work. Click-through isn't possible in a page, and typing reactions are always on but only count key presses inside the tab. Settings are kept in `localStorage`.
 
 ## Testing checklist
 

@@ -26,6 +26,11 @@ const HEAD_SCALE = 1.12;
 /** Sideways distance of the legs from the spine. */
 const HIP_WIDTH = 7.5;
 const OUTLINE = 1.7;
+/**
+ * While peeking, his feet sink this far (units) past the bottom edge of the screen, so
+ * the edge sits at this height on screen above his feet: just under his eyes.
+ */
+const PEEK_SINK_UNITS = 27;
 
 /** Drawing box in units around the feet. Wide and deep enough for him facing any way. */
 const VIEW = { x: -74, y: -96, width: 148, height: 158 };
@@ -192,6 +197,8 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
     baseSize: { width: VIEW.width * PX_PER_UNIT, height: VIEW.height * PX_PER_UNIT },
     anchor: { x: -VIEW.x / VIEW.width, y: -VIEW.y / VIEW.height },
     turnsItself: true,
+    // Standing up facing you, his eyes are about 41 units up: this leaves his face over the edge.
+    peekSink: PEEK_SINK_UNITS * PX_PER_UNIT,
 
     setScale(k) {
       set(svg, 'width', n(VIEW.width * PX_PER_UNIT * k));
@@ -275,7 +282,18 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
         const paw = { x: root.x + Math.sin(a) * length, y: root.y + Math.cos(a) * length };
         const l = side * HIP_WIDTH;
         const from = project(fromSide(root.x, root.y, l));
-        const to = project(fromSide(paw.x, paw.y - 3, l));
+        let to = project(fromSide(paw.x, paw.y - 3, l));
+        let pawAt = fromSide(paw.x + 1.5, paw.y - 3.6, l);
+        if (front && frame.animation === 'peek') {
+          // Holding on: front paws hooked over the bottom edge of the screen, either side
+          // of his chin. Pick a spot in front of him and solve for the height at which
+          // it lands on the edge line from this camera angle, whatever way he faces.
+          const reach = v3(12, side * 19, 0);
+          const toward = reach.f * sh + reach.l * ch;
+          const edgeY = -PEEK_SINK_UNITS - 3.5;
+          pawAt = { ...reach, u: (toward * SIN_E - edgeY) / COS_E };
+          to = project(add(pawAt, v3(-2, 0, -2)));
+        }
         const { bone, paw: pawBall } = legs[i]!;
         for (const el of [bone.fill.el, bone.edge]) {
           set(el, 'x1', n(from.x));
@@ -284,7 +302,8 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
           set(el, 'y2', n(to.y));
         }
         bone.fill.depth = (from.depth + to.depth) / 2 - 0.5;
-        placeBall(pawBall, fromSide(paw.x + 1.5, paw.y - 3.6, l), 4.6);
+        const holding = front && frame.animation === 'peek';
+        placeBall(pawBall, pawAt, holding ? 5.3 : 4.6);
       });
 
       // ---- Tail: a chain of ringed balls that sways side to side ----

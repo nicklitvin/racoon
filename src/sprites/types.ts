@@ -75,6 +75,8 @@ export interface RaccoonRenderer {
   readonly baseSize: { width: number; height: number };
   /** Where the feet are, as fractions of the element's width and height. */
   readonly anchor?: { x: number; y: number };
+  /** How far the feet sink past the bottom edge while peeking, in px at scale 1, so the face shows over it. */
+  readonly peekSink?: number;
   /** Draws `frame.heading` itself, so the page must not mirror it. */
   readonly turnsItself?: boolean;
   setScale(scale: number): void;

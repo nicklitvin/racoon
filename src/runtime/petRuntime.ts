@@ -58,6 +58,7 @@ export class PetRuntime {
   private size = { width: 0, height: 0 };
   /** How far the drawing reaches below the feet, in px. */
   private belowFeet = 0;
+  private scale = 1;
   private lastDrawn = '';
   private lastTransform = '';
   private lastEmote = '';
@@ -273,8 +274,9 @@ export class PetRuntime {
     const keyboard = this.settings.keyboardReactions;
     const wa = this.display.workArea;
     return {
-      // Drawings that reach below the feet (a top-down raccoon facing you) stop short of the bottom edge.
-      bounds: { ...wa, height: wa.height - this.belowFeet },
+      bounds: wa,
+      footroom: this.belowFeet,
+      peekDepth: this.renderer.peekSink === undefined ? undefined : this.renderer.peekSink * this.scale,
       size: this.size,
       cursor: this.cursor,
       cursorExcited: this.cursorTracker.isExcited(now),
@@ -337,6 +339,7 @@ export class PetRuntime {
 
   private applyScale(): void {
     const scale = this.display.workArea.width < 600 ? SMALL_SCREEN_SCALE : 1;
+    this.scale = scale;
     const { baseSize, anchor = { x: 0.5, y: 1 } } = this.renderer;
     this.renderer.setScale(scale);
     const height = baseSize.height * scale;
