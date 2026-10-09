@@ -14,7 +14,7 @@ export class Animator {
   private blinkLeftMs = 0;
 
   constructor(
-    private readonly specs: Record<AnimationName, AnimationSpec>,
+    private specs: Record<AnimationName, AnimationSpec>,
     private readonly random: () => number = Math.random,
   ) {
     this.blinkInMs = this.nextBlinkDelay();
@@ -28,6 +28,11 @@ export class Animator {
     if (name === this.name) return;
     this.name = name;
     this.elapsedMs = 0;
+  }
+
+  /** Swaps the timing table, e.g. for a drawing that animates at a different rate. */
+  setSpecs(specs: Record<AnimationName, AnimationSpec>): void {
+    this.specs = specs;
   }
 
   /** Advances keystroke-driven animations. Receives no key information. */

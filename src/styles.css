@@ -301,6 +301,118 @@ html[data-host='web'][data-theme='dark'] {
   stroke-width: 11;
 }
 
+/* ---- Black cat: flat 2D cartoon ---- */
+
+.raccoon-cat {
+  --c-fur: #24212b;
+  --c-far: #131117;
+  --c-edge: #46404f;
+  --c-iris: #d9d64a;
+  --c-iris-in: #f4f39a;
+  --c-iris-out: #8fa52c;
+  --c-ear-inner: #6e4459;
+  --c-nose: #e98fa8;
+  --c-line: #cfc8dc;
+  --c-mouth: #5d2338;
+  --c-tongue: #ea8aa3;
+  /* A light halo in every theme: a dark one would hide a black cat on a dark page. */
+  --c-halo: rgba(255, 255, 255, 0.75);
+  filter: none;
+}
+
+.raccoon-cat .raccoon-figure {
+  filter: drop-shadow(0 0 1.2px var(--c-halo));
+}
+
+.c-fur {
+  fill: var(--c-fur);
+}
+
+.c-far {
+  fill: var(--c-far);
+}
+
+.c-limb {
+  fill: none;
+  stroke-width: 5.6;
+  stroke-linecap: round;
+}
+
+.c-limb.c-fur {
+  stroke: var(--c-fur);
+}
+
+.c-limb.c-far {
+  stroke: var(--c-far);
+}
+
+.c-limb.c-edge {
+  stroke: var(--c-edge);
+  stroke-width: 7;
+}
+
+.c-paw-edge {
+  stroke: var(--c-edge);
+  stroke-width: 0.7;
+}
+
+.c-sheen {
+  fill: #fff;
+  opacity: 0.1;
+}
+
+.c-iris {
+  stop-color: var(--c-iris);
+}
+
+.c-iris-in {
+  stop-color: var(--c-iris-in);
+}
+
+.c-iris-out {
+  stop-color: var(--c-iris-out);
+}
+
+.c-pupil {
+  fill: #08070a;
+}
+
+.c-glint {
+  fill: #fff;
+}
+
+.c-ear-inner {
+  fill: var(--c-ear-inner);
+}
+
+.c-nose {
+  fill: var(--c-nose);
+}
+
+.c-mouth {
+  fill: var(--c-mouth);
+}
+
+.c-tongue {
+  fill: var(--c-tongue);
+}
+
+.c-line,
+.c-whisker {
+  fill: none;
+  stroke: var(--c-line);
+  stroke-linecap: round;
+}
+
+.c-line {
+  stroke-width: 0.8;
+}
+
+.c-whisker {
+  stroke-width: 0.4;
+  opacity: 0.75;
+}
+
 .sprite.facing-left {
   transform: scaleX(-1);
 }

@@ -8,7 +8,8 @@ import { DEFAULT_CONFIG } from '../core/behavior/config';
 import { ClickThroughController } from '../core/clickThrough';
 import { isTurning, targetHeading, turnTowards } from '../core/heading';
 import type { Host } from '../host';
-import { ANIMATIONS, RACCOON_STYLES, type RaccoonRenderer } from '../sprites';
+import { ANIMATIONS, RACCOON_STYLES, type AnimationName, type RaccoonRenderer } from '../sprites';
+import type { AnimationSpec } from '../sprites/types';
 
 export interface PetElements {
   /** Clip box covering the work area: hides whatever is past the edges or below the floor. */
@@ -31,6 +32,15 @@ const DRAG_THRESHOLD_PX = 4;
 const REFERENCE_SCREEN_PX = 1600;
 /** Raccoon scale on screens much narrower than a desktop. */
 const SMALL_SCREEN_SCALE = 0.8;
+
+/** The shared animation timings with the drawing's own changes applied. */
+function specsFor(renderer: RaccoonRenderer): Record<AnimationName, AnimationSpec> {
+  const specs = { ...ANIMATIONS };
+  for (const [name, change] of Object.entries(renderer.animations ?? {}) as [AnimationName, Partial<AnimationSpec>][]) {
+    specs[name] = { ...specs[name], ...change };
+  }
+  return specs;
+}
 
 interface DragState {
   pointerId: number;
@@ -238,7 +248,7 @@ export class PetRuntime {
     this.animator.update(dt);
     this.headingTarget = targetHeading(this.heading, snap);
     this.heading = turnTowards(this.heading, this.headingTarget, dt);
-    this.render(snap);
+    this.render(snap, now);
     if (this.cursor) this.updateHover(this.cursor);
     this.schedule();
   };
@@ -267,7 +277,7 @@ export class PetRuntime {
 
   private isResting(): boolean {
     const turning = this.renderer.turnsItself && isTurning(this.heading, this.headingTarget);
-    return !this.drag && !turning && (this.snap?.resting ?? false);
+    return !this.drag && !turning && !this.renderer.isSettling?.() && (this.snap?.resting ?? false);
   }
 
   private worldInput(now: number): WorldInput {
@@ -287,9 +297,10 @@ export class PetRuntime {
 
   // ---- Rendering ---------------------------------------------------------------------
 
-  private render(snap: PetSnapshot): void {
+  private render(snap: PetSnapshot, now: number): void {
     const { pet, sprite, emote } = this.els;
     const frame = {
+      clockMs: now,
       animation: this.animator.animation,
       timeMs: this.animator.time,
       keystrokes: this.animator.keystrokes,
@@ -298,7 +309,7 @@ export class PetRuntime {
     };
     const turns = this.renderer.turnsItself === true;
     const key = `${frame.animation}|${frame.timeMs}|${frame.keystrokes}|${frame.eyes}|${turns ? this.heading.toFixed(3) : ''}`;
-    if (key !== this.lastDrawn) {
+    if (key !== this.lastDrawn || this.renderer.isSettling?.()) {
       this.renderer.draw(frame);
       this.lastDrawn = key;
     }
@@ -353,6 +364,7 @@ export class PetRuntime {
     if (type === this.rendererType) return;
     this.renderer = RACCOON_STYLES[type].create();
     this.rendererType = type;
+    this.animator.setSpecs(specsFor(this.renderer));
     this.els.sprite.replaceChildren(this.renderer.element);
     this.lastDrawn = '';
     this.lastFacing = 0;

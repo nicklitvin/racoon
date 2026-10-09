@@ -59,6 +59,8 @@ export interface RaccoonFrame {
    * the screen (towards you). Only used by renderers that turn themselves.
    */
   heading?: number;
+  /** Wall-clock time of this frame in ms, for renderers that ease between poses on their own. */
+  clockMs?: number;
 }
 
 /**
@@ -79,6 +81,13 @@ export interface RaccoonRenderer {
   readonly peekSink?: number;
   /** Draws `frame.heading` itself, so the page must not mirror it. */
   readonly turnsItself?: boolean;
+  /** Timing changes for this drawing, e.g. a higher fps where it moves more smoothly. */
+  readonly animations?: Partial<Record<AnimationName, Partial<AnimationSpec>>>;
+  /**
+   * True while the drawing is still moving on its own since the last `draw` (easing
+   * into a new pose), so it must be redrawn every frame even if the frame is unchanged.
+   */
+  isSettling?(): boolean;
   setScale(scale: number): void;
   /** Cheap to call every tick: only touches what changed. */
   draw(frame: RaccoonFrame): void;

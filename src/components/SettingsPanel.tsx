@@ -36,7 +36,7 @@ interface TypePickerProps {
 function TypePicker({ value, onChange }: TypePickerProps) {
   return (
     <fieldset className="field type-picker">
-      <legend>Raccoon type</legend>
+      <legend>Pet</legend>
       {RACCOON_TYPES.map((type) => {
         const style = RACCOON_STYLES[type];
         return (
@@ -130,8 +130,8 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
 
       <p className="hint footer">
         {desktop
-          ? 'Tip: drag the raccoon to move it, click to pet it. Settings live in the tray menu.'
-          : 'Tip: drag the raccoon, tap to pet it, or swipe your finger (or mouse) around fast.'}
+          ? 'Tip: drag your pet to move it, click to pet it. Settings live in the tray menu.'
+          : 'Tip: drag your pet, tap to pet it, or swipe your finger (or mouse) around fast.'}
       </p>
     </section>
   );
