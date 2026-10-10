@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RACCOON_TYPES, type KeyboardStatus, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
-import { RACCOON_STYLES } from '../sprites';
+import { RACCOON_STYLES, type Species } from '../sprites';
 
 interface SettingsPanelProps {
   host: Host;
@@ -33,20 +33,51 @@ interface TypePickerProps {
   onChange: (value: RaccoonType) => void;
 }
 
+const GROUPS: { species: Species; title: string }[] = [
+  { species: 'raccoon', title: 'Raccoons' },
+  { species: 'cat', title: 'Cats' },
+];
+
+/** A small still of the pet, drawn once. */
+function PetPreview({ type }: { type: RaccoonType }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const host = ref.current;
+    if (!host) return;
+    const renderer = RACCOON_STYLES[type].create();
+    renderer.setScale(0.5);
+    renderer.draw({ animation: 'idle', timeMs: 1000, keystrokes: 0, eyes: 'open', heading: 0.5 });
+    // Stand every pet on the same floor, whatever empty space its drawing has below the feet.
+    const below = renderer.baseSize.height * 0.5 * (1 - (renderer.anchor?.y ?? 1));
+    (renderer.element as SVGElement).style.marginBottom = `${6 - below}px`;
+    host.replaceChildren(renderer.element);
+    return () => host.replaceChildren();
+  }, [type]);
+  return <span className="type-preview" ref={ref} aria-hidden="true" />;
+}
+
 function TypePicker({ value, onChange }: TypePickerProps) {
   return (
     <fieldset className="field type-picker">
       <legend>Pet</legend>
-      {RACCOON_TYPES.map((type) => {
-        const style = RACCOON_STYLES[type];
-        return (
-          <label key={type} className={type === value ? 'type-option selected' : 'type-option'}>
-            <input type="radio" name="raccoonType" checked={type === value} onChange={() => onChange(type)} />
-            <span className="type-name">{style.label}</span>
-            <span className="type-description">{style.description}</span>
-          </label>
-        );
-      })}
+      {GROUPS.map(({ species, title }) => (
+        <div key={species} className="type-group">
+          <h2 className="type-group-title">{title}</h2>
+          <div className="type-grid">
+            {RACCOON_TYPES.filter((type) => RACCOON_STYLES[type].species === species).map((type) => {
+              const style = RACCOON_STYLES[type];
+              return (
+                <label key={type} className={type === value ? 'type-option selected' : 'type-option'} title={style.description}>
+                  <input type="radio" name="raccoonType" checked={type === value} onChange={() => onChange(type)} />
+                  <PetPreview type={type} />
+                  <span className="type-name">{style.label}</span>
+                  <span className="type-description">{style.description}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </fieldset>
   );
 }

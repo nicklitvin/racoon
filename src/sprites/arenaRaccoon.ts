@@ -13,10 +13,8 @@ import type { RaccoonFrame, RaccoonRenderer } from './types';
  * turned to `frame.heading` and projected.
  */
 
-/** Camera elevation above the ground, in degrees. 90 would be straight down. */
+/** Default camera elevation above the ground, in degrees. 90 would be straight down. */
 const CAMERA_DEG = 52;
-const SIN_E = Math.sin((CAMERA_DEG * Math.PI) / 180);
-const COS_E = Math.cos((CAMERA_DEG * Math.PI) / 180);
 const DEG = Math.PI / 180;
 
 /** He turns around the middle of his body (in side-view x), not his front feet. */
@@ -27,10 +25,25 @@ const HEAD_SCALE = 1.12;
 const HIP_WIDTH = 7.5;
 const OUTLINE = 1.7;
 /**
- * While peeking, his feet sink this far (units) past the bottom edge of the screen, so
- * the edge sits at this height on screen above his feet: just under his eyes.
+ * While peeking with the default camera, his feet sink this far (units) past the bottom
+ * edge of the screen, so the edge sits at this height on screen above his feet: just
+ * under his eyes. Other camera angles scale it by how tall he looks.
  */
 const PEEK_SINK_UNITS = 27;
+
+export type ArenaSpecies = 'raccoon' | 'cat';
+
+export interface ArenaOptions {
+  species?: ArenaSpecies;
+  /** Camera elevation in degrees: low for a side-ish view, high for top-down. */
+  cameraDeg?: number;
+  /** "soft" shaded balls like a vinyl toy, or "cel": flat bands like a cartoon. */
+  shading?: 'soft' | 'cel';
+  /** Height of a hop on every step, in units; 0 for a plain walk. */
+  hop?: number;
+  /** Extra classes on the svg, for colours. */
+  className?: string;
+}
 
 /** Drawing box in units around the feet. Wide and deep enough for him facing any way. */
 const VIEW = { x: -74, y: -96, width: 148, height: 158 };
@@ -95,6 +108,12 @@ const BODY_BALLS: [x: number, y: number, r: number, shade: Shade][] = [
   [16, -23, 8, 'light'],
 ];
 
+/** The cat's tail: long, thin and ringed. */
+const CAT_TAIL_BALLS: [s: number, r: number, shade: Shade][] = Array.from({ length: 11 }, (_, i) => {
+  const s = i / 10;
+  return [s, 3.7 - s * 1.2, i % 2 === 1 && i < 9 ? 'dark' : 'fur'];
+});
+
 const LEGS: [LegName, side: number, front: boolean][] = [
   ['frontNear', 1, true],
   ['frontFar', -1, true],
@@ -107,26 +126,36 @@ const SKULL = { c: v3(9, 0, 8), r: 16 };
 const MUZZLE = { c: v3(23, 0, 1), r: 8 };
 
 /** Side-to-side tail wag, in units. */
-function tailSway(frame: RaccoonFrame): number {
+function tailSway(frame: RaccoonFrame, species: ArenaSpecies): number {
   const spec = ANIMATIONS[frame.animation];
   // A whole number of wags per loop, so looping animations don't jump.
   const wags = Math.max(1, Math.round(spec.durationMs / 1400));
   const period = spec.loop ? spec.durationMs / wags : 1400;
-  const amount = frame.animation === 'sleep' ? 1 : frame.animation === 'dangle' ? 2 : 4;
+  const amount = (frame.animation === 'sleep' ? 1 : frame.animation === 'dangle' ? 2 : 4) * (species === 'cat' ? 2 : 1);
   return amount * Math.sin((2 * Math.PI * frame.timeMs) / period);
 }
 
 let instances = 0;
 
-export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
+export function createArenaRaccoon(doc: Document = document, options: ArenaOptions = {}): RaccoonRenderer {
   const { make, set } = svgWriter(doc);
   const id = `arena${++instances}`;
+  const species = options.species ?? 'raccoon';
+  const cat = species === 'cat';
+  const cameraDeg = options.cameraDeg ?? CAMERA_DEG;
+  const SIN_E = Math.sin(cameraDeg * DEG);
+  const COS_E = Math.cos(cameraDeg * DEG);
+  // Seen from higher up he looks shorter, so he sinks less to keep his face over the edge.
+  const peekSink = (PEEK_SINK_UNITS * COS_E) / Math.cos(CAMERA_DEG * DEG);
+  const hop = options.hop ?? 0;
+  const tailBalls = cat ? CAT_TAIL_BALLS : TAIL_BALLS;
+  const bodySize = cat ? 0.84 : 1;
 
   const svg = make('svg', {
-    class: 'raccoon raccoon-arena',
+    class: `raccoon raccoon-arena arena-${species} ${options.className ?? ''}`.trim(),
     viewBox: `${VIEW.x} ${VIEW.y} ${VIEW.width} ${VIEW.height}`,
     role: 'img',
-    'aria-label': 'raccoon',
+    'aria-label': species,
   });
 
   // Light comes from the upper left: each ball gets a highlight there and darkens towards its rim.
@@ -134,9 +163,14 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
   for (const shade of SHADES) {
     const grad = make('radialGradient', { id: `${id}-${shade}`, cx: 0.4, cy: 0.36, r: 0.68, fx: 0.34, fy: 0.27 }, defs);
     const base = `var(${SHADE_VAR[shade]})`;
-    make('stop', { offset: 0, style: `stop-color: color-mix(in srgb, ${base}, white 38%)` }, grad);
-    make('stop', { offset: 0.5, style: `stop-color: ${base}` }, grad);
-    make('stop', { offset: 1, style: `stop-color: color-mix(in srgb, ${base}, black 32%)` }, grad);
+    const light = `color-mix(in srgb, ${base}, white 38%)`;
+    const dark = `color-mix(in srgb, ${base}, black 32%)`;
+    // Cel shading: the same light and shade, but in hard bands like an inked cartoon.
+    const stops: [number, string][] =
+      options.shading === 'cel'
+        ? [[0, light], [0.16, light], [0.16, base], [0.76, base], [0.76, dark], [1, dark]]
+        : [[0, light], [0.5, base], [1, dark]];
+    for (const [offset, color] of stops) make('stop', { offset, style: `stop-color: ${color}` }, grad);
   }
   const fillOf = (shade: Shade) => `url(#${id}-${shade})`;
 
@@ -170,7 +204,7 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
   /** A flat shape lying on a surface: a unit circle mapped by a matrix. */
   const decal = (cls: string) => ({ fill: track(make('circle', { r: 1, class: cls }, fills)) });
 
-  const tail = TAIL_BALLS.map(([, , shade]) => ball(shade));
+  const tail = tailBalls.map(([, , shade]) => ball(shade));
   const legs = LEGS.map(() => ({ bone: stick(), paw: ball('leg') }));
   const body = BODY_BALLS.map(([, , , shade]) => ball(shade));
   const skull = ball('fur');
@@ -178,6 +212,8 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
   const muzzle = ball('light');
   const nose = ball('dark');
   const ears = [0, 1].map(() => ({ outer: ball('fur'), inner: decal('r-ear-pink') }));
+  // A cat's ears come to a point: two smaller balls stacked on each.
+  const earTips = cat ? [0, 1].map(() => [ball('fur'), ball('fur')]) : [];
   const face = {
     brows: [decal('r-light'), decal('r-light')],
     bridge: decal('r-dark'),
@@ -198,7 +234,7 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
     anchor: { x: -VIEW.x / VIEW.width, y: -VIEW.y / VIEW.height },
     turnsItself: true,
     // Standing up facing you, his eyes are about 41 units up: this leaves his face over the edge.
-    peekSink: PEEK_SINK_UNITS * PX_PER_UNIT,
+    peekSink: peekSink * PX_PER_UNIT,
 
     setScale(k) {
       set(svg, 'width', n(VIEW.width * PX_PER_UNIT * k));
@@ -207,6 +243,11 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
 
     draw(frame: RaccoonFrame) {
       const pose: Pose = poseFor(frame.animation, frame.timeMs, frame.keystrokes);
+      const gait = frame.animation === 'walk' ? 600 : frame.animation === 'run' ? 340 : frame.animation === 'chase' ? 300 : 0;
+      if (hop && gait) {
+        // A bouncy toy: a little hop on every footfall.
+        pose.y -= hop * Math.abs(Math.sin((2 * Math.PI * frame.timeMs) / gait));
+      }
       const heading = frame.heading ?? 0;
       const ch = Math.cos(heading);
       const sh = Math.sin(heading);
@@ -271,7 +312,7 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
       set(shadow, 'opacity', n(1 - lift));
 
       // ---- Body ----
-      BODY_BALLS.forEach(([x, y, r], i) => placeBall(body[i]!, bodyPoint(x, y, 0), r * (0.5 + pose.breathe * 0.5)));
+      BODY_BALLS.forEach(([x, y, r], i) => placeBall(body[i]!, bodyPoint(x, y, 0), r * bodySize * (0.5 + pose.breathe * 0.5)));
 
       // ---- Legs: a stubby stick and a round paw ----
       LEGS.forEach(([name, side, front], i) => {
@@ -290,7 +331,7 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
           // it lands on the edge line from this camera angle, whatever way he faces.
           const reach = v3(12, side * 19, 0);
           const toward = reach.f * sh + reach.l * ch;
-          const edgeY = -PEEK_SINK_UNITS - 3.5;
+          const edgeY = -peekSink - 3.5;
           pawAt = { ...reach, u: (toward * SIN_E - edgeY) / COS_E };
           to = project(add(pawAt, v3(-2, 0, -2)));
         }
@@ -307,13 +348,14 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
       });
 
       // ---- Tail: a chain of ringed balls that sways side to side ----
-      const sway = tailSway(frame);
+      const sway = tailSway(frame, species);
       const curl = 5;
-      TAIL_BALLS.forEach(([s, r], i) => {
+      tailBalls.forEach(([s, r], i) => {
         const u = 1 - s;
         // A gentle upward curve from the root (side-view tail coordinates, pointing back and up).
-        const x = u * u * -2 + 2 * u * s * (-16 - curl) + s * s * -30;
-        const y = u * u * -1 + 2 * u * s * (-10 - curl * 1.6) + s * s * -19;
+        // The cat's is longer and rises higher.
+        const x = cat ? u * u * -2 + 2 * u * s * -30 + s * s * -22 : u * u * -2 + 2 * u * s * (-16 - curl) + s * s * -30;
+        const y = cat ? u * u * -1 + 2 * u * s * -8 + s * s * -40 : u * u * -1 + 2 * u * s * (-10 - curl * 1.6) + s * s * -19;
         const c = Math.cos(pose.tail.angle * DEG);
         const sn = Math.sin(pose.tail.angle * DEG);
         const puff = pose.tail.puff;
@@ -324,9 +366,16 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
 
       // ---- Head ----
       placeBall(skull, headPoint(SKULL.c), SKULL.r * HEAD_SCALE);
-      placeBall(muzzle, headPoint(MUZZLE.c), MUZZLE.r * HEAD_SCALE);
-      placeBall(nose, headPoint(v3(30.5, 0, 3)), 3.2 * HEAD_SCALE);
-      [-1, 1].forEach((side, i) => placeBall(cheeks[i]!, headPoint(v3(13, side * 11, 1)), 7 * HEAD_SCALE));
+      if (cat) {
+        // A short, neat muzzle and a little pink nose.
+        placeBall(muzzle, headPoint(v3(20, 0, 0)), 6.2 * HEAD_SCALE);
+        placeBall(nose, headPoint(v3(25.6, 0, 2.6)), 2 * HEAD_SCALE);
+        [-1, 1].forEach((side, i) => placeBall(cheeks[i]!, headPoint(v3(17, side * 4.5, -0.5)), 5 * HEAD_SCALE));
+      } else {
+        placeBall(muzzle, headPoint(MUZZLE.c), MUZZLE.r * HEAD_SCALE);
+        placeBall(nose, headPoint(v3(30.5, 0, 3)), 3.2 * HEAD_SCALE);
+        [-1, 1].forEach((side, i) => placeBall(cheeks[i]!, headPoint(v3(13, side * 11, 1)), 7 * HEAD_SCALE));
+      }
       const skullDepth = skull.fill.depth;
 
       /** A decal lying on the skull, centred where `dir` (head space) meets its surface. */
@@ -350,15 +399,22 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
 
       const shut = frame.eyes === 'closed' || frame.eyes === 'blink';
       const eyeSize = frame.eyes === 'wide' ? 1.2 : 1;
-      onSkull(face.bridge, v3(0.95, 0, 0.3), 4.6, 2);
+      // The raccoon's bandit mask; a cat has a plain face.
+      onSkull(face.bridge, v3(0.95, 0, 0.3), 4.6, 2, 1, undefined, !cat);
       [-1, 1].forEach((side, i) => {
-        const dir = v3(0.8, 0.4 * side, 0.42);
-        onSkull(face.brows[i]!, v3(0.55, 0.42 * side, 0.74), 4.8, 1);
-        onSkull(face.masks[i]!, dir, 6.4, 3);
-        onSkull(face.whites[i]!, dir, 3.9 * eyeSize, 4, 1, undefined, !shut);
+        const dir = cat ? v3(0.8, 0.42 * side, 0.32) : v3(0.8, 0.4 * side, 0.42);
+        onSkull(face.brows[i]!, v3(0.55, 0.42 * side, 0.74), 4.8, 1, 1, undefined, !cat);
+        onSkull(face.masks[i]!, dir, 6.4, 3, 1, undefined, !cat);
+        onSkull(face.whites[i]!, dir, (cat ? 4.6 : 3.9) * eyeSize, 4, cat ? 1.1 : 1, undefined, !shut);
         // Both eyes look the same way: "a" runs across the face, "b" up it.
         const look = { a: pose.look.x * 1.3, b: -pose.look.y * 1.3 };
-        onSkull(face.pupils[i]!, dir, 2.7 * eyeSize, 5, 1, look, !shut);
+        if (cat) {
+          // A cat's slit pupil, wider when wide-eyed.
+          const width = frame.eyes === 'wide' ? 2.6 : 1.3;
+          onSkull(face.pupils[i]!, dir, width * eyeSize, 5, (4 / width) * 1.05, look, !shut);
+        } else {
+          onSkull(face.pupils[i]!, dir, 2.7 * eyeSize, 5, 1, look, !shut);
+        }
         onSkull(face.glints[i]!, dir, 0.95, 6, 1, { a: look.a + 0.9, b: look.b + 1 }, !shut);
         onSkull(face.lids[i]!, dir, 3.4, 4, 0.28, { a: 0, b: -0.5 }, shut);
       });
@@ -366,10 +422,16 @@ export function createArenaRaccoon(doc: Document = document): RaccoonRenderer {
       // Ears: round bobbles on top of the head with a pink inside, folding back when flattened.
       [-1, 1].forEach((side, i) => {
         const back = pose.ears;
-        const c = v3(3 - back * 4, side * 9.5, 20 - back * 4);
+        const c = cat ? v3(5 - back * 5, side * 8.5, 18 - back * 4) : v3(3 - back * 4, side * 9.5, 20 - back * 4);
         const { outer, inner } = ears[i]!;
-        const r = 5.6;
+        const r = cat ? 5.2 : 5.6;
         placeBall(outer, headPoint(c), r * HEAD_SCALE);
+        earTips[i]?.forEach((tip, k) => {
+          // Each ball smaller and higher, leaning back as the ears flatten.
+          const up = (k + 1) * 3.6;
+          const at = v3(c.f - (k + 1) * (0.6 + back * 2.5), c.l + side * (k + 1) * 0.6, c.u + up * (1 - back * 0.5));
+          placeBall(tip, headPoint(at), (r - (k + 1) * 1.7) * HEAD_SCALE);
+        });
         const dir = norm(v3(0.85 - back * 0.6, side * 0.45, 0.25));
         const ta = norm(cross(dir, v3(0, 0, 1)));
         const tb = cross(ta, dir);

@@ -1,7 +1,31 @@
 // User settings, shared by the Electron main process (which stores them) and the renderer.
 
 /** The pets to choose from: raccoons in several art styles, and a cat. The first one is the default. */
-export const RACCOON_TYPES = ['arena', 'cartoon', 'plush', 'classic', 'cat'] as const;
+export const RACCOON_TYPES = [
+  'arena',
+  'arena-low',
+  'arena-top',
+  'arena-cel',
+  'cartoon',
+  'plush',
+  'classic',
+  'raccoon-pixel',
+  'raccoon-sketch',
+  'raccoon-sticker',
+  'raccoon-neon',
+  'cat',
+  'cat-tabby',
+  'cat-siamese',
+  'cat-kitten',
+  'cat-chonk',
+  'cat-hose',
+  'cat-snappy',
+  'cat-3d',
+  'cat-3d-top',
+  'cat-pixel',
+  'cat-sketch',
+  'cat-neon',
+] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
 export interface Settings {

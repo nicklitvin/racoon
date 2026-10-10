@@ -1,8 +1,9 @@
 import type { Point } from '../core/geometry';
+import { ANIMATIONS } from './animations';
 import { CAT, bodyPoint, catPoseFor, headCentre, legRoot, smooth, spineLength, tailAngles, tailPoints, type CatPose } from './catPose';
 import type { LegName } from './rig';
 import { n, PX_PER_UNIT, svgWriter } from './svg';
-import type { AnimationName, AnimationSpec, RaccoonFrame, RaccoonRenderer } from './types';
+import { ANIMATION_NAMES, type AnimationName, type AnimationSpec, type RaccoonFrame, type RaccoonRenderer } from './types';
 
 /**
  * How each part eases into a new animation: a delay and a duration in ms. Parts start
@@ -19,6 +20,107 @@ const BLEND = {
 const BLEND_END_MS = Math.max(...Object.values(BLEND).map((b) => b.delay + b.duration));
 /** Turning round: a quick squash-through flip. */
 const FLIP_MS = 190;
+
+/** How a breed moves. 1 is the black cat's smooth, Disney-ish feel. */
+export interface CatMotion {
+  /** Scales how long changes take to ease in; 0 snaps straight to the new pose. */
+  blend: number;
+  /** How far the ears and tail swing past their target: 0 none, 1 normal, 2 a lot. */
+  overshoot: number;
+  /** Hop on every footfall while walking or running, in units. */
+  bounce: number;
+  /** Bobbing up and down even while standing about (rubber-hose style), in units. */
+  idleBob: number;
+  /** Draw everything at 12 fps, "on twos", like limited TV animation. */
+  onTwos: boolean;
+}
+
+export interface CatBuild {
+  label: string;
+  /** Palette class; colours live in CSS. */
+  className: string;
+  head: number;
+  /** Body thickness. */
+  body: number;
+  eyes: number;
+  /** Muscly thighs and shoulders; off for noodle legs. */
+  thighs: boolean;
+  stripes: boolean;
+  motion: CatMotion;
+}
+
+const SMOOTH: CatMotion = { blend: 1, overshoot: 1, bounce: 0, idleBob: 0, onTwos: false };
+
+export const CAT_BREEDS = {
+  black: { label: 'black cat', className: 'cat-black', head: 1.1, body: 1, eyes: 1, thighs: true, stripes: false, motion: SMOOTH },
+  tabby: {
+    label: 'tabby cat',
+    className: 'cat-tabby',
+    head: 1.1,
+    body: 1.05,
+    eyes: 1,
+    thighs: true,
+    stripes: true,
+    motion: { ...SMOOTH, bounce: 0.8 },
+  },
+  // Elegant and unhurried: long, soft eases and hardly any wobble.
+  siamese: {
+    label: 'siamese cat',
+    className: 'cat-siamese',
+    head: 1.02,
+    body: 0.92,
+    eyes: 1,
+    thighs: true,
+    stripes: false,
+    motion: { ...SMOOTH, blend: 1.6, overshoot: 0.5 },
+  },
+  // Springy and over-excited: hops along, everything jiggles.
+  kitten: {
+    label: 'kitten',
+    className: 'cat-kitten',
+    head: 1.38,
+    body: 0.95,
+    eyes: 1.2,
+    thighs: true,
+    stripes: false,
+    motion: { ...SMOOTH, blend: 0.8, overshoot: 2.2, bounce: 2.6 },
+  },
+  // Big and lazy: slow to get going, a waddle in the walk.
+  chonk: {
+    label: 'chonky tuxedo cat',
+    className: 'cat-chonk',
+    head: 1.15,
+    body: 1.42,
+    eyes: 0.95,
+    thighs: true,
+    stripes: false,
+    motion: { ...SMOOTH, blend: 1.9, overshoot: 0.4, bounce: 0.7 },
+  },
+  // 1930s rubber-hose cartoon: noodle legs, white gloves, a constant bounce, on twos.
+  hose: {
+    label: 'rubber-hose cat',
+    className: 'cat-hose',
+    head: 1.25,
+    body: 0.95,
+    eyes: 1.25,
+    thighs: false,
+    stripes: false,
+    motion: { blend: 0.7, overshoot: 2.6, bounce: 4, idleBob: 1.8, onTwos: true },
+  },
+  // Limited animation: snaps between key poses at 12 fps with no easing at all.
+  snappy: {
+    label: 'white cat',
+    className: 'cat-white',
+    head: 1.18,
+    body: 1,
+    eyes: 1.1,
+    thighs: true,
+    stripes: false,
+    motion: { blend: 0, overshoot: 0, bounce: 0, idleBob: 0, onTwos: true },
+  },
+} satisfies Record<string, CatBuild>;
+
+export type CatBreed = keyof typeof CAT_BREEDS;
 /** Eyelids close and open over roughly this long. */
 const LID_MS = 30;
 
@@ -34,15 +136,12 @@ const CAT_ANIMATIONS: Partial<Record<AnimationName, Partial<AnimationSpec>>> = {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-/** Eases out past the target and back: follow-through. */
-const overshoot = (v: number) => {
+/** Eases out past the target and back: follow-through. `amount` 0 is a plain ease. */
+const overshoot = (v: number, amount: number) => {
   const x = clamp01(v) - 1;
-  return 1 + 2.4 * x * x * x + 1.4 * x * x;
+  return smooth(v) + amount * (1 + 2.4 * x * x * x + 1.4 * x * x - smooth(v));
 };
 const angleDiff = (from: number, to: number) => ((((to - from + 180) % 360) + 360) % 360) - 180;
-
-/** A slightly oversized head reads as young and cute. */
-const HEAD_SCALE = 1.1;
 
 const LEGS: LegName[] = ['backFar', 'frontFar', 'backNear', 'frontNear'];
 
@@ -56,13 +155,14 @@ function lerpPoint(a: Point, b: Point, t: number): Point {
   return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
 }
 
-function mix(from: Shown, to: Shown, sinceMs: number): Shown {
+function mix(from: Shown, to: Shown, sinceMs: number, motion: CatMotion): Shown {
   const w = (part: keyof typeof BLEND, ease: (v: number) => number = smooth) =>
-    ease((sinceMs - BLEND[part].delay) / BLEND[part].duration);
+    motion.blend <= 0 ? 1 : ease((sinceMs - BLEND[part].delay * motion.blend) / (BLEND[part].duration * motion.blend));
+  const swing = (v: number) => overshoot(v, motion.overshoot);
   const body = w('body');
   const head = w('head');
-  const ears = w('ears', overshoot);
-  const tail = w('tail', overshoot);
+  const ears = w('ears', swing);
+  const tail = w('tail', swing);
   const a = from.pose;
   const b = to.pose;
   const paws = {} as CatPose['paws'];
@@ -121,21 +221,54 @@ function joint(root: Point, paw: Point, upper: number, lower: number, bend: 1 | 
 
 let gradientIds = 0;
 
+/** Bounces a pose: a hop on every footfall, squashing on landing and stretching in the air. */
+function bounced(pose: CatPose, frame: RaccoonFrame, motion: CatMotion): CatPose {
+  const gait = frame.animation === 'walk' ? 600 : frame.animation === 'run' ? 340 : frame.animation === 'chase' ? 300 : 0;
+  const resting = frame.animation === 'idle' || frame.animation === 'sit' || frame.animation === 'happy';
+  if (gait && motion.bounce) {
+    const up = Math.abs(Math.sin((2 * Math.PI * frame.timeMs) / gait));
+    const lift = motion.bounce * up;
+    const paws = {} as CatPose['paws'];
+    for (const leg of LEGS) paws[leg] = { x: pose.paws[leg].x, y: pose.paws[leg].y - lift };
+    return {
+      ...pose,
+      hip: { x: pose.hip.x, y: pose.hip.y - lift },
+      chest: { x: pose.chest.x, y: pose.chest.y - lift },
+      paws,
+      squash: pose.squash * (1 + 0.025 * motion.bounce * (up * 2 - 1)),
+    };
+  }
+  if (resting && motion.idleBob) {
+    // Only the body bobs; the legs flex to keep the paws planted.
+    const down = Math.abs(Math.sin((2 * Math.PI * frame.timeMs) / 700));
+    const bob = motion.idleBob * down;
+    return {
+      ...pose,
+      hip: { x: pose.hip.x, y: pose.hip.y + bob },
+      chest: { x: pose.chest.x, y: pose.chest.y + bob * 1.2 },
+      squash: pose.squash * (1 - 0.02 * motion.idleBob * down),
+    };
+  }
+  return pose;
+}
+
 /**
- * A sleek 2D black cat in a hand-drawn cartoon style. Poses come from `catPoseFor`;
- * this renderer adds what makes it feel animated rather than mechanical: each change
- * of animation is eased in part by part (body first, the tail last and overshooting),
- * eyelids close softly, and turning round is a quick squash-through flip instead of
- * an instant mirror.
+ * A 2D cartoon cat. Poses come from `catPoseFor`; this renderer adds what makes it feel
+ * animated rather than mechanical: each change of animation is eased in part by part
+ * (body first, the tail last and overshooting), eyelids close softly, and turning round
+ * is a quick squash-through flip instead of an instant mirror. Breeds change the
+ * colours, proportions and how springy or snappy all of that is.
  */
-export function createBlackCat(doc: Document = document): RaccoonRenderer {
+export function createCat(doc: Document = document, breed: CatBreed = 'black'): RaccoonRenderer {
   const { make, set } = svgWriter(doc);
   const { view } = CAT;
+  const build: CatBuild = CAT_BREEDS[breed];
+  const { motion } = build;
   const svg = make('svg', {
-    class: 'raccoon raccoon-cat',
+    class: `raccoon raccoon-cat ${build.className}`,
     viewBox: `${view.x} ${view.y} ${view.width} ${view.height}`,
     role: 'img',
-    'aria-label': 'black cat',
+    'aria-label': build.label,
   });
   const irisId = `cat-iris-${++gradientIds}`;
   const defs = make('defs', {}, svg);
@@ -149,32 +282,41 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
   const figure = make('g', { class: 'raccoon-figure' }, turn);
   const squash = make('g', {}, figure);
 
-  const tail = make('path', { class: 'c-fur' }, squash);
+  const tail = make('path', { class: 'c-tail' }, squash);
+  const tailRings = make('path', { class: 'c-stripe', display: build.stripes ? 'inline' : 'none' }, squash);
   const makeLeg = (name: LegName) => {
-    const cls = name.endsWith('Far') ? 'c-far' : 'c-fur';
+    const near = name.endsWith('Near');
+    const cls = near ? 'c-leg' : 'c-far';
     const group = make('g', {}, squash);
-    // Near legs get a faint light edge so they read against the black body.
-    const edge = name.endsWith('Near') ? make('path', { class: 'c-limb c-edge' }, group) : null;
-    const upper = make('ellipse', { class: cls }, group);
+    // Near legs get a faint edge so they read against the body.
+    const edge = near ? make('path', { class: 'c-limb c-edge' }, group) : null;
+    const upper = make('ellipse', { class: cls, display: build.thighs ? 'inline' : 'none' }, group);
     const limb = make('path', { class: `c-limb ${cls}` }, group);
-    const paw = make('ellipse', { rx: 3.9, ry: 2.6, class: `${cls} ${edge ? 'c-paw-edge' : ''}` }, group);
+    const paw = make('ellipse', { rx: 3.9, ry: 2.6, class: near ? 'c-paw c-paw-edge' : 'c-paw-far' }, group);
     return { group, edge, upper, limb, paw };
   };
   const legs = {} as Record<LegName, ReturnType<typeof makeLeg>>;
   legs.backFar = makeLeg('backFar');
   legs.frontFar = makeLeg('frontFar');
-  const body = make('path', { class: 'c-fur' }, squash);
+  const body = make('path', { class: 'c-body' }, squash);
+  // A pale chest patch for the breeds that have one (transparent otherwise).
+  const bib = make('ellipse', { class: 'c-bib' }, squash);
+  const bodyStripes = make('path', { class: 'c-stripe', display: build.stripes ? 'inline' : 'none' }, squash);
   const bodySheen = make('path', { class: 'c-sheen' }, squash);
   legs.backNear = makeLeg('backNear');
   legs.frontNear = makeLeg('frontNear');
 
   const head = make('g', {}, squash);
-  const farEar = make('path', { d: 'M-9,-5 Q-9.5,-17 -7,-23 Q-1,-17 2,-10 Z', class: 'c-far' }, head);
-  make('ellipse', { cx: 0, cy: -1, rx: 13, ry: 11.5, class: 'c-fur' }, head);
-  make('ellipse', { cx: 1.5, cy: 4, rx: 12.5, ry: 8, class: 'c-fur' }, head);
-  make('ellipse', { cx: 10.5, cy: 3.4, rx: 6, ry: 4.4, class: 'c-fur' }, head);
+  const farEar = make('path', { d: 'M-9,-5 Q-9.5,-17 -7,-23 Q-1,-17 2,-10 Z', class: 'c-ear-far' }, head);
+  make('ellipse', { cx: 0, cy: -1, rx: 13, ry: 11.5, class: 'c-head' }, head);
+  make('ellipse', { cx: 1.5, cy: 4, rx: 12.5, ry: 8, class: 'c-head' }, head);
+  make('ellipse', { cx: 10.5, cy: 3.4, rx: 6, ry: 4.4, class: 'c-muzzle' }, head);
+  if (build.stripes) {
+    // The tabby "M" on the forehead.
+    make('path', { d: 'M-7,-8 Q-6,-6 -4.5,-4.5 M-2.5,-11 Q-1.5,-8 -0.5,-6 M2,-11.5 Q2.6,-9 3,-7', class: 'c-stripe' }, head);
+  }
   const nearEar = make('g', {}, head);
-  make('path', { d: 'M-2,-9 Q1,-20 5,-25 Q9,-17 11,-7 Z', class: 'c-fur' }, nearEar);
+  make('path', { d: 'M-2,-9 Q1,-20 5,-25 Q9,-17 11,-7 Z', class: 'c-ear' }, nearEar);
   make('path', { d: 'M1,-10 Q3,-17 5,-20.5 Q7.5,-15 8.5,-9 Z', class: 'c-ear-inner' }, nearEar);
   make('ellipse', { cx: -4, cy: -7, rx: 6.5, ry: 2.8, transform: 'rotate(-20 -4 -7)', class: 'c-sheen' }, head);
 
@@ -182,7 +324,7 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
     { x: 4.5, y: -2.5, rx: 4.4, ry: 5.4 },
     { x: 12.6, y: -2.8, rx: 2.9, ry: 5 },
   ].map(({ x, y, rx, ry }, i) => {
-    const group = make('g', { transform: `translate(${x} ${y})` }, head);
+    const group = make('g', {}, head);
     const clipId = `${irisId}-eye${i}`;
     const clip = make('clipPath', { id: clipId }, defs);
     make('ellipse', { rx, ry }, clip);
@@ -190,12 +332,12 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
     make('ellipse', { rx, ry, fill: `url(#${irisId})` }, open);
     const pupil = make('ellipse', { rx: 1, ry: ry * 0.82, class: 'c-pupil' }, open);
     const glint = make('circle', { r: Math.min(1.3, rx * 0.3), class: 'c-glint' }, open);
-    const lid = make('rect', { x: -rx - 1, width: rx * 2 + 2, class: 'c-fur' }, open);
+    const lid = make('rect', { x: -rx - 1, width: rx * 2 + 2, class: 'c-head' }, open);
     const shut = make('path', { d: `M${-rx},0.3 Q0,${n(ry * 0.5)} ${rx},0.3`, class: 'c-line', display: 'none' }, group);
     return { group, open, pupil, glint, lid, shut, rx, ry, x, y };
   });
   make('path', { d: 'M14.5,-0.6 L17.6,-0.8 Q17.4,1.3 16.1,1.9 Q14.8,1.2 14.5,-0.6 Z', class: 'c-nose' }, head);
-  const smile = make('path', { d: 'M16,2 Q16.2,4.2 14.2,4.6 M16,2 Q16.6,4 18.2,4', class: 'c-line' }, head);
+  const smile = make('path', { d: 'M16,2 Q16.2,4.2 14.2,4.6 M16,2 Q16.6,4 18.2,4', class: 'c-line c-smile' }, head);
   const mouth = make('g', { display: 'none' }, head);
   const mouthHole = make('ellipse', { cx: 14.8, cy: 4.8, rx: 2.8, ry: 1, class: 'c-mouth' }, mouth);
   const tongue = make('ellipse', { cx: 14.6, cy: 5.6, rx: 1.8, ry: 0.8, class: 'c-tongue' }, mouth);
@@ -247,8 +389,8 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
 
   const drawBody = (pose: CatPose) => {
     const L = spineLength(pose);
-    const rr = CAT.rump * pose.breathe;
-    const rc = CAT.chest * pose.breathe;
+    const rr = CAT.rump * pose.breathe * build.body;
+    const rc = CAT.chest * pose.breathe * build.body;
     const k = 0.55;
     const arch = pose.arch * 1.33;
     const p = (a: number, b: number) => {
@@ -267,6 +409,23 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
         // A slightly tucked-up belly gives the sleek cat waist.
         `C${p(L * 0.62, rc * 0.7)} ${p(L * 0.38, rr * 0.7)} ${p(0, rr)}Z`,
     );
+    const bibAt = bodyPoint(pose, L + rc * 0.45, rc * 0.35);
+    set(bib, 'cx', n(bibAt.x));
+    set(bib, 'cy', n(bibAt.y));
+    set(bib, 'rx', n(rc * 0.62));
+    set(bib, 'ry', n(rc * 0.72));
+    if (build.stripes) {
+      // Stripes run down from the spine, following the arch of the back.
+      let d = '';
+      for (const s of [-0.25, 0.1, 0.3, 0.5, 0.7]) {
+        const a = s * L;
+        const t = clamp01(s);
+        const r = lerp(rr, rc, t);
+        const top = -r - arch * 3 * t * (1 - t) * 0.9 + 1;
+        d += `M${p(a, top)}Q${p(a + 2.5, top + r * 0.5)} ${p(a + 1.2, -r * 0.1)}`;
+      }
+      set(bodyStripes, 'd', d);
+    }
     // A soft rim of light along the back, so the shape reads even though it's all black.
     set(
       bodySheen,
@@ -297,6 +456,12 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
     const tl = Math.hypot(tip.x - before.x, tip.y - before.y) || 1;
     const cap = { x: tip.x + ((tip.x - before.x) / tl) * 2.4 * pose.tail.puff, y: tip.y + ((tip.y - before.y) / tl) * 2.4 * pose.tail.puff };
     set(tail, 'd', smoothPath([...left, cap, ...right.reverse()]));
+    if (build.stripes) {
+      // Rings round the tail.
+      let d = '';
+      for (const i of [3, 5, 7, 9]) d += `M${n(left[i]!.x)},${n(left[i]!.y)}L${n(right[last - i]!.x)},${n(right[last - i]!.y)}`;
+      set(tailRings, 'd', d);
+    }
   };
 
   const draw = (pose: CatPose, tailAnglesNow: number[], frame: RaccoonFrame) => {
@@ -318,7 +483,7 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
     for (const leg of LEGS) drawLeg(pose, leg);
 
     const centre = headCentre(pose);
-    set(head, 'transform', `translate(${n(centre.x)} ${n(centre.y)}) rotate(${n(pose.head.angle)}) scale(${HEAD_SCALE})`);
+    set(head, 'transform', `translate(${n(centre.x)} ${n(centre.y)}) rotate(${n(pose.head.angle)}) scale(${build.head})`);
     set(farEar, 'transform', `rotate(${n(-pose.ears * 50)} -4 -8)`);
     set(nearEar, 'transform', `rotate(${n(-pose.ears * 45)} 4 -9)`);
     set(whiskers, 'transform', `rotate(${n(pose.ears * 8 + pose.mouth * 10)} 15 3)`);
@@ -338,7 +503,7 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
 
     const wide = Math.max(0, -lids);
     for (const eye of eyes) {
-      set(eye.group, 'transform', `translate(${eye.x} ${eye.y}) scale(${n(1 + wide * 0.6)})`);
+      set(eye.group, 'transform', `translate(${eye.x} ${eye.y}) scale(${n((1 + wide * 0.6) * build.eyes)})`);
       const shut = lids > 0.85;
       set(eye.open, 'display', shut ? 'none' : 'inline');
       set(eye.shut, 'display', shut ? 'inline' : 'none');
@@ -355,7 +520,12 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
     }
   };
 
-  const flipProgress = () => clamp01((clock - flipAt) / FLIP_MS);
+  const flipMs = FLIP_MS * Math.min(1, motion.blend);
+  const flipProgress = () => (flipMs <= 0 ? 1 : clamp01((clock - flipAt) / flipMs));
+  const blendEnd = BLEND_END_MS * motion.blend;
+  const animations: Partial<Record<AnimationName, Partial<AnimationSpec>>> = motion.onTwos
+    ? Object.fromEntries(ANIMATION_NAMES.map((name) => [name, { fps: Math.min(12, ANIMATIONS[name].fps) }]))
+    : CAT_ANIMATIONS;
 
   const renderer: RaccoonRenderer = {
     element: svg,
@@ -364,7 +534,7 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
     anchor: { x: -view.x / view.width, y: -view.y / view.height },
     peekSink: CAT.peekSink * PX_PER_UNIT,
     turnsItself: true,
-    animations: CAT_ANIMATIONS,
+    animations,
 
     setScale(scale) {
       set(svg, 'width', n(view.width * PX_PER_UNIT * scale));
@@ -372,14 +542,14 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
     },
 
     isSettling() {
-      return clock - changedAt < BLEND_END_MS || flipProgress() < 1 || Math.abs(lids - lidTarget) > 0.02;
+      return clock - changedAt < blendEnd || flipProgress() < 1 || Math.abs(lids - lidTarget) > 0.02;
     },
 
     draw(frame) {
       const now = frame.clockMs ?? clock;
       const dt = Math.max(0, Math.min(100, now - clock));
       clock = now;
-      const pose = catPoseFor(frame.animation, frame.timeMs, frame.keystrokes);
+      const pose = bounced(catPoseFor(frame.animation, frame.timeMs, frame.keystrokes), frame, motion);
       const target: Shown = { pose, tail: tailAngles(pose) };
 
       if (frame.animation !== animation) {
@@ -388,10 +558,11 @@ export function createBlackCat(doc: Document = document): RaccoonRenderer {
         animation = frame.animation;
         changedAt = frame.clockMs === undefined ? -Infinity : clock;
       }
-      shown = from ? mix(from, target, clock - changedAt) : target;
+      shown = from ? mix(from, target, clock - changedAt, motion) : target;
 
       lidTarget = frame.eyes === 'closed' || frame.eyes === 'blink' ? 1 : frame.eyes === 'wide' ? Math.min(pose.lids, -0.25) : pose.lids;
-      lids = frame.clockMs === undefined ? lidTarget : lerp(lids, lidTarget, 1 - Math.exp(-dt / LID_MS));
+      const snap = frame.clockMs === undefined || motion.blend <= 0;
+      lids = snap ? lidTarget : lerp(lids, lidTarget, 1 - Math.exp(-dt / LID_MS));
 
       // Turning round: a quick cartoon turn. He squeezes narrow and tall with a little hop,
       // pops round at the middle, and springs back out, rather than mirroring instantly.

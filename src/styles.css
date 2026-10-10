@@ -301,20 +301,36 @@ html[data-host='web'][data-theme='dark'] {
   stroke-width: 11;
 }
 
-/* ---- Black cat: flat 2D cartoon ---- */
+/* ---- 2D cats: flat cartoon ---- */
 
+/* Each part has its own colour, defaulting to the fur, so breeds can paint points,
+   bibs and gloves. Breeds below only override what differs from the black cat. */
 .raccoon-cat {
   --c-fur: #24212b;
   --c-far: #131117;
   --c-edge: #46404f;
+  --c-body: var(--c-fur);
+  --c-head: var(--c-fur);
+  --c-muzzle: var(--c-head);
+  --c-ear: var(--c-head);
+  --c-ear-far: var(--c-far);
+  --c-tail: var(--c-fur);
+  --c-leg: var(--c-fur);
+  --c-paw: var(--c-leg);
+  --c-paw-far: var(--c-far);
+  --c-bib: transparent;
+  --c-stripe: transparent;
   --c-iris: #d9d64a;
   --c-iris-in: #f4f39a;
   --c-iris-out: #8fa52c;
+  --c-pupil: #08070a;
   --c-ear-inner: #6e4459;
   --c-nose: #e98fa8;
   --c-line: #cfc8dc;
+  --c-smile: var(--c-line);
   --c-mouth: #5d2338;
   --c-tongue: #ea8aa3;
+  --c-sheen: 0.1;
   /* A light halo in every theme: a dark one would hide a black cat on a dark page. */
   --c-halo: rgba(255, 255, 255, 0.75);
   filter: none;
@@ -324,12 +340,55 @@ html[data-host='web'][data-theme='dark'] {
   filter: drop-shadow(0 0 1.2px var(--c-halo));
 }
 
-.c-fur {
-  fill: var(--c-fur);
+.c-body {
+  fill: var(--c-body);
+}
+
+.c-head {
+  fill: var(--c-head);
+}
+
+.c-muzzle {
+  fill: var(--c-muzzle);
+}
+
+.c-ear {
+  fill: var(--c-ear);
+}
+
+.c-ear-far {
+  fill: var(--c-ear-far);
+}
+
+.c-tail {
+  fill: var(--c-tail);
+}
+
+.c-leg {
+  fill: var(--c-leg);
 }
 
 .c-far {
   fill: var(--c-far);
+}
+
+.c-paw {
+  fill: var(--c-paw);
+}
+
+.c-paw-far {
+  fill: var(--c-paw-far);
+}
+
+.c-bib {
+  fill: var(--c-bib);
+}
+
+.c-stripe {
+  fill: none;
+  stroke: var(--c-stripe);
+  stroke-width: 2.2;
+  stroke-linecap: round;
 }
 
 .c-limb {
@@ -338,8 +397,8 @@ html[data-host='web'][data-theme='dark'] {
   stroke-linecap: round;
 }
 
-.c-limb.c-fur {
-  stroke: var(--c-fur);
+.c-limb.c-leg {
+  stroke: var(--c-leg);
 }
 
 .c-limb.c-far {
@@ -358,7 +417,7 @@ html[data-host='web'][data-theme='dark'] {
 
 .c-sheen {
   fill: #fff;
-  opacity: 0.1;
+  opacity: var(--c-sheen);
 }
 
 .c-iris {
@@ -374,7 +433,7 @@ html[data-host='web'][data-theme='dark'] {
 }
 
 .c-pupil {
-  fill: #08070a;
+  fill: var(--c-pupil);
 }
 
 .c-glint {
@@ -408,9 +467,197 @@ html[data-host='web'][data-theme='dark'] {
   stroke-width: 0.8;
 }
 
+.c-smile {
+  stroke: var(--c-smile);
+}
+
 .c-whisker {
   stroke-width: 0.4;
   opacity: 0.75;
+}
+
+/* Ginger tabby with a cream chest and darker stripes. */
+.cat-tabby {
+  --c-fur: #e48a3c;
+  --c-far: #b9662a;
+  --c-edge: #a65a22;
+  --c-muzzle: #f8dcb6;
+  --c-bib: #f8dcb6;
+  --c-paw: #f8dcb6;
+  --c-stripe: #b5561d;
+  --c-ear-inner: #f0a39a;
+  --c-iris: #9fcf5a;
+  --c-iris-in: #dff3a0;
+  --c-iris-out: #5f8f2a;
+  --c-line: #6b3a1c;
+  --c-sheen: 0.18;
+  --c-halo: rgba(60, 30, 10, 0.35);
+}
+
+/* Siamese: cream body with dark brown points and blue eyes. */
+.cat-siamese {
+  --c-fur: #efe2cc;
+  --c-far: #4b3428;
+  --c-edge: #c9b79c;
+  --c-muzzle: #5a3f30;
+  --c-ear: #5a3f30;
+  --c-ear-far: #4b3428;
+  --c-tail: #4f372b;
+  --c-leg: #5a3f30;
+  --c-ear-inner: #8a6655;
+  --c-iris: #5aa8e6;
+  --c-iris-in: #bfe3ff;
+  --c-iris-out: #2b6aa8;
+  --c-line: #3b2a22;
+  --c-smile: #d9c7ad;
+  --c-nose: #2f211b;
+  --c-sheen: 0.25;
+  --c-halo: rgba(40, 25, 15, 0.35);
+}
+
+/* Fluffy grey kitten with big blue-green eyes. */
+.cat-kitten {
+  --c-fur: #9aa0aa;
+  --c-far: #747a84;
+  --c-edge: #80868f;
+  --c-muzzle: #eef0f3;
+  --c-bib: #eef0f3;
+  --c-paw: #eef0f3;
+  --c-ear-inner: #f3b3c2;
+  --c-iris: #6cc7b8;
+  --c-iris-in: #d2fff4;
+  --c-iris-out: #2f8a83;
+  --c-line: #3a3d44;
+  --c-sheen: 0.22;
+  --c-halo: rgba(30, 30, 40, 0.3);
+}
+
+/* Tuxedo: black with a white bib, muzzle and socks. */
+.cat-chonk {
+  --c-muzzle: #f4f2ee;
+  --c-bib: #f4f2ee;
+  --c-paw: #f4f2ee;
+  --c-paw-far: #d9d6d0;
+  --c-smile: #3a3640;
+  --c-iris: #9ad25a;
+  --c-iris-in: #e4f7b8;
+  --c-iris-out: #4f8a2a;
+}
+
+/* Rubber hose: pitch black, white face and gloves, big white "pie" eyes, thin noodle legs. */
+.cat-hose {
+  --c-fur: #141216;
+  --c-far: #0b0a0c;
+  --c-muzzle: #f6f1e4;
+  --c-paw: #f6f1e4;
+  --c-paw-far: #e2dccd;
+  --c-iris: #f6f1e4;
+  --c-iris-in: #ffffff;
+  --c-iris-out: #d8d0bd;
+  --c-smile: #141216;
+  --c-nose: #141216;
+  --c-ear-inner: #141216;
+  --c-sheen: 0;
+}
+
+.cat-hose .c-limb {
+  stroke-width: 3;
+}
+
+.cat-hose .c-limb.c-edge {
+  stroke-width: 4.4;
+}
+
+.cat-hose .c-paw,
+.cat-hose .c-paw-far {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.35);
+}
+
+/* White cat for limited animation; the ink outline does the halo's job. */
+.cat-white {
+  --c-fur: #f7f5f2;
+  --c-far: #dcd8d3;
+  --c-edge: #c8c3bd;
+  --c-ear-inner: #f6a9b8;
+  --c-iris: #4fa3f0;
+  --c-iris-in: #c7e6ff;
+  --c-iris-out: #2361a8;
+  --c-line: #4a4550;
+  --c-sheen: 0;
+  --c-halo: transparent;
+}
+
+/* ---- 3D palettes ---- */
+
+/* Brighter toy colours for the cel-shaded raccoon. */
+.arena-bright {
+  --r-fur: #9aa3b5;
+  --r-dark: #2c3040;
+  --r-light: #ffffff;
+  --r-leg: #3b4052;
+  --r3-outline: #1b1d2a;
+}
+
+.arena-ginger {
+  --r-fur: #e8913f;
+  --r-dark: #b85f22;
+  --r-light: #fbe2c2;
+  --r-leg: #e8913f;
+  --r-eye: #b8e05a;
+  --r-pupil: #1a1410;
+  --r-ear-pink: #f4a6a0;
+  --r3-outline: #4a2a16;
+}
+
+.arena-black-cat {
+  --r-fur: #34303d;
+  --r-dark: #221f29;
+  --r-light: #4a4555;
+  --r-leg: #34303d;
+  --r-eye: #e3dc4e;
+  --r-pupil: #08070a;
+  --r-ear-pink: #8a5870;
+  --r3-outline: #0d0c10;
+}
+
+/* Cats in 3D have slimmer legs. */
+.arena-cat .r3-leg {
+  stroke-width: 5.5;
+}
+
+.arena-cat .r3-stick-edge {
+  stroke-width: 9;
+}
+
+/* ---- Art styles laid over any pet ---- */
+
+/* These draw their own edges, so the usual halo would only blur them. */
+.art-pixel,
+.art-neon,
+.art-sketch,
+.art-sticker,
+.art-ink,
+.art-pixel .raccoon-figure,
+.art-neon .raccoon-figure,
+.art-sketch .raccoon-figure,
+.art-sticker .raccoon-figure,
+.art-ink .raccoon-figure {
+  filter: none;
+}
+
+.art-pixel .r-shadow,
+.art-neon .r-shadow {
+  display: none;
+}
+
+.raccoon-cat.art-neon {
+  --neon: #ff4fd8;
+}
+
+.raccoon-cartoon.art-neon {
+  --neon: #48f0ff;
 }
 
 .sprite.facing-left {
@@ -604,25 +851,40 @@ html[data-view='settings'] .settings {
   margin: 0;
   border: 0;
   border-bottom: 1px solid var(--border);
-  display: grid;
-  gap: 8px;
 }
 
 .type-picker legend {
   padding: 0;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   font-weight: 600;
 }
 
-.type-option {
+.type-group-title {
+  margin: 10px 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.type-grid {
   display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.type-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 10px 12px;
+  gap: 2px;
+  padding: 6px 6px 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
   cursor: pointer;
+  text-align: center;
 }
 
 .type-option.selected {
@@ -630,22 +892,44 @@ html[data-view='settings'] .settings {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+.type-option:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The card itself is the control; the radio stays for keyboard and screen readers. */
 .type-option input {
-  grid-row: span 2;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--accent);
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.type-preview {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(var(--web-bg-top), var(--web-bg-bottom));
+}
+
+.type-preview .raccoon {
+  flex: none;
 }
 
 .field .type-option .type-name {
+  font-size: 13px;
   font-weight: 600;
+  line-height: 1.25;
 }
 
 .type-description {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 400;
+  line-height: 1.3;
 }
 
 .toggle {
