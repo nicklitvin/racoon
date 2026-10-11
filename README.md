@@ -96,7 +96,7 @@ Two rules keep this portable and testable: **`src/core` never imports React, the
 
 ### Behaviour
 
-`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek, dragged, petted** and **zoomies**. While chasing or dashing about at full tilt, it leaps now and then (`motion.leapMs`, `motion.leapEvery`), flying straight on through each leap.
+`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek, dragged, petted** and **zoomies**. While chasing or dashing about at full tilt, it leaps now and then (`motion.leapMs`, `motion.leapEvery`), flying straight on through each leap. At speed it steers like an animal, not a hovercraft: the direction it's running can only swing round so fast (the faster it goes, the wider the turn) and it slows down to turn sharply, so it runs round in curves to a cursor behind it instead of stopping and reversing.
 
 - **Wandering:** the whole work area is the raccoon's world; there is no floor and no gravity. After each pause it picks something to do: walk to a random point anywhere on screen, sit and groom or yawn, or just turn round and look about. After about 3 calm minutes it yawns and falls asleep. Dropping it after a drag leaves it exactly where you let go.
 - **Organic movement:** walks follow a gently curved path with ease-in-out speed, and each walk varies a little in distance, curve and top speed. Everything else (chasing, fleeing, pouncing) goes through velocity with limited acceleration ("arrive" steering). Nothing ever teleports; the tests check this on every simulated frame.
@@ -144,12 +144,13 @@ Every pet is the same rig in `src/sprites/critter/`, drawn as inline SVG:
 - `catAct.ts` and `raccoonAct.ts` give a pose for every animation, based on how the real animal holds itself. A pose is plain numbers: hips, shoulders, head, where each paw is, the tail's shape, ears, eyes and mouth. Legs are worked out from where the paws are, so a paw can stay planted.
 - `motion.ts` makes the movement continuous:
   - Animations blend into each other.
-  - He faces the way he's going on the floor, including up and down the screen.
+  - He faces the way he's going on the floor, including up and down the screen. On the move his body follows the path, bent along its curves; turning on the spot, the shoulders lead, the hips follow and he steps round.
   - Paws advance by the ground actually covered, so they never skate.
-  - The tail is a chain of springs.
+  - Legs never stretch past their length: the shoulder blade slides to reach, and the wrist or heel tips up.
+  - The tail is a chain of springs that is never quite still: it drifts, swishes and curls, and each swing runs from the base to the tip.
   - Carried, he hangs from the scruff and swings like a pendulum.
   - Glances, ear flicks and blinks.
-  - The head turns on the neck to look at the pointer.
+  - The head turns on the neck to look at the pointer. The eyes keep up with it; the head holds still through small movements and swings after bigger ones a beat behind.
 - `view.ts` is the camera. The screen is a floor seen from a little above, so a step towards you shows lower on the screen. The brain uses the same idea (`wander.floorDepth`), so walking up or down the screen goes at the same pace on the floor as walking across it.
 - `skin.ts` draws the pose from any side. The body is a solid built from slices along the spine, drawn by its true outline. Legs hang from either side, and parts are layered by how near you they are. The head is a small 3D model.
 

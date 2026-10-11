@@ -40,11 +40,18 @@ export interface ActInput {
   life: Life;
   /**
    * Something to look at (the pointer), null if nothing is near: how far to turn the head on
-   * the neck towards his right side, and how far to nod down, in degrees.
+   * the neck towards his right side, and how far to nod down, in degrees. The head follows
+   * lazily; `eyes` is where the thing really is, which the eyes keep up with.
    */
-  gaze: { yaw: number; pitch: number } | null;
+  gaze: Gaze | null;
   /** Side swing while being carried, degrees, from the pendulum. */
   swing: number;
+}
+
+export interface Gaze {
+  yaw: number;
+  pitch: number;
+  eyes?: { yaw: number; pitch: number };
 }
 
 export interface Act {
@@ -84,19 +91,20 @@ export function walkBob(pose: Pose, gait: Gait, phase: number, amp: number): voi
  * Turns the head towards something, within what a neck allows, and lets the eyes make up
  * the rest. `weight` 0..1 blends from the pose's own head turn.
  */
-export function lookAt(pose: Pose, target: { yaw: number; pitch: number }, weight: number): void {
+export function lookAt(pose: Pose, target: Gaze, weight: number): void {
   const yaw = clamp(target.yaw, -110, 110);
   const pitch = clamp(target.pitch, -30, 35);
+  const eyes = target.eyes ?? target;
   pose.hturn = lerp(pose.hturn, yaw, weight);
   // Really looking at something replaces just turning his face to you.
   pose.hyaw = lerp(pose.hyaw, 0, weight);
   pose.hpitch = lerp(pose.hpitch, pitch, weight);
-  pose.lookX = lerp(pose.lookX, clamp((target.yaw - yaw) / 40, -0.6, 0.6) + 0.1, weight);
-  pose.lookY = lerp(pose.lookY, clamp((target.pitch - pitch) / 25 + pitch / 60, -0.8, 0.8), weight);
+  pose.lookX = lerp(pose.lookX, clamp((eyes.yaw - yaw) / 40, -0.6, 0.6) + 0.1, weight);
+  pose.lookY = lerp(pose.lookY, clamp((eyes.pitch - pitch) / 25 + pitch / 60, -0.8, 0.8), weight);
 }
 
 /** How long an excited leap takes, ms; matches `motion.leapMs` in the behaviour config. */
-export const LEAP_MS = 520;
+export const LEAP_MS = 420;
 
 /** How a species leaps: how high (units), and how its back sits standing. */
 export interface LeapStyle {
@@ -174,8 +182,9 @@ export function leapKind(startMs: number): LeapKind {
 export function leap(build: Build, p: Pose, t: number, style: LeapStyle, kind: LeapKind = 'bound'): Pose {
   const keys = LEAP_KEYS[kind];
   const u = clamp01(t / LEAP_MS);
-  // Airborne from the moment the hind paws leave to when the front paws touch down.
-  const flight = clamp01((u - 0.12) / 0.72);
+  // Airborne almost throughout: at a gallop the paws are only down for an instant at
+  // take-off and landing, or they'd be seen skidding along under him.
+  const flight = clamp01((u - 0.03) / 0.92);
   const air = style.height * keys.height * 4 * flight * (1 - flight) + leapKey(keys.rise, u);
   const pitch = leapKey(keys.pitch, u);
   const length = (build.shoulder.x - build.pelvis.x) * leapKey(keys.stretch, u);

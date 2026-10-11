@@ -29,6 +29,46 @@ export function steer2d(
   return { x: velocity.x + (change.x / changeLength) * maxChange, y: velocity.y + (change.y / changeLength) * maxChange };
 }
 
+/**
+ * Arrive steering for an animal rather than a hovercraft: on the move, the direction of
+ * travel can only swing round so fast (the faster he goes, the wider the turn), and he
+ * slows down to turn sharply. So he runs round in curves to something behind him instead
+ * of braking to a stop and reversing, and his body always points the way he's going.
+ * From a standstill he sets off straight towards the target.
+ */
+export function steerArc(
+  position: Point,
+  velocity: Point,
+  target: Point,
+  maxSpeed: number,
+  accel: number,
+  dt: number,
+  slowRadius = 120,
+): Point {
+  const dx = target.x - position.x;
+  const dy = target.y - position.y;
+  const distance = Math.hypot(dx, dy);
+  const speed = Math.hypot(velocity.x, velocity.y);
+  if (speed < STANDING_SPEED || distance < 1e-6) return steer2d(position, velocity, target, maxSpeed, accel, dt, slowRadius);
+  const heading = Math.atan2(velocity.y, velocity.x);
+  const want = Math.atan2(dy, dx);
+  let off = want - heading;
+  off -= Math.PI * 2 * Math.round(off / (Math.PI * 2));
+  // Cornering: sideways grip limits the turn rate at speed; slowing down tightens the turn.
+  const rate = Math.min(MAX_TURN_RATE, (accel * CORNER_GRIP) / speed);
+  const turned = heading + Math.max(-rate * dt, Math.min(rate * dt, off));
+  const facing = (1 + Math.cos(off)) / 2;
+  const desired = maxSpeed * Math.min(1, distance / slowRadius) * (0.2 + 0.8 * facing ** 1.5);
+  const next = approach(speed, desired, accel * dt);
+  return { x: Math.cos(turned) * next, y: Math.sin(turned) * next };
+}
+/** Below this speed (px/s) he can set off in any direction. */
+const STANDING_SPEED = 40;
+/** The quickest he can swing round on the move, rad/s. */
+const MAX_TURN_RATE = 9;
+/** Sideways acceleration he can corner with, as a multiple of his forward acceleration. */
+const CORNER_GRIP = 1.3;
+
 export function easeInOutSine(t: number): number {
   return -(Math.cos(Math.PI * t) - 1) / 2;
 }

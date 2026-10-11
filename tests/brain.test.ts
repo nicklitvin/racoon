@@ -223,6 +223,26 @@ describe('Brain: cursor reactions', () => {
     expect(after.mode).toBe('idle');
   });
 
+  it('runs round in curves after the cursor rather than stopping and reversing', () => {
+    const brain = makeBrain();
+    runUntil(brain, (s) => s.reaction === 'chase', excited());
+    // The cursor jumps from one side of him to the other and back.
+    const zigzag = (t: number) => excited({ x: Math.floor(t / 700) % 2 ? 200 : 1400, y: 300 + Math.floor(t / 1400) * 40 });
+    const snaps = run(brain, 5000, zigzag);
+    const k = DEFAULT_CONFIG.wander.floorDepth;
+    let fast = 0;
+    for (let i = 1; i < snaps.length; i++) {
+      const a = snaps[i - 1]!.velocity;
+      const b = snaps[i]!.velocity;
+      if (Math.hypot(a.x, a.y / k) < 45 || Math.hypot(b.x, b.y / k) < 45) continue;
+      fast++;
+      // Over the floor, his direction only swings round so fast while he's moving.
+      const turn = Math.atan2(a.x * (b.y / k) - (a.y / k) * b.x, a.x * b.x + (a.y / k) * (b.y / k));
+      expect(Math.abs(turn), `step ${i}`).toBeLessThan(0.16);
+    }
+    expect(fast).toBeGreaterThan(150);
+  });
+
   it('leaps now and then from sheer excitement while chasing, flying straight on', () => {
     const brain = makeBrain();
     runUntil(brain, (s) => s.reaction === 'chase', excited());

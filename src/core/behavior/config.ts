@@ -74,7 +74,7 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     accel: 380,
     runAccel: 1500,
     chaseAccel: 2600,
-    leapMs: 520,
+    leapMs: 420,
     leapEvery: { min: 900, max: 2600 },
   },
   wander: {

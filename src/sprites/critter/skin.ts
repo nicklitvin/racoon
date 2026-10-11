@@ -6,7 +6,7 @@ import { HeadView, onDisc, onSphere, v3, type Disc, type V3 } from './head';
 import { add, clamp, clamp01, curve, fmt, lerp, mixPt, scale, sub, tube, unit } from './kit';
 import type { Point3, Shown } from './motion';
 import { LEGS, type Pose } from './pose';
-import { bodyAt, legJoints, spineFrame, type Frame } from './rig';
+import { bodyAt, legJoints, spineFrame, uprightness, type Frame } from './rig';
 import { DEPTH, ellipseOf, ellipsePath, type BodyView, type Ellipse } from './view';
 
 /**
@@ -380,7 +380,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
   function drawTorso(frame: Frame, pose: Pose, view: BodyView): void {
     const L = frame.length;
     // Upright (sitting up, standing on hind legs), a raccoon's hump straightens out.
-    const upright = clamp01((-Math.sin((frame.angle * Math.PI) / 180) - 0.5) / 0.4);
+    const upright = uprightness(frame);
     const spec = TORSO[build.species](L, pose, upright);
     const tops = spec.top;
     const bottoms = spec.bottom.slice().reverse();

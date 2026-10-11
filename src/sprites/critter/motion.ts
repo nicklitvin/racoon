@@ -1,11 +1,11 @@
 import type { Point } from '../../core/geometry';
 import type { AnimationName, RaccoonFrame } from '../types';
-import { NO_LIFE, type Act, type ActInput, type Life } from './act';
+import { NO_LIFE, type Act, type ActInput, type Gaze, type Life } from './act';
 import type { Build } from './build';
 import { strideAt } from './gait';
-import { angleDiff, bump, clamp, DEG, dir, lerp, noise1, rng, smooth } from './kit';
+import { angleDiff, bump, clamp, DEG, dir, lerp, noise1, rng, smooth, wave } from './kit';
 import { POSE_KEYS, type Pose, type PoseFlags, type PoseKey } from './pose';
-import { scruffAt, tailRest, tailRoot } from './rig';
+import { keepInReach, scruffAt, tailRest, tailRoot } from './rig';
 import { BodyView, DEPTH, worldYaw, type Projected } from './view';
 
 /**
@@ -16,9 +16,13 @@ import { BodyView, DEPTH, worldYaw, type Projected } from './view';
  *   own pace: the body leads, the head follows, the ears swing past and settle.
  * - He faces the way he's going on the floor, up, down or across the screen, and the gait
  *   advances with ground actually covered there, so planted paws don't skate.
- * - Turning, the shoulders swing round first and the hips follow, so the spine bows into
- *   the turn; turning on the spot, he steps round on his paws.
- * - The tail is a chain with weight: it trails, sways and whips with the body.
+ * - On the move his body follows the path he runs: it always points the way he's going,
+ *   and bends along a curve, shoulders ahead of the hips, as much as the curve is sharp.
+ * - Turning on the spot, the shoulders swing round first and the hips follow, so the spine
+ *   bows into the turn, and he steps round on his paws.
+ * - The tail is a chain with weight: it trails, sways and whips with the body, and is never
+ *   quite still: it drifts, swishes lazily and curls at the tip, and every swing runs
+ *   down it from the base to the tip.
  * - Carried by the scruff, the body swings like a pendulum from the pointer's movement.
  * - Little unscripted life: glances, ear flicks, blinks (and the slow cat blink), a
  *   twitching tail tip.
@@ -78,6 +82,23 @@ const MIRRORED: [PoseKey, PoseKey][] = [
 const LOCOMOTION = new Set<AnimationName>(['walk', 'run', 'chase', 'jump', 'leap']);
 const RESTING = new Set<AnimationName>(['idle', 'sit', 'groom', 'yawn', 'sleep', 'happy', 'confused']);
 
+/** How much the tail wanders on its own in each animation: 0 still (posed), 1 a relaxed animal's. */
+const TAIL_LIFE: Partial<Record<AnimationName, number>> = {
+  idle: 1,
+  sit: 0.5,
+  confused: 1.3,
+  peek: 0.6,
+  walk: 0.6,
+  groom: 0.4,
+  yawn: 0.4,
+  run: 0.3,
+  chase: 0.35,
+  surprised: 0.5,
+  sleep: 0.12,
+};
+/** How long a sideways swing takes to travel from one tail joint to the next, s. */
+const TAIL_RIPPLE = 0.03;
+
 /** Nominal ground speeds, used when the frame doesn't say how fast he's going (previews). */
 const NOMINAL_SPEED: Partial<Record<AnimationName, number>> = { walk: 76, run: 300, chase: 560, leap: 560 };
 
@@ -87,10 +108,33 @@ const NOMINAL_SPEED: Partial<Record<AnimationName, number>> = { walk: 76, run: 3
  */
 const TURN_RATE = 10;
 const HIPS_RATE = 7.5;
+/** The same, wheeling round to dash off somewhere: much quicker. */
+const DASH_TURN_RATE = 17;
+const DASH_HIPS_RATE = 12;
+/** How tightly the body follows the path on the move: spring frequency, rad/s. */
+const FOLLOW_RATE = 24;
+/** Below this ground speed (units/s) he isn't following a path, just turning. */
+const PATH_SPEED = 20;
+/**
+ * Following a path only once the body is lined up with it to within this (radians): set
+ * off the other way, he turns round first, as he would standing.
+ */
+const PATH_ALIGNED = 1.2;
+/** The fastest a path can be seen to swing round, rad/s; anything quicker is a fresh start. */
+const PATH_SPIN = 14;
+/** How much more than the curve itself the spine bends round it, so you can see it. */
+const PATH_BEND = 1.4;
 /** Turning on the spot faster than this (rad/s), he steps round rather than pivot on planted paws; he stops below the second. */
 const STEP_TURN = [1.6, 0.6] as const;
 /** How far the paws travel per radian turned on the spot, units: about half his length. */
 const TURN_STRIDE = 13;
+/**
+ * Watching the pointer, the eyes keep up but the head doesn't track it like a turret: it
+ * stays put until the pointer has wandered this far (degrees) from where it's pointed, then
+ * swings over to catch up, at this spring rate (rad/s), overshooting a touch.
+ */
+const GAZE_SLACK = 11;
+const GAZE_RATE = 5.5;
 /** How far in front of the screen the pointer is taken to be, when working out where to look. */
 const POINTER_DEPTH = 45;
 
@@ -118,6 +162,10 @@ export class Motion {
   private rear = 0;
   private rearSpin = 0;
   private yawTarget = 0;
+  /** The heading of his path on the floor (radians, unwrapped) and how fast it's turning, while he's moving. */
+  private path: { yaw: number; spin: number; speed: number } | null = null;
+  /** The way he was last going, and when, so he doesn't swing back once he stops. */
+  private lastPath = { yaw: 0, at: -Infinity };
   /** Stepping round to turn on the spot. */
   private stepping = false;
   /** The animation the pose was last made for (stepping round shows a walk). */
@@ -125,6 +173,8 @@ export class Motion {
   /** Which of his sides you mostly see: 1 his right (facing right), -1 his left. */
   private viewSide: 1 | -1 = 1;
   private lastShown: Shown | null = null;
+  /** Where the head is aiming while watching the pointer, how fast it's turning, and where it's going. */
+  private gazeHead: { yaw: number; pitch: number; vYaw: number; vPitch: number; aim: { yaw: number; pitch: number } } | null = null;
 
   /** Offsets still dying away from the last change, and their rates. */
   private readonly offset = new Float64Array(POSE_KEYS.length);
@@ -138,6 +188,8 @@ export class Motion {
   private tailRootPrev: Point = { x: 0, y: 0 };
   private tailRootVel: Point = { x: 0, y: 0 };
   private tailMotion = 0;
+  /** How far each tail joint is carried out to the side, lagging the one before it. */
+  private tailSides: number[] = [];
 
   private swing = 0;
   private swingVel = 0;
@@ -185,6 +237,8 @@ export class Motion {
     if (this.tailMotion > 1.5) return 'tail';
     if (Math.abs(this.swingVel) > 1 || Math.abs(this.swing) > 0.5) return 'swing';
     if (Math.abs(this.glanceVel.yaw) + Math.abs(this.glanceVel.pitch) > 10) return 'glance';
+    const g = this.gazeHead;
+    if (g && Math.abs(g.vYaw) + Math.abs(g.vPitch) > 4) return 'gaze';
     if (active(this.blink)) return 'blink';
     if (active(this.earFlick)) return 'ear';
     if (active(this.tailFlick)) return 'tailflick';
@@ -200,7 +254,8 @@ export class Motion {
 
     // Where he's facing: the way he's heading on the floor (walking up the screen is walking
     // away), except when carried, when he hangs three-quarters towards you.
-    this.yawTarget = this.facingFor(frame);
+    this.followPath(frame, unitsPerPx, dt);
+    this.yawTarget = this.path ? this.path.yaw : this.clock - this.lastPath.at < 1 ? this.lastPath.yaw : this.facingFor(frame);
     this.turn(dt, frame.animation);
     const view = new BodyView(this.yaw);
     if (Math.abs(view.side) > 0.35 && !LOCOMOTION.has(frame.animation)) this.viewSide = view.side > 0 ? 1 : -1;
@@ -235,12 +290,15 @@ export class Motion {
     this.acted = acting;
 
     const gait = acting === 'chase' || acting === 'leap' ? this.build.chase : acting === 'run' ? this.build.run : this.build.walk;
-    if (dt > 0) this.phase += (stepSpeed * dt) / strideAt(gait, stepSpeed);
+    // The paws cycle with the ground actually covered this frame, so they keep up as he
+    // speeds up; the stride length changes more gently.
+    const covered = this.stepping || !ground ? stepSpeed : speed;
+    if (dt > 0) this.phase += (covered * dt) / strideAt(gait, stepSpeed);
     if (!v && !timed) this.phase = (frame.timeMs / 1000) * (this.speed / strideAt(gait, this.speed));
 
     this.updateSwing(frame.animation, dt);
     const life = this.updateLife(frame, dt);
-    const gaze = frame.gaze ? this.gazeAt({ x: frame.gaze.x * unitsPerPx, y: frame.gaze.y * unitsPerPx }, view) : null;
+    const gaze = this.watch(frame.gaze ? this.gazeAt({ x: frame.gaze.x * unitsPerPx, y: frame.gaze.y * unitsPerPx }, view) : null, dt);
 
     const act = this.actor({
       animation: acting,
@@ -257,6 +315,7 @@ export class Motion {
     if (frame.eyes === 'closed') target.lids = Math.max(target.lids, 1);
     if (frame.eyes === 'wide') target.lids = Math.min(target.lids, -0.3);
     target.lids = Math.max(target.lids, this.blinkAmount());
+    this.tailLife(target, frame.animation, now);
     // Seen from his left, his left paws do what his right ones were posed to.
     if (this.viewSide < 0) {
       for (const [a, b] of MIRRORED) [target[a], target[b]] = [target[b], target[a]];
@@ -264,6 +323,7 @@ export class Motion {
     }
 
     const pose = this.inertialize(target, dt, changed);
+    keepInReach(this.build, pose);
     // Into a sharp turn, the head drops a little and leads the way round.
     const bend = this.bend;
     pose.hpitch += Math.abs(bend) * 7;
@@ -286,8 +346,32 @@ export class Motion {
     return this.front - this.rear;
   }
 
+  /** Where he's going on the floor, when he's moving along. */
+  private followPath(frame: RaccoonFrame, unitsPerPx: number, dt: number): void {
+    const v = frame.velocity;
+    const speed = v ? Math.hypot(v.x, v.y / DEPTH) * unitsPerPx : 0;
+    if (!v || !LOCOMOTION.has(frame.animation) || speed < PATH_SPEED) {
+      this.path = null;
+      return;
+    }
+    const heading = Math.atan2(v.y / DEPTH, v.x);
+    // Unwrapped next to his shoulders, so it never jumps a turn.
+    const yaw = this.front + angleDiff(this.front / DEG, heading / DEG) * DEG;
+    this.lastPath = { yaw, at: this.clock };
+    const last = this.path;
+    const turned = last && dt > 0 ? (yaw - last.yaw) / dt : 0;
+    if (Math.abs(yaw - this.front) > PATH_ALIGNED || Math.abs(turned) > PATH_SPIN) {
+      // Facing well off the way he's going: turn round to it first.
+      this.path = null;
+      return;
+    }
+    const spin = last ? lerp(last.spin, turned, 1 - Math.exp(-dt * 40)) : 0;
+    this.path = { yaw, spin, speed };
+  }
+
   /**
-   * Swings the body round towards its heading, easing in and out, never snapping: the
+   * Swings the body round towards its heading, easing in and out, never snapping. On the
+   * move it follows the path, bent along its curve. Turning without going anywhere, the
    * shoulders lead and the hips follow, so the spine bows into the turn and straightens
    * out as he comes round.
    */
@@ -299,15 +383,31 @@ export class Motion {
     }
     // Hanging from the scruff the body turns as one; sitting or lying, it bends less.
     const flex = animation === 'dangle' ? 0 : LOCOMOTION.has(animation) || animation === 'idle' ? this.build.flex : this.build.flex * 0.5;
+    const path = this.path;
+    // Running round a curve, the shoulders are already heading further round it than the
+    // middle of the body, and the hips not as far.
+    const length = this.build.shoulder.x - this.build.pelvis.x;
+    const curve = path ? clamp(((length * path.spin) / path.speed) * PATH_BEND, -flex, flex) : 0;
+    // Already moving off the way he's not facing.
+    const dashing = !path && this.clock - this.lastPath.at < 1 && LOCOMOTION.has(animation) && animation !== 'walk';
     const steps = Math.ceil(dt / 0.008);
     const h = dt / steps;
     for (let i = 0; i < steps; i++) {
-      const d = turnBy(this.front, this.yawTarget);
-      this.frontSpin += (TURN_RATE * TURN_RATE * d - 2 * TURN_RATE * this.frontSpin) * h;
-      this.front += this.frontSpin * h;
-      const lag = this.front - this.rear;
-      this.rearSpin += (HIPS_RATE * HIPS_RATE * lag - 2 * HIPS_RATE * this.rearSpin) * h;
-      this.rear += this.rearSpin * h;
+      if (path) {
+        const R = FOLLOW_RATE;
+        this.frontSpin += (R * R * turnBy(this.front, path.yaw + curve / 2) + 2 * R * (path.spin - this.frontSpin)) * h;
+        this.rearSpin += (R * R * turnBy(this.rear, path.yaw - curve / 2) + 2 * R * (path.spin - this.rearSpin)) * h;
+        this.front += this.frontSpin * h;
+        this.rear += this.rearSpin * h;
+      } else {
+        const d = turnBy(this.front, this.yawTarget);
+        const [fr, hr] = dashing ? [DASH_TURN_RATE, DASH_HIPS_RATE] : [TURN_RATE, HIPS_RATE];
+        this.frontSpin += (fr * fr * d - 2 * fr * this.frontSpin) * h;
+        this.front += this.frontSpin * h;
+        const lag = this.front - this.rear;
+        this.rearSpin += (hr * hr * lag - 2 * hr * this.rearSpin) * h;
+        this.rear += this.rearSpin * h;
+      }
       // A spine only bends so far: past that, the hips are dragged round with the shoulders.
       const over = this.front - this.rear;
       if (Math.abs(over) > flex) {
@@ -321,7 +421,10 @@ export class Motion {
   private facingFor(frame: RaccoonFrame): number {
     const side = (c: number) => (c > 0.05 ? 1 : c < -0.05 ? -1 : this.viewSide);
     if (frame.animation === 'dangle') return side(Math.cos(this.yaw)) > 0 ? 0.65 : Math.PI - 0.65;
-    const heading = worldYaw(frame.heading ?? 0);
+    let heading = worldYaw(frame.heading ?? 0);
+    // Just stopped: the page's heading is still catching up with the way he was going.
+    const recent = this.lastPath;
+    if (this.clock - recent.at < 1000 && Math.abs(angleDiff(heading / DEG, recent.yaw / DEG)) < 40) heading = recent.yaw;
     // Settling down after walking away up the screen, he turns round side-on rather than
     // sit with his back to you.
     if (RESTING.has(frame.animation) && Math.sin(heading) < -0.4) return Math.atan2(0.3, side(Math.cos(heading)));
@@ -404,6 +507,36 @@ export class Motion {
     };
   }
 
+  /**
+   * The head's lazy follow of what the eyes are on: it holds still through small movements
+   * of the pointer, then swings round after it, a beat behind.
+   */
+  private watch(target: { yaw: number; pitch: number } | null, dt: number): Gaze | null {
+    if (!target) {
+      this.gazeHead = null;
+      return null;
+    }
+    let g = this.gazeHead;
+    if (!g) {
+      // Just noticed it: the eyes go straight there, and the head starts turning from ahead.
+      g = this.gazeHead = { yaw: target.yaw * 0.25, pitch: target.pitch * 0.25, vYaw: 0, vPitch: 0, aim: { ...target } };
+    }
+    if (Math.hypot(target.yaw - g.aim.yaw, (target.pitch - g.aim.pitch) * 1.4) > GAZE_SLACK) g.aim = { ...target };
+    if (dt > 0) {
+      const w = GAZE_RATE;
+      const zeta = 0.8;
+      const steps = Math.ceil(dt / 0.008);
+      const h = dt / steps;
+      for (let i = 0; i < steps; i++) {
+        g.vYaw += (w * w * (g.aim.yaw - g.yaw) - 2 * zeta * w * g.vYaw) * h;
+        g.vPitch += (w * w * (g.aim.pitch - g.pitch) - 2 * zeta * w * g.vPitch) * h;
+        g.yaw += g.vYaw * h;
+        g.pitch += g.vPitch * h;
+      }
+    }
+    return { yaw: g.yaw, pitch: g.pitch, eyes: target };
+  }
+
   private updateSwing(animation: AnimationName, dt: number): void {
     if (animation !== 'dangle') {
       this.swing *= 0.8;
@@ -424,12 +557,30 @@ export class Motion {
     }
   }
 
+  /**
+   * A tail is never held quite still. Two slow drifts, out of step, lift and lower it,
+   * swing it from side to side and curl the tip; now and then it gives a lazy swish. A cat's
+   * tail is more expressive than a raccoon's heavy brush.
+   */
+  private tailLife(pose: Pose, animation: AnimationName, now: number): void {
+    const amount = (TAIL_LIFE[animation] ?? 0) * (this.build.species === 'cat' ? 1 : 0.75);
+    if (amount === 0) return;
+    const drift = (ms: number, seed: number) => noise1(now / ms, seed) * 0.65 + noise1(now / (ms * 0.37), seed + 1) * 0.35;
+    // The odd slow swish: a big swing over and back.
+    const swish = Math.max(0, noise1(now / 5200, 41)) ** 2 * wave(now, 1700);
+    pose.tailA += (drift(2600, 31) * 16 + swish * 6) * amount;
+    pose.tailBend += drift(3400, 33) * 1.6 * amount;
+    pose.tailCurl += drift(1500, 35) * 14 * amount;
+    pose.tailSide += (drift(2900, 37) * 0.45 + swish * 0.7) * amount;
+  }
+
   private updateTail(pose: Pose, flags: PoseFlags, dt: number): void {
     const { tail: spec } = this.build;
     const root = tailRoot(this.build, pose);
     const rest = tailRest(this.build, pose);
     const count = spec.segments;
     if (this.tailAngles.length !== count || dt === 0) {
+      this.tailSides = rest.map(() => pose.tailSide);
       this.tailAngles = [...rest];
       this.tailSpin = rest.map(() => 0);
       this.tailRootPrev = root;
@@ -446,7 +597,15 @@ export class Motion {
     const steps = Math.max(1, Math.ceil(dt / 0.006));
     const h = dt / steps;
     let motion = 0;
+    // A swing out to the side starts at the base and runs down to the tip.
+    const ripple = 1 - Math.exp(-h / TAIL_RIPPLE);
     for (let s = 0; s < steps; s++) {
+      for (let i = 0; i < count; i++) {
+        const lead = i === 0 ? pose.tailSide : this.tailSides[i - 1]!;
+        const before = this.tailSides[i]!;
+        this.tailSides[i] = before + (lead - before) * ripple;
+        motion = Math.max(motion, (Math.abs(this.tailSides[i]! - before) / h) * 60);
+      }
       for (let i = 0; i < count; i++) {
         const tipward = i / (count - 1);
         // Each joint springs towards its resting bend relative to the segment before it, so
@@ -479,7 +638,7 @@ export class Motion {
       points.push({
         x: prev.x + d.x * spec.segment,
         y: flags.noShadow ? y : Math.min(y, -spec.tip * 0.9),
-        z: pose.tailSide * reach * ((i + 1) / count) ** 1.4,
+        z: this.tailSides[i]! * reach * ((i + 1) / count) ** 1.4,
       });
     }
     this.tail = points;

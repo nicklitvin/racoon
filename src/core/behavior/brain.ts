@@ -1,7 +1,7 @@
 import type { AnimationName } from '../../sprites/types';
 import { clamp, type Point, type Rect } from '../geometry';
 import { DEFAULT_CONFIG, pick, type BehaviorConfig } from './config';
-import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d } from './motion';
+import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d, steerArc } from './motion';
 
 /** Top-level states of the behaviour state machine. */
 export type Mode = 'idle' | 'walk' | 'sit' | 'sleep' | 'react';
@@ -304,7 +304,8 @@ export class Brain {
       }
 
       case 'pounce':
-        this.vel = this.steer(s.target, m.pounceSpeed * k, m.chaseAccel * 1.6 * k, dt, 40);
+        // A pounce is one quick lunge at the spot, not a run: straight there.
+        this.vel = this.steer(s.target, m.pounceSpeed * k, m.chaseAccel * 1.6 * k, dt, 40, false);
         if ((dist(this.pos, s.target) < 4 && length(this.vel) < 30) || this.now >= s.until) this.confused();
         return;
 
@@ -446,12 +447,13 @@ export class Brain {
   /**
    * Steers towards `target` with the speed and acceleration measured over the floor, so
    * dashing up or down the screen (away from or towards you) is as quick as across it
-   * looks, rather than twice as quick.
+   * looks, rather than twice as quick. On the move he runs round in curves (see `steerArc`)
+   * unless `arc` is false.
    */
-  private steer(target: Point, maxSpeed: number, accel: number, dt: number, slowRadius: number): Point {
+  private steer(target: Point, maxSpeed: number, accel: number, dt: number, slowRadius: number, arc = true): Point {
     const k = this.config.wander.floorDepth;
     const flat = (p: Point) => ({ x: p.x, y: p.y / k });
-    const v = steer2d(flat(this.pos), flat(this.vel), flat(target), maxSpeed, accel, dt, slowRadius);
+    const v = (arc ? steerArc : steer2d)(flat(this.pos), flat(this.vel), flat(target), maxSpeed, accel, dt, slowRadius);
     return { x: v.x, y: v.y * k };
   }
 

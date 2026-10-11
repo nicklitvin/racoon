@@ -9,7 +9,7 @@ export const ANIMATIONS: Record<AnimationName, AnimationSpec> = {
   walk: { fps: 60, durationMs: 600, loop: true, eyes: 'open' },
   run: { fps: 60, durationMs: 340, loop: true, eyes: 'open' },
   jump: { fps: 60, durationMs: 400, loop: false, eyes: 'wide' },
-  leap: { fps: 60, durationMs: 520, loop: false, eyes: 'wide' },
+  leap: { fps: 60, durationMs: 420, loop: false, eyes: 'wide' },
   sit: { fps: 6, durationMs: 12_000, loop: true, eyes: 'open' },
   groom: { fps: 10, durationMs: 1000, loop: true, eyes: 'closed' },
   yawn: { fps: 12, durationMs: 2200, loop: false, eyes: 'closed' },

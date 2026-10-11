@@ -221,6 +221,73 @@ describe.each(SPECIES)('lifelike %s', (_name, build, act) => {
     expect(quiet).toBeGreaterThan(300);
   });
 
+  it('follows a curving path with his body, bent round the curve', () => {
+    const d = driver(build, act);
+    // Running round in a circle, the way he's going swinging round at 2.5 rad/s.
+    let shown!: Shown;
+    for (let i = 0; i < 120; i++) {
+      const a = i * 0.016 * 2.5;
+      const velocity = { x: Math.cos(a) * 340, y: Math.sin(a) * 340 * DEPTH };
+      shown = d.step({ animation: 'run', heading: Math.atan2(velocity.y, velocity.x), velocity });
+      if (i < 40) continue;
+      const going = Math.atan2(velocity.y / DEPTH, velocity.x);
+      const off = Math.abs(Math.atan2(Math.sin(going - shown.view.yaw), Math.cos(going - shown.view.yaw)));
+      expect(off, `frame ${i}`).toBeLessThan(0.1);
+      // Curving to his right: the shoulders are further round than the hips.
+      expect(shown.view.bend, `frame ${i}`).toBeGreaterThan(0.05);
+    }
+  });
+
+  it('follows the pointer with a lazy head and quick eyes', () => {
+    const d = driver(build, act);
+    const look = (gaze: { x: number; y: number }) => d.step({ animation: 'idle', heading: 0.4, gaze });
+    let shown!: Shown;
+    for (let i = 0; i < 150; i++) shown = look({ x: 160, y: -60 });
+    const settled = shown.pose.hturn;
+    // Small movements of the pointer: the eyes follow, the head stays put.
+    for (let i = 0; i < 30; i++) shown = look({ x: 160 + Math.sin(i / 3) * 12, y: -60 });
+    expect(Math.abs(shown.pose.hturn - settled)).toBeLessThan(3);
+    // It darts right over to his other side: the eyes get there first, the head follows.
+    const before = shown;
+    for (let i = 0; i < 6; i++) shown = look({ x: -160, y: -60 });
+    expect(Math.abs(shown.pose.lookX - before.pose.lookX)).toBeGreaterThan(0.25);
+    const quick = Math.abs(shown.pose.hturn - before.pose.hturn);
+    for (let i = 0; i < 90; i++) shown = look({ x: -160, y: -60 });
+    const total = Math.abs(shown.pose.hturn - before.pose.hturn);
+    expect(total).toBeGreaterThan(20);
+    expect(quick).toBeLessThan(total * 0.25);
+  });
+
+  it("never holds his tail still while he's idle", () => {
+    const d = driver(build, act);
+    const tips: number[] = [];
+    for (let i = 0; i < 700; i++) {
+      const shown = d.step({ animation: 'idle' });
+      const tip = shown.tail.at(-1)!;
+      if (i > 60) tips.push(shown.view.at(tip.x, tip.y, tip.z).y);
+    }
+    expect(Math.max(...tips) - Math.min(...tips)).toBeGreaterThan(10);
+  });
+
+  it('builds legs that reach their paws all through every gait', () => {
+    for (const [animation, speed] of [
+      ['walk', 85],
+      ['run', 340],
+      ['chase', 650],
+    ] as const) {
+      const d = driver(build, act);
+      for (let i = 0; i < 300; i++) {
+        const shown = d.step({ animation, velocity: { x: speed, y: 0 } });
+        if (i < 40) continue;
+        for (const leg of LEGS) {
+          const j = legJoints(build, shown.pose, leg);
+          const [upper, lower] = leg.startsWith('front') ? build.front : build.back;
+          expect(Math.hypot(j.low.x - j.root.x, j.low.y - j.root.y), `${animation} ${leg} ${i}`).toBeLessThan((upper + lower) * 1.02);
+        }
+      }
+    }
+  });
+
   it('builds legs that reach their paws', () => {
     const d = driver(build, act);
     for (const animation of ['idle', 'sit', 'walk', 'peek'] as const) {
@@ -233,6 +300,19 @@ describe.each(SPECIES)('lifelike %s', (_name, build, act) => {
         // Never stretched more than a little past straight.
         expect(reach, `${animation} ${leg}`).toBeLessThan((upper + lower) * 1.12);
       }
+    }
+  });
+});
+
+describe('lifelike raccoon stood up', () => {
+  it('holds his arms from his chest, well below his chin', () => {
+    const d = driver(RACCOON_BUILD, raccoonAct);
+    for (let i = 0; i < 30; i++) d.step({ animation: 'idle' });
+    let shown!: Shown;
+    for (let i = 0; i < 40; i++) shown = d.step({ animation: 'surprised' });
+    const chin = shown.pose.hy + RACCOON_BUILD.head.r;
+    for (const leg of ['frontNear', 'frontFar'] as const) {
+      expect(legJoints(RACCOON_BUILD, shown.pose, leg).root.y - chin).toBeGreaterThan(4);
     }
   });
 });
