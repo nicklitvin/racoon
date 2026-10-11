@@ -3,7 +3,7 @@ import type { AnimationName, RaccoonFrame } from '../types';
 import { NO_LIFE, type Act, type ActInput, type Gaze, type Life } from './act';
 import type { Build } from './build';
 import { strideAt } from './gait';
-import { angleDiff, bump, clamp, DEG, dir, lerp, noise1, rng, smooth, wave } from './kit';
+import { angleDiff, bump, clamp, DEG, dir, lerp, noise1, rng, smooth } from './kit';
 import { POSE_KEYS, type Pose, type PoseFlags, type PoseKey } from './pose';
 import { keepInReach, scruffAt, tailRest, tailRoot } from './rig';
 import { BodyView, DEPTH, worldYaw, type Projected } from './view';
@@ -96,6 +96,8 @@ const TAIL_LIFE: Partial<Record<AnimationName, number>> = {
   surprised: 0.5,
   sleep: 0.12,
 };
+/** How far a tail wrapped round the paws comes on round in front of them, past straight ahead (radians). */
+const WRAP_PAST = 0.55;
 /** How long a sideways swing takes to travel from one tail joint to the next, s. */
 const TAIL_RIPPLE = 0.03;
 
@@ -190,6 +192,13 @@ export class Motion {
   private tailMotion = 0;
   /** How far each tail joint is carried out to the side, lagging the one before it. */
   private tailSides: number[] = [];
+  /** What the tail's doing on its own (see `moveTail`): where it is, how fast it's going, where it's headed. */
+  private tailMood = { side: 0.3, lift: 0, bend: 0, curl: 0 };
+  private tailMoodVel = { side: 0, lift: 0, bend: 0, curl: 0 };
+  private tailGoal = { side: 0.3, lift: 0, bend: 0, curl: 0 };
+  private tailRate = 2;
+  private tailSwishes = 0;
+  private nextTailMove = 0;
 
   private swing = 0;
   private swingVel = 0;
@@ -315,7 +324,7 @@ export class Motion {
     if (frame.eyes === 'closed') target.lids = Math.max(target.lids, 1);
     if (frame.eyes === 'wide') target.lids = Math.min(target.lids, -0.3);
     target.lids = Math.max(target.lids, this.blinkAmount());
-    this.tailLife(target, frame.animation, now);
+    this.tailLife(target, act.flags, frame.animation, now, dt);
     // Seen from his left, his left paws do what his right ones were posed to.
     if (this.viewSide < 0) {
       for (const [a, b] of MIRRORED) [target[a], target[b]] = [target[b], target[a]];
@@ -562,16 +571,78 @@ export class Motion {
    * swing it from side to side and curl the tip; now and then it gives a lazy swish. A cat's
    * tail is more expressive than a raccoon's heavy brush.
    */
-  private tailLife(pose: Pose, animation: AnimationName, now: number): void {
-    const amount = (TAIL_LIFE[animation] ?? 0) * (this.build.species === 'cat' ? 1 : 0.75);
+  private tailLife(pose: Pose, flags: PoseFlags, animation: AnimationName, now: number, dt: number): void {
+    const cat = this.build.species === 'cat';
+    const amount = (TAIL_LIFE[animation] ?? 0) * (cat ? 1 : 0.9);
+    this.moveTail(now, dt, cat);
     if (amount === 0) return;
-    const drift = (ms: number, seed: number) => noise1(now / ms, seed) * 0.65 + noise1(now / (ms * 0.37), seed + 1) * 0.35;
-    // The odd slow swish: a big swing over and back.
-    const swish = Math.max(0, noise1(now / 5200, 41)) ** 2 * wave(now, 1700);
-    pose.tailA += (drift(2600, 31) * 16 + swish * 6) * amount;
-    pose.tailBend += drift(3400, 33) * 1.6 * amount;
-    pose.tailCurl += drift(1500, 35) * 14 * amount;
-    pose.tailSide += (drift(2900, 37) * 0.45 + swish * 0.7) * amount;
+    const m = this.tailMood;
+    // A little drift as well, so even holding still it's never frozen.
+    const drift = noise1(now / 2300, 31) * 0.25;
+    pose.tailA += (m.lift * 16 + drift * 8) * amount;
+    pose.tailBend += m.bend * 1.6 * amount;
+    pose.tailCurl += (m.curl * 18 + drift * 6) * amount;
+    // Swishing carries it right across to his other side, whichever side it's held on; a
+    // tail wrapped round the paws stays round them, only the tip stirring.
+    if (!flags.tailFront) pose.tailSide = lerp(pose.tailSide, m.side, 0.75 * amount);
+  }
+
+  /**
+   * What the tail is up to, chosen afresh every so often like a real one: holding still, a
+   * slow swish across and back (once, or a few times), settling at a new angle, or a flick
+   * of the tip. Each move eases in and out at its own pace, so it never repeats.
+   */
+  private moveTail(now: number, dt: number, cat: boolean): void {
+    const r = this.random;
+    const goal = this.tailGoal;
+    if (now >= this.nextTailMove) {
+      // Raccoons' heavy brushes move less often and more slowly.
+      const pace = cat ? 1 : 1.3;
+      if (this.tailSwishes > 0) {
+        // On over to the other side.
+        this.tailSwishes--;
+        goal.side = -(Math.sign(goal.side) || 1) * lerp(0.45, 0.95, r());
+        goal.lift = lerp(-0.3, 0.5, r());
+        this.tailRate = lerp(3.2, 5, r()) / pace;
+        this.nextTailMove = now + lerp(550, 950, r()) * pace;
+      } else if (goal.curl !== 0) {
+        // The tip uncurls after a flick.
+        goal.curl = 0;
+        this.tailRate = lerp(4, 7, r());
+        this.nextTailMove = now + lerp(300, 700, r());
+      } else {
+        const pick = r();
+        if (pick < 0.35) {
+          this.tailSwishes = 1 + Math.floor(r() * (cat ? 3 : 2));
+          this.nextTailMove = now;
+        } else if (pick < 0.6) {
+          // Settles somewhere new: off to one side or the other, higher or lower.
+          goal.side = lerp(-0.6, 0.6, r());
+          goal.lift = lerp(-1, 1, r());
+          goal.bend = lerp(-1, 1, r());
+          this.tailRate = lerp(1.4, 2.6, r()) / pace;
+          this.nextTailMove = now + lerp(1500, 4200, r()) * pace;
+        } else if (pick < (cat ? 0.82 : 0.7)) {
+          // A flick of the tip.
+          goal.curl = (r() < 0.5 ? -1 : 1) * lerp(0.6, 1, r());
+          this.tailRate = lerp(8, 12, r());
+          this.nextTailMove = now + lerp(160, 320, r());
+        } else {
+          // Holds still a while.
+          this.nextTailMove = now + lerp(1200, 3800, r()) * pace;
+        }
+      }
+    }
+    if (dt <= 0) return;
+    const w = this.tailRate;
+    const steps = Math.ceil(dt / 0.008);
+    const h = dt / steps;
+    for (const key of ['side', 'lift', 'bend', 'curl'] as const) {
+      for (let i = 0; i < steps; i++) {
+        this.tailMoodVel[key] += (w * w * (goal[key] - this.tailMood[key]) - 2 * 0.9 * w * this.tailMoodVel[key]) * h;
+        this.tailMood[key] += this.tailMoodVel[key] * h;
+      }
+    }
   }
 
   private updateTail(pose: Pose, flags: PoseFlags, dt: number): void {
@@ -631,13 +702,42 @@ export class Motion {
     // Lay the segments end to end, keeping them off the floor, and curve them out sideways.
     const points: Point3[] = [{ ...root, z: 0 }];
     const reach = spec.segment * count * 0.42;
+    const floor = -spec.tip * 0.9;
+    // A tail wrapped round the paws lies along the floor: from where it touches down, the
+    // rest of its curl turns it round his side on the ground instead of back up into the air.
+    const wrap = flags.tailFront && !flags.noShadow;
+    const around = Math.sign(pose.tailSide) || 1;
+    // It hugs an oval round where he sits: from the rump to just past the front paws, and
+    // as wide as his haunches.
+    const rearmost = Math.min(pose.px, pose.bnx, pose.bfx) - 5;
+    const foremost = Math.max(pose.fnx, pose.ffx) + spec.tip + 1.5;
+    const oval = { x: (rearmost + foremost) / 2, rx: (foremost - rearmost) / 2, rz: this.build.stance.hip + spec.base + 2 };
+    let angle = 0;
+    let landed = -1;
     for (let i = 0; i < count; i++) {
-      const d = dir(this.tailAngles[i]!);
+      const a = this.tailAngles[i]!;
+      const d = dir(a);
       const prev = points[i]!;
       const y = prev.y + d.y * spec.segment;
+      if (wrap && (landed >= 0 || y >= floor)) {
+        if (landed < 0) {
+          landed = i;
+          // Round the oval from behind him, out his side, to in front of his paws.
+          angle = Math.PI * around;
+        }
+        // Whatever the tail's springs are doing over its resting shape (a twitch of the
+        // tip, a flick) lifts and swings the end of it.
+        const wobble = angleDiff(rest[i]!, a) * DEG;
+        const step = spec.segment / Math.hypot(oval.rx * Math.sin(angle), oval.rz * Math.cos(angle));
+        angle = around > 0 ? Math.max(-WRAP_PAST, angle - step) : Math.min(WRAP_PAST, angle + step);
+        const swing = angle + wobble * 0.5 * around;
+        const lift = clamp(Math.abs(wobble) * 6, 0, spec.tip * 2.5) * ((i - landed) / Math.max(1, count - 1 - landed));
+        points.push({ x: oval.x + oval.rx * Math.cos(swing), y: floor - lift, z: oval.rz * Math.sin(swing) });
+        continue;
+      }
       points.push({
         x: prev.x + d.x * spec.segment,
-        y: flags.noShadow ? y : Math.min(y, -spec.tip * 0.9),
+        y: flags.noShadow ? y : Math.min(y, floor),
         z: this.tailSides[i]! * reach * ((i + 1) / count) ** 1.4,
       });
     }

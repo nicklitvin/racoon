@@ -24,6 +24,11 @@ export default defineConfig({
   // Relative asset paths so the same build loads from file:// in Electron and from a web host.
   base: './',
   plugins: [react(), contentSecurityPolicy],
+  define: {
+    // Stamps the build date into the bundle so the settings report the build actually
+    // running, not whatever today happens to be. See src/lib/version.ts.
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

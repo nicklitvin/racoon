@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RACCOON_TYPES, type KeyboardStatus, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
 import { RACCOON_STYLES, type Species } from '../sprites';
+import { PatchNotes, VersionChip } from './PatchNotes';
 
 interface SettingsPanelProps {
   host: Host;
@@ -84,22 +85,36 @@ function TypePicker({ value, onChange }: TypePickerProps) {
 
 export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
   const { settings, keyboard } = useHostState(host);
+  const [notes, setNotes] = useState(false);
   if (!settings) return null;
 
   const update = (patch: Partial<Settings>) => void host.updateSettings(patch);
   const desktop = host.kind === 'electron';
   const blocked = settings.keyboardReactions && keyboard && !keyboard.listening && keyboard.message;
 
+  const header = (
+    <header className="settings-header">
+      <h1>Racoon settings</h1>
+      {onClose && (
+        <button type="button" className="icon-button" onClick={onClose} aria-label="Close settings">
+          ×
+        </button>
+      )}
+    </header>
+  );
+
+  if (notes) {
+    return (
+      <section className="settings" aria-label="Racoon settings">
+        {header}
+        <PatchNotes onBack={() => setNotes(false)} />
+      </section>
+    );
+  }
+
   return (
     <section className="settings" aria-label="Racoon settings">
-      <header className="settings-header">
-        <h1>Racoon settings</h1>
-        {onClose && (
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close settings">
-            ×
-          </button>
-        )}
-      </header>
+      {header}
 
       <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
 
@@ -159,11 +174,14 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
         </>
       )}
 
-      <p className="hint footer">
-        {desktop
-          ? 'Tip: drag your pet to move it, click to pet it. Settings live in the tray menu.'
-          : 'Tip: drag your pet, tap to pet it, or swipe your finger (or mouse) around fast.'}
-      </p>
+      <div className="settings-footer">
+        <p className="hint footer">
+          {desktop
+            ? 'Tip: drag your pet to move it, click to pet it. Settings live in the tray menu.'
+            : 'Tip: drag your pet, tap to pet it, or swipe your finger (or mouse) around fast.'}
+        </p>
+        <VersionChip onClick={() => setNotes(true)} />
+      </div>
     </section>
   );
 }

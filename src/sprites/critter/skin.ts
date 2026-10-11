@@ -3,7 +3,7 @@ import type { LegName } from './pose';
 import { n, svgWriter } from '../svg';
 import type { Build } from './build';
 import { HeadView, onDisc, onSphere, v3, type Disc, type V3 } from './head';
-import { add, clamp, clamp01, curve, fmt, lerp, mixPt, scale, sub, tube, unit } from './kit';
+import { add, clamp, clamp01, curve, fmt, lerp, mixPt, scale, smooth, sub, tube, unit } from './kit';
 import type { Point3, Shown } from './motion';
 import { LEGS, type Pose } from './pose';
 import { bodyAt, legJoints, spineFrame, uprightness, type Frame } from './rig';
@@ -103,18 +103,32 @@ export function createSkin(doc: Document, build: Build, className: string, label
   const faceInFront = make('g', {}, figure);
   const front = union('front', figure);
   const layers: Record<Layer, SVGElement> = { far: far.fill, main: main.fill, front: front.fill };
+  // The first thing in front of everything: the tail when it's all in front, or else a copy
+  // of it cut down to the stretch that comes round in front (a tail wrapped round the paws),
+  // the rest staying behind the body. The cut goes straight across outline and fill alike,
+  // over the same tail continuing behind, so there's no seam.
+  const tailFrontSlot = make('g', {}, front.fill);
+  const tailCut = make('clipPath', { id: `${id}-tailcut` }, defs);
+  const tailCutPath = make('path', {}, tailCut);
 
-  // Tail, with the raccoon's rings clipped to it.
-  const tailGroup = make('g', {}, tailBack.fill);
-  const tailPath = make('path', { id: `${id}-tailpath`, class: 'k-p k-tailfur' }, tailGroup);
-  const tailClip = make('clipPath', { id: `${id}-tailclip` }, defs);
-  make('use', { href: `#${id}-tailpath` }, tailClip);
-  const rings = make('g', { 'clip-path': `url(#${id}-tailclip)`, class: 'k-rings' }, tailGroup);
+  // Tail, with the raccoon's rings clipped to it; and the copy for the stretch in front.
   // Raccoons have four broad dark rings and a dark tip; a tabby cat has faint thin ones.
   const raccoon = build.species === 'raccoon';
-  const ringCount = raccoon ? 4 : 6;
-  const ringPaths = Array.from({ length: ringCount }, () => make('path', { class: raccoon ? 'k-ring' : 'k-stripe' }, rings));
-  const tailTip = raccoon ? make('circle', { class: 'k-ringfill' }, rings) : null;
+  const makeTail = (name: string) => {
+    const group = make('g', {});
+    const path = make('path', { id: `${id}-${name}`, class: 'k-p k-tailfur' }, group);
+    const clip = make('clipPath', { id: `${id}-${name}clip` }, defs);
+    make('use', { href: `#${id}-${name}` }, clip);
+    const rings = make('g', { 'clip-path': `url(#${id}-${name}clip)`, class: 'k-rings' }, group);
+    const ringPaths = Array.from({ length: raccoon ? 4 : 6 }, () => make('path', { class: raccoon ? 'k-ring' : 'k-stripe' }, rings));
+    const tip = raccoon ? make('circle', { class: 'k-ringfill' }, rings) : null;
+    return { group, path, ringPaths, tip };
+  };
+  const tails = [makeTail('tailpath'), makeTail('tailcopy')] as const;
+  const tailGroup = tails[0].group;
+  tailBack.fill.appendChild(tailGroup);
+  const tailCopy = tails[1].group;
+  set(tailCopy, 'clip-path', `url(#${id}-tailcut)`);
 
   const makeLeg = (): LegParts => {
     const group = make('g', {});
@@ -218,7 +232,6 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const head = new HeadView(view.at(pose.hx, pose.hy, shown.head.z), pose.hpitch, shown.head.yaw, pose.hroll, HEAD_TILT);
     drawNeck(frame, pose, view, head, shown);
     drawHead(head, pose);
-    drawTail(shown.tail, pose, view);
 
     // Who's in front of whom, from how far towards you each part stands on the floor.
     const bodyDepth = view.towards((pose.px + pose.sx) / 2);
@@ -240,11 +253,57 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const faceSlot = headBehind ? faceBehind : faceInFront;
     if (face.parentNode !== faceSlot) faceSlot.appendChild(face);
 
-    const tailDepth = shown.tail.slice(2).reduce((sum, p) => sum + view.towards(p.x, p.z), 0) / Math.max(1, shown.tail.length - 2);
-    const tailHome = flags.tailFront || tailDepth > bodyDepth + 4 ? front.fill : tailBack.fill;
-    if (tailGroup.parentNode !== tailHome) tailHome.insertBefore(tailGroup, tailHome.firstChild);
+    placeTail(shown.tail, view, bodyDepth, flags.tailFront);
+    drawTail(shown.tail, pose, view);
 
     drawContours(pose, view, frame, placed);
+  }
+
+  /**
+   * Which stretches of the tail are in front of the body and which behind it: each piece is
+   * drawn in its own layer, so a tail curled round in front of the paws doesn't show through
+   * the body where it passes behind.
+   */
+  function placeTail(points: Point3[], view: BodyView, bodyDepth: number, wrapped: boolean): void {
+    // In front once clear of the body's near side. A wrapped tail lies on the floor round
+    // the paws, so it only has to clear the middle.
+    const clear = bodyDepth + (wrapped ? 0 : build.stance.hip);
+    const count = points.length;
+    const ahead: boolean[] = [];
+    for (let i = 0; i < count - 1; i++) {
+      const a = points[i]!;
+      const b = points[i + 1]!;
+      ahead.push((view.towards(a.x, a.z) + view.towards(b.x, b.z)) / 2 > clear);
+    }
+    // The first segment or two leave the rump, inside the body: they go with the rest.
+    const rest = ahead.slice(2);
+    const all = rest.every(Boolean);
+    const none = !rest.some(Boolean);
+    const home = all ? tailFrontSlot : tailBack.fill;
+    if (tailGroup.parentNode !== home) home.insertBefore(tailGroup, home.firstChild);
+    if (all || none) {
+      if (tailCopy.parentNode) tailCopy.remove();
+      return;
+    }
+    if (tailCopy.parentNode !== tailFrontSlot) tailFrontSlot.appendChild(tailCopy);
+    // Cover each stretch in front with a broad band cut square at its ends, rounded at the
+    // joints in between so a bend isn't nicked.
+    const pts = points.map((p) => view.at(p.x, p.y, p.z));
+    const wide = (build.tail.base + 3) * 2.2;
+    let d = '';
+    for (let i = 2; i < count - 1; i++) {
+      if (!ahead[i]) continue;
+      const a = pts[i]!;
+      const b = pts[i + 1]!;
+      const along = unit(sub(b, a));
+      const side = { x: -along.y * wide, y: along.x * wide };
+      const corners = [add(a, side), add(b, side), sub(b, side), sub(a, side)];
+      d += `M${corners.map(fmt).join('L')}Z`;
+      if (i + 1 < count - 1 ? ahead[i + 1] : true) {
+        d += `M${fmt({ x: b.x - wide, y: b.y })}a${n(wide)},${n(wide)} 0 1,0 ${n(wide * 2)},0a${n(wide)},${n(wide)} 0 1,0 ${n(-wide * 2)},0Z`;
+      }
+    }
+    set(tailCutPath, 'd', d);
   }
 
   /** Puts each part in its layer, farthest first, touching the page only when something moves. */
@@ -252,8 +311,8 @@ export function createSkin(doc: Document, build: Build, className: string, label
     for (const layer of ['far', 'main', 'front'] as const) {
       const parent = layers[layer];
       const wanted = placed.filter((p) => p.layer === layer).sort((a, b) => a.depth - b.depth);
-      // The body stays first in the main layer; a wrapped tail stays first in front.
-      const fixed = layer === 'main' ? 1 : layer === 'front' && tailGroup.parentNode === parent ? 1 : 0;
+      // The body stays first in the main layer, and the tail's place first in front.
+      const fixed = layer === 'main' || layer === 'front' ? 1 : 0;
       const current = Array.from(parent.children).slice(fixed) as SVGElement[];
       const same = current.length === wanted.length && current.every((el, i) => el === wanted[i]!.el);
       if (!same) for (const p of wanted) parent.appendChild(p.el);
@@ -285,13 +344,19 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const puff = 1 + pose.puff * (raccoon ? 0.4 : 1.1);
     const radii = points.map((_, i) => {
       const t = i / (count - 1);
-      // Cats' tails are even; raccoons' are bushy, fullest a third of the way along.
-      const base = raccoon ? lerp(tail.base * 0.75, tail.tip, t) + Math.sin(Math.min(1, t * 1.6) * Math.PI * 0.5) * 2 : lerp(tail.base, tail.tip, t);
+      // Cats' tails are even, thickening at the root where they grow out of the rump;
+      // raccoons' are bushy, fullest a third of the way along.
+      const base = raccoon
+        ? lerp(tail.base * 0.75, tail.tip, t) + Math.sin(Math.min(1, t * 1.6) * Math.PI * 0.5) * 2
+        : lerp(tail.base, tail.tip, t) * (1 + 0.3 * smooth(1 - t / 0.2));
       return base * puff;
     });
-    set(tailPath, 'd', tube(pts, radii));
+    // No cap at the root: it starts inside the rump.
+    const d = tube(pts, radii, false);
+    const copies = tailCopy.parentNode ? tails : [tails[0]];
+    for (const copy of copies) set(copy.path, 'd', d);
     // Rings: dark bands across the tail at even spacing, and a dark tip.
-    ringPaths.forEach((ring, r) => {
+    tails[0].ringPaths.forEach((_, r) => {
       const at = raccoon ? 0.22 + r * 0.18 : 0.2 + r * 0.13;
       const i = Math.min(count - 2, Math.floor(at * (count - 1)));
       const f = at * (count - 1) - i;
@@ -299,17 +364,31 @@ export function createSkin(doc: Document, build: Build, className: string, label
       const along = unit(sub(pts[i + 1]!, pts[i]!));
       const across = { x: -along.y * 9, y: along.x * 9 };
       const back = scale(along, -0.6);
-      set(ring, 'd', `M${fmt(add(add(c, across), back))}L${fmt(sub(add(c, back), across))}`);
+      const band = `M${fmt(add(add(c, across), back))}L${fmt(sub(add(c, back), across))}`;
       // A band round a tail pointing at you is seen edge-on: thinner, not a smear.
       const foreshortened = clamp(Math.hypot(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y) / tail.segment, 0.2, 1);
-      set(ring, 'style', `stroke-width:${n((raccoon ? 3.4 : 1.7) * foreshortened)}px`);
+      const width = `stroke-width:${n((raccoon ? 3.4 : 1.7) * foreshortened)}px`;
+      for (const copy of copies) {
+        set(copy.ringPaths[r]!, 'd', band);
+        set(copy.ringPaths[r]!, 'style', width);
+      }
     });
-    if (tailTip) {
-      const tip = pts[count - 1]!;
-      set(tailTip, 'cx', n(tip.x));
-      set(tailTip, 'cy', n(tip.y));
-      set(tailTip, 'r', n(radii[count - 1]! * 1.05));
+    const tip = pts[count - 1]!;
+    for (const copy of copies) {
+      if (!copy.tip) continue;
+      set(copy.tip, 'cx', n(tip.x));
+      set(copy.tip, 'cy', n(tip.y));
+      set(copy.tip, 'r', n(radii[count - 1]! * 1.05));
     }
+  }
+
+  /**
+   * Where a leg's upper part starts, inside the body: the shoulder blade or the top of the
+   * thigh. Low enough that it never shows as a knob above the line of the back, even on the
+   * far side, which the camera, looking down a little, sees higher up.
+   */
+  function limbTop(root: Point, frame: Frame, front: boolean): Point {
+    return add(root, add(scale(frame.up, front ? 1.6 : -0.6), scale(frame.along, front ? -1.5 : 0.5)));
   }
 
   /** Draws a leg and returns how far towards you it stands. */
@@ -324,7 +403,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const low = view.pt(j.low, j.z.low);
     const paw = view.pt(j.paw, j.z.paw);
     // Upper part starts inside the body: the shoulder blade or the top of the thigh.
-    const top = view.pt(add(j.root, add(scale(frame.up, front ? 3.2 : 2.6), scale(frame.along, front ? -1.5 : 0.5))), j.z.root * 0.8);
+    const top = view.pt(limbTop(j.root, frame, front), j.z.root * 0.8);
     // Bend softly through each joint instead of kinking.
     set(parts.upper, 'd', tube([top, mixPt(root, mid, 0.35), mid], front ? [w0 * 0.8, w0, w1] : [w0 * 0.8, w0 * 0.98, w1]));
     const muscle = front ? [w1, w1 * 1.02, w2] : [w1, w1 * 1.05, w2];
@@ -522,7 +601,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
         const hind = leg.startsWith('back');
         const j = legJoints(build, pose, leg);
         const [w0, w1] = limbWidths(leg, view.local(j.root.x));
-        const top = add(j.root, add(scale(frame.up, hind ? 2.6 : 3.2), scale(frame.along, hind ? 0.5 : -1.5)));
+        const top = limbTop(j.root, frame, !hind);
         const down = hind ? 0.3 : 0.4;
         const spine = [
           view.pt(top, j.z.root * 0.8),
@@ -918,11 +997,13 @@ const TORSO: Record<Build['species'], (L: number, pose: Pose, upright: number) =
     const br = pose.breath;
     const puff = pose.puff * 1.5;
     return {
-      rear: [-9.6, 0.5],
+      // The rump rounds off and runs smoothly down into the root of the tail.
+      rear: [-12.4, 0.2],
       front: [L + 6.6, -2.2],
       top: [
-        [-7.6, 4.8 + puff],
-        [-3.4, 6.9 + puff],
+        [-10.4, 2.6 + puff * 0.5],
+        [-8, 4.5 + puff],
+        [-4.5, 6.5 + puff],
         [2.5, 7.1 + puff],
         [L * 0.33, 6.5 + puff],
         [L * 0.6, 6.4 + puff],
@@ -936,7 +1017,8 @@ const TORSO: Record<Build['species'], (L: number, pose: Pose, upright: number) =
         [L * 0.38, 9.2 + puff * 0.5],
         [L * 0.12, 8.8],
         [-3.5, 7.6],
-        [-7.4, 4.8],
+        [-7.6, 5.6],
+        [-10.4, 1.4],
       ],
       bellyDepth: (a) => (a > L * 0.5 ? 2.2 : 1.4),
     };

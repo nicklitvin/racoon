@@ -72,10 +72,10 @@ export const CAT_BUILD: Build = {
   // Cats are famously bendy: one can turn round in its own length.
   flex: 1.3,
   uprightShoulder: 0,
-  scapula: 3.6,
+  scapula: 4,
   pawFront: [2.9, 2],
   pawBack: [3.2, 2.1],
-  tail: { segments: 14, segment: 3.1, base: 3, tip: 2.2, root: { x: -7.5, y: -1.8 } },
+  tail: { segments: 14, segment: 3.1, base: 3, tip: 2.2, root: { x: -8, y: -1.3 } },
   head: { r: 9.2 },
   // A lateral-sequence walk: back left, front left, back right, front right.
   walk: {
@@ -88,12 +88,13 @@ export const CAT_BUILD: Build = {
     bob: 0.55,
     peak: [0.36, 0.5],
   },
-  // A bounding run: back paws close together, front paws one after the other.
+  // Running, a cat gallops (a transverse gallop): one hind paw lands, then the other a
+  // clear beat later, then one front paw and the other. No two paws land together.
   run: {
     stride: 74,
     speed: 300,
     duty: 0.34,
-    offsets: { backNear: 0, backFar: 0.07, frontNear: 0.5, frontFar: 0.6 },
+    offsets: { backNear: 0, backFar: 0.16, frontNear: 0.46, frontFar: 0.62 },
     lift: [7, 6],
     curl: [110, 70],
     bob: 2.2,
@@ -103,7 +104,7 @@ export const CAT_BUILD: Build = {
     stride: 96,
     speed: 560,
     duty: 0.28,
-    offsets: { backNear: 0, backFar: 0.06, frontNear: 0.5, frontFar: 0.58 },
+    offsets: { backNear: 0, backFar: 0.13, frontNear: 0.44, frontFar: 0.58 },
     lift: [8, 7],
     curl: [115, 75],
     bob: 3,
@@ -128,7 +129,7 @@ export const RACCOON_BUILD: Build = {
   stance: { shoulder: 5.4, hip: 6.4, frontPaw: 4.4, backPaw: 5.2, girth: 1.1 },
   flex: 0.95,
   uprightShoulder: 5.5,
-  scapula: 2.6,
+  scapula: 3,
   pawFront: [3.2, 1.9],
   pawBack: [3.6, 2],
   tail: { segments: 10, segment: 3.4, base: 5, tip: 4, root: { x: -8.5, y: -1.5 } },
@@ -145,11 +146,12 @@ export const RACCOON_BUILD: Build = {
     bob: 0.9,
     peak: [0.4, 0.45],
   },
+  // Running, a transverse gallop like the cat's, each paw landing in turn.
   run: {
     stride: 58,
     speed: 300,
     duty: 0.36,
-    offsets: { backNear: 0, backFar: 0.08, frontNear: 0.48, frontFar: 0.58 },
+    offsets: { backNear: 0, backFar: 0.17, frontNear: 0.47, frontFar: 0.63 },
     lift: [5, 5],
     curl: [70, 50],
     bob: 2.4,
@@ -159,7 +161,7 @@ export const RACCOON_BUILD: Build = {
     stride: 74,
     speed: 560,
     duty: 0.3,
-    offsets: { backNear: 0, backFar: 0.07, frontNear: 0.48, frontFar: 0.57 },
+    offsets: { backNear: 0, backFar: 0.14, frontNear: 0.45, frontFar: 0.6 },
     lift: [6, 6],
     curl: [80, 55],
     bob: 3,

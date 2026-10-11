@@ -260,13 +260,14 @@ describe.each(SPECIES)('lifelike %s', (_name, build, act) => {
 
   it("never holds his tail still while he's idle", () => {
     const d = driver(build, act);
-    const tips: number[] = [];
-    for (let i = 0; i < 700; i++) {
+    const tips: { x: number; y: number }[] = [];
+    for (let i = 0; i < 1250; i++) {
       const shown = d.step({ animation: 'idle' });
       const tip = shown.tail.at(-1)!;
-      if (i > 60) tips.push(shown.view.at(tip.x, tip.y, tip.z).y);
+      if (i > 60) tips.push(shown.view.at(tip.x, tip.y, tip.z));
     }
-    expect(Math.max(...tips) - Math.min(...tips)).toBeGreaterThan(10);
+    const range = (k: 'x' | 'y') => Math.max(...tips.map((p) => p[k])) - Math.min(...tips.map((p) => p[k]));
+    expect(Math.hypot(range('x'), range('y'))).toBeGreaterThan(10);
   });
 
   it('builds legs that reach their paws all through every gait', () => {

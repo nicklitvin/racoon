@@ -77,7 +77,8 @@ src/                      The page (React). Runs in Electron and in a browser
     archive/              Retired pets (3D arena, cartoon, plush, classic, cartoon cat)
   runtime/petRuntime.ts   Connects core logic to the DOM; runs the animation loop
   host/                   "Where am I running?": Electron bridge or browser fallback
-  components/             React: the pet page and the settings panel
+  components/             React: the pet page, the settings panel and its "What's new" notes
+  lib/                    The version (the build date) and the patch notes
 tests/                    Vitest unit tests
 scripts/                  Dev runner and esbuild bundling for electron/
 assets/                   Tray icon (used at runtime)
@@ -147,7 +148,7 @@ Every pet is the same rig in `src/sprites/critter/`, drawn as inline SVG:
   - He faces the way he's going on the floor, including up and down the screen. On the move his body follows the path, bent along its curves; turning on the spot, the shoulders lead, the hips follow and he steps round.
   - Paws advance by the ground actually covered, so they never skate.
   - Legs never stretch past their length: the shoulder blade slides to reach, and the wrist or heel tips up.
-  - The tail is a chain of springs that is never quite still: it drifts, swishes and curls, and each swing runs from the base to the tip.
+  - The tail is a chain of springs with a mind of its own: every so often it picks something to do (hold still, swish across to the other side and back, settle at a new angle, flick its tip), and each swing runs from the base to the tip. Wrapped round the paws, it lies along the floor round his side.
   - Carried, he hangs from the scruff and swings like a pendulum.
   - Glances, ear flicks and blinks.
   - The head turns on the neck to look at the pointer. The eyes keep up with it; the head holds still through small movements and swings after bigger ones a beat behind.
@@ -173,6 +174,10 @@ TypeScript points out anything missing. `tests/critter.test.ts` checks every ani
 The art styles are just CSS, the `look-*` and `coat-*` classes in `src/styles.css`.
 
 **Another art style:** behaviour code only ever names animations, and the page only talks to the `RaccoonRenderer` interface (`src/sprites/types.ts`). To swap the art, write another renderer and add it to `RACCOON_STYLES` in `src/sprites/index.ts`; nothing in `src/core` changes. The retired renderers in `src/sprites/archive/` still work: to bring one back, give it a type in `shared/settings.ts` and an entry in `RACCOON_STYLES`.
+
+## Version and patch notes
+
+The version is the date of the build, stamped in by `vite.config.mts` (`__BUILD_DATE__`), and shows at the bottom of the settings panel. Clicking it opens "What's new", the hand-written notes in `src/lib/patchNotes.ts`. When you ship something worth noticing, add an entry at the top, written for someone watching their pet rather than reading the code.
 
 ## Building and packaging
 
