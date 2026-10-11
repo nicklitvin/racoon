@@ -30,6 +30,8 @@ const DRAG_THRESHOLD_PX = 4;
  * like phones, get proportionally more sensitive so a finger swipe counts as "fast".
  */
 const REFERENCE_SCREEN_PX = 1600;
+/** The pointer catches his eye within this distance. */
+const GAZE_RADIUS_PX = 420;
 /** Raccoon scale on screens much narrower than a desktop. */
 const SMALL_SCREEN_SCALE = 0.8;
 
@@ -306,6 +308,8 @@ export class PetRuntime {
       keystrokes: this.animator.keystrokes,
       eyes: this.animator.eyes,
       heading: this.heading,
+      velocity: snap.velocity,
+      gaze: this.gazeAt(snap.position),
     };
     const turns = this.renderer.turnsItself === true;
     const key = `${frame.animation}|${frame.timeMs}|${frame.keystrokes}|${frame.eyes}|${turns ? this.heading.toFixed(3) : ''}`;
@@ -333,6 +337,15 @@ export class PetRuntime {
       emote.dataset.emote = snap.emote;
       this.lastEmote = snap.emote;
     }
+  }
+
+  /** The pointer relative to his feet, when it's near enough to catch his eye. */
+  private gazeAt(feet: Point): Point | null {
+    const c = this.cursor;
+    if (!c) return null;
+    const dx = c.x - feet.x;
+    const dy = c.y - feet.y;
+    return Math.hypot(dx, dy) < GAZE_RADIUS_PX ? { x: dx, y: dy } : null;
   }
 
   private applyLayout(): void {

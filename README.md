@@ -156,7 +156,20 @@ To add an animation:
 
 TypeScript points out anything missing. `npm test` checks every pose for bad numbers, keeps it inside the drawing's box, and checks that standing and sitting paws stay on the ground.
 
-**Another art style:** behaviour code only ever names animations, and the page only talks to the `RaccoonRenderer` interface (`src/sprites/types.ts`). To swap the art, write another renderer and create it in `PetRuntime` instead of `createSvgRaccoon()`; nothing in `src/core` changes.
+**Another art style:** behaviour code only ever names animations, and the page only talks to the `RaccoonRenderer` interface (`src/sprites/types.ts`). To swap the art, write another renderer and add it to `RACCOON_STYLES` in `src/sprites/index.ts`; nothing in `src/core` changes.
+
+**The lifelike pets** (storybook, ink sketch and shadow) share one rig in `src/sprites/critter/`:
+- `catAct.ts` and `raccoonAct.ts` give a pose for every animation, based on how the real animal holds itself.
+- `build.ts` holds each animal's proportions and gaits.
+- `motion.ts` makes the movement continuous:
+  - Animations blend into each other.
+  - Paws are planted by the distance actually covered.
+  - The tail is a chain of springs.
+  - A pendulum swing while carried.
+  - Glances, ear flicks and blinks.
+- `skin.ts` draws the pose. Its head is a small 3D model projected onto the page, so it can turn to look at you.
+
+The art styles are just CSS, the `look-*` and `coat-*` classes in `src/styles.css`. `tests/critter.test.ts` checks that planted paws never slide.
 
 ## Building and packaging
 

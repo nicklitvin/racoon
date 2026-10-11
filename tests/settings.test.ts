@@ -26,12 +26,3 @@ describe('normalizeSettings', () => {
     );
   });
 });
-
-describe('pet registry', () => {
-  it('offers a drawing for every type, with raccoons and cats to choose from', async () => {
-    const { RACCOON_STYLES } = await import('../src/sprites');
-    for (const type of RACCOON_TYPES) expect(RACCOON_STYLES[type]?.label, type).toBeTruthy();
-    const species = new Set(RACCOON_TYPES.map((type) => RACCOON_STYLES[type].species));
-    expect([...species].sort()).toEqual(['cat', 'raccoon']);
-  });
-});

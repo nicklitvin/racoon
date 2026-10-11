@@ -61,6 +61,10 @@ export interface RaccoonFrame {
   heading?: number;
   /** Wall-clock time of this frame in ms, for renderers that ease between poses on their own. */
   clockMs?: number;
+  /** How fast he's moving on screen, px/s, so legs can keep pace with the ground. */
+  velocity?: { x: number; y: number };
+  /** Where the pointer is relative to his feet, in screen px, if it's close enough to look at. */
+  gaze?: { x: number; y: number } | null;
 }
 
 /**

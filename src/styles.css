@@ -301,36 +301,20 @@ html[data-host='web'][data-theme='dark'] {
   stroke-width: 11;
 }
 
-/* ---- 2D cats: flat cartoon ---- */
+/* ---- Black cat: flat 2D cartoon ---- */
 
-/* Each part has its own colour, defaulting to the fur, so breeds can paint points,
-   bibs and gloves. Breeds below only override what differs from the black cat. */
 .raccoon-cat {
   --c-fur: #24212b;
   --c-far: #131117;
   --c-edge: #46404f;
-  --c-body: var(--c-fur);
-  --c-head: var(--c-fur);
-  --c-muzzle: var(--c-head);
-  --c-ear: var(--c-head);
-  --c-ear-far: var(--c-far);
-  --c-tail: var(--c-fur);
-  --c-leg: var(--c-fur);
-  --c-paw: var(--c-leg);
-  --c-paw-far: var(--c-far);
-  --c-bib: transparent;
-  --c-stripe: transparent;
   --c-iris: #d9d64a;
   --c-iris-in: #f4f39a;
   --c-iris-out: #8fa52c;
-  --c-pupil: #08070a;
   --c-ear-inner: #6e4459;
   --c-nose: #e98fa8;
   --c-line: #cfc8dc;
-  --c-smile: var(--c-line);
   --c-mouth: #5d2338;
   --c-tongue: #ea8aa3;
-  --c-sheen: 0.1;
   /* A light halo in every theme: a dark one would hide a black cat on a dark page. */
   --c-halo: rgba(255, 255, 255, 0.75);
   filter: none;
@@ -340,55 +324,12 @@ html[data-host='web'][data-theme='dark'] {
   filter: drop-shadow(0 0 1.2px var(--c-halo));
 }
 
-.c-body {
-  fill: var(--c-body);
-}
-
-.c-head {
-  fill: var(--c-head);
-}
-
-.c-muzzle {
-  fill: var(--c-muzzle);
-}
-
-.c-ear {
-  fill: var(--c-ear);
-}
-
-.c-ear-far {
-  fill: var(--c-ear-far);
-}
-
-.c-tail {
-  fill: var(--c-tail);
-}
-
-.c-leg {
-  fill: var(--c-leg);
+.c-fur {
+  fill: var(--c-fur);
 }
 
 .c-far {
   fill: var(--c-far);
-}
-
-.c-paw {
-  fill: var(--c-paw);
-}
-
-.c-paw-far {
-  fill: var(--c-paw-far);
-}
-
-.c-bib {
-  fill: var(--c-bib);
-}
-
-.c-stripe {
-  fill: none;
-  stroke: var(--c-stripe);
-  stroke-width: 2.2;
-  stroke-linecap: round;
 }
 
 .c-limb {
@@ -397,8 +338,8 @@ html[data-host='web'][data-theme='dark'] {
   stroke-linecap: round;
 }
 
-.c-limb.c-leg {
-  stroke: var(--c-leg);
+.c-limb.c-fur {
+  stroke: var(--c-fur);
 }
 
 .c-limb.c-far {
@@ -417,7 +358,7 @@ html[data-host='web'][data-theme='dark'] {
 
 .c-sheen {
   fill: #fff;
-  opacity: var(--c-sheen);
+  opacity: 0.1;
 }
 
 .c-iris {
@@ -433,7 +374,7 @@ html[data-host='web'][data-theme='dark'] {
 }
 
 .c-pupil {
-  fill: var(--c-pupil);
+  fill: #08070a;
 }
 
 .c-glint {
@@ -467,197 +408,293 @@ html[data-host='web'][data-theme='dark'] {
   stroke-width: 0.8;
 }
 
-.c-smile {
-  stroke: var(--c-smile);
-}
-
 .c-whisker {
   stroke-width: 0.4;
   opacity: 0.75;
 }
 
-/* Ginger tabby with a cream chest and darker stripes. */
-.cat-tabby {
-  --c-fur: #e48a3c;
-  --c-far: #b9662a;
-  --c-edge: #a65a22;
-  --c-muzzle: #f8dcb6;
-  --c-bib: #f8dcb6;
-  --c-paw: #f8dcb6;
-  --c-stripe: #b5561d;
-  --c-ear-inner: #f0a39a;
-  --c-iris: #9fcf5a;
-  --c-iris-in: #dff3a0;
-  --c-iris-out: #5f8f2a;
-  --c-line: #6b3a1c;
-  --c-sheen: 0.18;
-  --c-halo: rgba(60, 30, 10, 0.35);
+/* ---- Lifelike animals: one rig, three ways of drawing it ---- */
+
+/* Each part's colour falls back to the fur; coats below only set what differs. Parts in an
+   outline copy (k-outline) get --f instead, so the copy draws the outline in one colour. */
+.critter {
+  --k-fur: #8d9199;
+  --k-far: #6e727a;
+  --k-leg: var(--k-fur);
+  --k-head: var(--k-fur);
+  --k-muzzle: var(--k-head);
+  --k-ear: var(--k-head);
+  --k-cheek: var(--k-head);
+  --k-tail: var(--k-fur);
+  --k-line: #2c2a2e;
+  --k-lw: 0.6;
+  --k-contour: var(--k-line);
+  --k-belly: transparent;
+  --k-shade: rgba(30, 20, 40, 0.12);
+  --k-ear-in: #d99a9e;
+  --k-nose: #d98a96;
+  --k-mouth: #4a2430;
+  --k-tongue: #e98aa0;
+  --k-eyeball: #f4f0e2;
+  --k-iris: #b9c24a;
+  --k-pupil: #141217;
+  --k-glint: #ffffff;
+  --k-eyerim: var(--k-line);
+  --k-mask: #26252b;
+  --k-brow: #f2efe8;
+  --k-ring: #2f2e34;
+  --k-stripe: transparent;
+  --k-back: transparent;
+  --k-whisker: var(--k-line);
+  --k-halo: rgba(255, 255, 255, 0.8);
+  filter: drop-shadow(0 0 1.1px var(--k-halo));
 }
 
-/* Siamese: cream body with dark brown points and blue eyes. */
-.cat-siamese {
-  --c-fur: #efe2cc;
-  --c-far: #4b3428;
-  --c-edge: #c9b79c;
-  --c-muzzle: #5a3f30;
-  --c-ear: #5a3f30;
-  --c-ear-far: #4b3428;
-  --c-tail: #4f372b;
-  --c-leg: #5a3f30;
-  --c-ear-inner: #8a6655;
-  --c-iris: #5aa8e6;
-  --c-iris-in: #bfe3ff;
-  --c-iris-out: #2b6aa8;
-  --c-line: #3b2a22;
-  --c-smile: #d9c7ad;
-  --c-nose: #2f211b;
-  --c-sheen: 0.25;
-  --c-halo: rgba(40, 25, 15, 0.35);
+.critter .k-p {
+  fill: var(--f, var(--k-fur));
+}
+.critter .k-farfur {
+  fill: var(--f, var(--k-far));
+}
+.critter .k-legfur {
+  fill: var(--f, var(--k-leg));
+}
+.critter .k-headfur {
+  fill: var(--f, var(--k-head));
+}
+.critter .k-cheekfur {
+  fill: var(--f, var(--k-cheek));
+}
+.critter .k-muzzlefur {
+  fill: var(--f, var(--k-muzzle));
+}
+.critter .k-earfur {
+  fill: var(--f, var(--k-ear));
+}
+.critter .k-tailfur {
+  fill: var(--f, var(--k-tail));
 }
 
-/* Fluffy grey kitten with big blue-green eyes. */
-.cat-kitten {
-  --c-fur: #9aa0aa;
-  --c-far: #747a84;
-  --c-edge: #80868f;
-  --c-muzzle: #eef0f3;
-  --c-bib: #eef0f3;
-  --c-paw: #eef0f3;
-  --c-ear-inner: #f3b3c2;
-  --c-iris: #6cc7b8;
-  --c-iris-in: #d2fff4;
-  --c-iris-out: #2f8a83;
-  --c-line: #3a3d44;
-  --c-sheen: 0.22;
-  --c-halo: rgba(30, 30, 40, 0.3);
+.critter .k-outline {
+  --f: var(--k-line);
+  stroke: var(--k-line);
+  stroke-width: calc(var(--k-lw) * 2);
+  stroke-linejoin: round;
 }
 
-/* Tuxedo: black with a white bib, muzzle and socks. */
-.cat-chonk {
-  --c-muzzle: #f4f2ee;
-  --c-bib: #f4f2ee;
-  --c-paw: #f4f2ee;
-  --c-paw-far: #d9d6d0;
-  --c-smile: #3a3640;
-  --c-iris: #9ad25a;
-  --c-iris-in: #e4f7b8;
-  --c-iris-out: #4f8a2a;
+.critter .k-shadow {
+  fill: var(--r-shadow);
 }
 
-/* Rubber hose: pitch black, white face and gloves, big white "pie" eyes, thin noodle legs. */
-.cat-hose {
-  --c-fur: #141216;
-  --c-far: #0b0a0c;
-  --c-muzzle: #f6f1e4;
-  --c-paw: #f6f1e4;
-  --c-paw-far: #e2dccd;
-  --c-iris: #f6f1e4;
-  --c-iris-in: #ffffff;
-  --c-iris-out: #d8d0bd;
-  --c-smile: #141216;
-  --c-nose: #141216;
-  --c-ear-inner: #141216;
-  --c-sheen: 0;
+.critter .k-backfur {
+  fill: var(--f, var(--k-back));
 }
 
-.cat-hose .c-limb {
-  stroke-width: 3;
+.critter .k-bellyfur {
+  fill: var(--f, var(--k-belly));
 }
 
-.cat-hose .c-limb.c-edge {
-  stroke-width: 4.4;
+.critter .k-shade {
+  fill: var(--k-shade);
 }
 
-.cat-hose .c-paw,
-.cat-hose .c-paw-far {
-  transform-box: fill-box;
-  transform-origin: center;
-  transform: scale(1.35);
+.critter .k-contour {
+  fill: none;
+  stroke: var(--k-contour);
+  stroke-width: calc(var(--k-lw) * 0.9);
+  stroke-linecap: round;
 }
 
-/* White cat for limited animation; the ink outline does the halo's job. */
-.cat-white {
-  --c-fur: #f7f5f2;
-  --c-far: #dcd8d3;
-  --c-edge: #c8c3bd;
-  --c-ear-inner: #f6a9b8;
-  --c-iris: #4fa3f0;
-  --c-iris-in: #c7e6ff;
-  --c-iris-out: #2361a8;
-  --c-line: #4a4550;
-  --c-sheen: 0;
-  --c-halo: transparent;
+.critter .k-toes {
+  fill: none;
+  stroke: var(--k-contour);
+  stroke-width: calc(var(--k-lw) * 0.7);
+  stroke-linecap: round;
 }
 
-/* ---- 3D palettes ---- */
-
-/* Brighter toy colours for the cel-shaded raccoon. */
-.arena-bright {
-  --r-fur: #9aa3b5;
-  --r-dark: #2c3040;
-  --r-light: #ffffff;
-  --r-leg: #3b4052;
-  --r3-outline: #1b1d2a;
+.critter .k-ring {
+  fill: none;
+  stroke: var(--k-ring);
+  stroke-width: 3.4;
 }
 
-.arena-ginger {
-  --r-fur: #e8913f;
-  --r-dark: #b85f22;
-  --r-light: #fbe2c2;
-  --r-leg: #e8913f;
-  --r-eye: #b8e05a;
-  --r-pupil: #1a1410;
-  --r-ear-pink: #f4a6a0;
-  --r3-outline: #4a2a16;
+.critter .k-stripe {
+  fill: none;
+  stroke: var(--k-stripe);
+  stroke-width: 1.7;
+  stroke-linecap: round;
 }
 
-.arena-black-cat {
-  --r-fur: #34303d;
-  --r-dark: #221f29;
-  --r-light: #4a4555;
-  --r-leg: #34303d;
-  --r-eye: #e3dc4e;
-  --r-pupil: #08070a;
-  --r-ear-pink: #8a5870;
-  --r3-outline: #0d0c10;
+.critter .k-stripe.k-fine {
+  stroke-width: 0.9;
 }
 
-/* Cats in 3D have slimmer legs. */
-.arena-cat .r3-leg {
-  stroke-width: 5.5;
+.critter .k-ringfill {
+  fill: var(--k-ring);
 }
 
-.arena-cat .r3-stick-edge {
-  stroke-width: 9;
+.critter .k-earinner {
+  fill: var(--k-ear-in);
 }
 
-/* ---- Art styles laid over any pet ---- */
-
-/* These draw their own edges, so the usual halo would only blur them. */
-.art-pixel,
-.art-neon,
-.art-sketch,
-.art-sticker,
-.art-ink,
-.art-pixel .raccoon-figure,
-.art-neon .raccoon-figure,
-.art-sketch .raccoon-figure,
-.art-sticker .raccoon-figure,
-.art-ink .raccoon-figure {
-  filter: none;
+.critter .k-mask {
+  fill: var(--k-mask);
 }
 
-.art-pixel .r-shadow,
-.art-neon .r-shadow {
-  display: none;
+.critter .k-brow {
+  fill: var(--k-brow);
 }
 
-.raccoon-cat.art-neon {
-  --neon: #ff4fd8;
+.critter .k-eyeball {
+  fill: var(--k-eyeball);
 }
 
-.raccoon-cartoon.art-neon {
-  --neon: #48f0ff;
+.critter .k-iris {
+  fill: var(--k-iris);
+}
+
+.critter .k-pupil {
+  fill: var(--k-pupil);
+}
+
+.critter .k-glint {
+  fill: var(--k-glint);
+}
+
+.critter .k-eyerim,
+.critter .k-eyeshut {
+  fill: none;
+  stroke: var(--k-eyerim);
+  stroke-width: 0.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.critter .k-eyeshut {
+  stroke-width: 0.75;
+}
+
+.critter .k-nose {
+  fill: var(--k-nose);
+  stroke: var(--k-line);
+  stroke-width: 0.35;
+  stroke-linejoin: round;
+}
+
+.critter .k-mouthline {
+  fill: none;
+  stroke: var(--k-line);
+  stroke-width: 0.5;
+  stroke-linecap: round;
+}
+
+.critter .k-mouth {
+  fill: var(--k-mouth);
+}
+
+.critter .k-tongue {
+  fill: var(--k-tongue);
+}
+
+.critter .k-whisker {
+  fill: none;
+  stroke: var(--k-whisker);
+  stroke-width: 0.28;
+  stroke-linecap: round;
+}
+
+/* Storybook: soft fur colours, a confident outer line and finer inner lines. */
+.critter.look-paint {
+  --k-lw: 0.7;
+}
+
+.critter.look-paint .k-contour {
+  stroke-width: 0.5;
+}
+
+/* Ink sketch: black pen line on paper-white, nothing else. */
+.critter.look-ink {
+  --k-fur: #fbf8f1;
+  --k-far: #ece7dc;
+  --k-line: #24201f;
+  --k-lw: 0.75;
+  --k-shade: transparent;
+  --k-ear-in: #fbf8f1;
+  --k-nose: #24201f;
+  --k-mouth: #24201f;
+  --k-tongue: #fbf8f1;
+  --k-eyeball: #24201f;
+  --k-iris: #24201f;
+  --k-pupil: #24201f;
+  --k-halo: transparent;
+}
+
+/* Shadow: a black silhouette; only the eyes catch the light. */
+.critter.look-shadow {
+  --k-fur: #17151b;
+  --k-far: #0d0c10;
+  --k-line: #17151b;
+  --k-lw: 0;
+  --k-contour: #2c2833;
+  --k-shade: transparent;
+  --k-ear-in: #2b2530;
+  --k-nose: #17151b;
+  --k-eyeball: #e9e15a;
+  --k-iris: #e9e15a;
+  --k-pupil: #0b0a0d;
+  --k-eyerim: #17151b;
+  --k-whisker: #6e6878;
+  --k-halo: rgba(255, 255, 255, 0.95);
+}
+
+/* A black cat on a dark wallpaper still needs an edge. */
+.critter.look-shadow {
+  filter: drop-shadow(0 0 1.4px var(--k-halo));
+}
+
+/* Ginger tabby with a cream chest and green eyes. */
+.critter.coat-ginger {
+  --k-fur: #e09a52;
+  --k-far: #b87436;
+  --k-line: #6b3d1d;
+  --k-belly: #f6e2c4;
+  --k-muzzle: #f6e2c4;
+  --k-iris: #a9c64a;
+  --k-ear-in: #f0b3a8;
+  --k-nose: #e58f94;
+  --k-shade: rgba(120, 50, 10, 0.16);
+  --k-stripe: #c5732f;
+  --k-back: #d48b47;
+}
+
+/* Raccoon: grizzled grey, black mask and rings, white brows and muzzle. */
+.critter.coat-raccoon {
+  --k-fur: #9a9a9e;
+  --k-far: #6f6f74;
+  --k-leg: #55545a;
+  --k-head: #a9a8ab;
+  --k-muzzle: #f1efea;
+  --k-cheek: #e9e7e2;
+  --k-ear: #e6e3dc;
+  --k-ear-in: #57565c;
+  --k-tail: #b3a998;
+  --k-line: #2f2d33;
+  --k-belly: #c3c1bd;
+  --k-iris: #2a2023;
+  --k-pupil: #0d0b0c;
+  --k-nose: #1c1b1f;
+  --k-mask: #2a292e;
+  --k-ring: #3f3c43;
+  --k-back: #87868c;
+  --k-shade: rgba(20, 20, 40, 0.14);
+}
+
+.critter.coat-raccoon-ink {
+  --k-mask: #24201f;
+  --k-ring: #24201f;
+  --k-brow: #fbf8f1;
+  --k-muzzle: #fbf8f1;
+  --k-leg: #fbf8f1;
 }
 
 .sprite.facing-left {

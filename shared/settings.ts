@@ -3,28 +3,15 @@
 /** The pets to choose from: raccoons in several art styles, and a cat. The first one is the default. */
 export const RACCOON_TYPES = [
   'arena',
-  'arena-low',
-  'arena-top',
-  'arena-cel',
+  'raccoon-storybook',
+  'raccoon-sketch',
   'cartoon',
   'plush',
   'classic',
-  'raccoon-pixel',
-  'raccoon-sketch',
-  'raccoon-sticker',
-  'raccoon-neon',
-  'cat',
-  'cat-tabby',
-  'cat-siamese',
-  'cat-kitten',
-  'cat-chonk',
-  'cat-hose',
-  'cat-snappy',
-  'cat-3d',
-  'cat-3d-top',
-  'cat-pixel',
+  'cat-storybook',
   'cat-sketch',
-  'cat-neon',
+  'cat-shadow',
+  'cat',
 ] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
