@@ -1,5 +1,5 @@
 import { CAT_BUILD as B } from './build';
-import { gaitFor, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
+import { gaitFor, leap, leapKind, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
 import { bump, clamp01, easeOut, frac, lerp, noise1, smoother, span, wave } from './kit';
 import { blankPose, setPaw, type Pose } from './pose';
 import { DEPTH } from './view';
@@ -132,6 +132,23 @@ export function catAct(input: ActInput): Act {
       p.tailBend += noise1(clock / 1900, 5) * 1.5;
       alive(p, input);
       gaze(p, input);
+      return { pose: p, flags };
+    }
+
+    case 'leap': {
+      // Ears back, eyes wide, tail streaming out behind for balance.
+      const kind = leapKind(clock - t);
+      const p = leap(B, stand(), t, { height: 16, arch: 1.2 }, kind);
+      if (kind === 'hop') p.puff = 0.35;
+      p.hyaw = 18;
+      p.earN = -0.45;
+      p.earF = -0.45;
+      p.tailA = 196;
+      p.tailBend = 1.2;
+      p.tailCurl = 8;
+      p.tailStiff = 0.2;
+      p.pupil = 1;
+      p.lookX = 0.5;
       return { pose: p, flags };
     }
 
@@ -480,31 +497,46 @@ function dangle(input: ActInput): Act {
   return { pose: p, flags };
 }
 
-/** Being stroked: eyes shut in bliss, head rubbing, kneading, tail straight up and quivering. */
+/**
+ * Being stroked, and loving it: first pushing his head up into your hand, then rubbing his
+ * cheek against it one way and the other, back rising into each stroke, eyes squeezed shut,
+ * purring (the deep, quick breaths), kneading, tail straight up with the tip quivering.
+ */
 function happy(input: ActInput): Act {
   const { t, clock } = input;
   const flags = noFlags();
   const p = sit();
   flags.tailFront = false;
-  breathe(p, clock, 2400, 1);
-  const rub = wave(t, 1600);
-  p.hroll = -10 + rub * 8;
-  p.hpitch = -12 + rub * 4;
+  breathe(p, clock, 1300, 1.3);
+  // Pushing up into the hand.
+  const push = span(t, 0, 420);
+  // Then rubbing his cheek along it, side to side.
+  const rubbing = span(t, 350, 900);
+  const rub = wave(t, 1800) * rubbing;
+  p.hy -= 3.5 * push - Math.abs(rub) * 1.2;
+  p.hx += 1.5 * push + rub * 1.2;
+  p.sy -= 1.5 * push;
+  p.hpitch = lerp(0, -22, push) + Math.abs(rub) * 8;
   p.hyaw = 58;
-  p.hy -= 1.5;
-  p.happy = 1;
+  p.hturn = rub * 26;
+  p.hroll = -6 * push + rub * 14;
+  // The back rises into each stroke.
+  p.arch += (1.5 + 1.5 * (0.5 + 0.5 * wave(t, 1800, 0.25))) * push;
+  // Leaning towards your hand, eyes shut.
+  if (input.gaze) lookAt(p, { yaw: input.gaze.yaw * 0.3, pitch: Math.min(0, input.gaze.pitch) }, 0.3 * (1 - rubbing));
+  p.happy = span(t, 80, 450);
   p.lids = 0.9;
-  p.earN = -0.25 + rub * 0.1;
-  p.earF = -0.2;
+  p.earN = -0.3 + rub * 0.15;
+  p.earF = -0.25 - rub * 0.15;
   // Kneading: front paws pushing down one after the other.
-  const knead = (phase: number) => Math.max(0, Math.sin((t / 700 + phase) * Math.PI * 2));
+  const knead = (phase: number) => Math.max(0, Math.sin((t / 700 + phase) * Math.PI * 2)) * rubbing;
   setPaw(p, 'frontNear', 5.5 + knead(0) * 1.5, -knead(0) * 3, 4 - knead(0) * 40);
   setPaw(p, 'frontFar', 3 + knead(0.5) * 1.5, -knead(0.5) * 3, 4 - knead(0.5) * 40);
   p.tailA = 262;
   p.tailSide = 0;
   p.tailBend = 1.4;
-  p.tailCurl = 10 + Math.sin(clock / 45) * 2;
-  p.tailStiff = 0.7;
+  p.tailCurl = 10 + Math.sin(clock / 45) * 2.5;
+  p.tailStiff = 0.75;
   p.mouth = 0;
   return { pose: p, flags };
 }

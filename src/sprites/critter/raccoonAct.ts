@@ -1,5 +1,5 @@
 import { RACCOON_BUILD as B } from './build';
-import { gaitFor, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
+import { gaitFor, leap, leapKind, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
 import { bump, clamp01, easeOut, lerp, noise1, smoother, span, wave } from './kit';
 import { blankPose, setPaw, type Pose } from './pose';
 import { DEPTH } from './view';
@@ -188,6 +188,20 @@ export function raccoonAct(input: ActInput): Act {
 
     case 'jump':
       return pounce(input);
+
+    case 'leap': {
+      // A bouncy, humped hop, mouth open in a grin.
+      const p = leap(B, stand(), t, { height: 12, arch: 4.5 }, leapKind(clock - t));
+      p.hyaw = 22;
+      p.earN = -0.3;
+      p.earF = -0.3;
+      p.tailA = 188;
+      p.tailBend = 0.8;
+      p.tailStiff = 0.25;
+      p.mouth = 0.22;
+      p.lookX = 0.5;
+      return { pose: p, flags };
+    }
 
     case 'sit': {
       const p = sitUp();
@@ -431,27 +445,42 @@ function dangle(input: ActInput): Act {
   return { pose: p, flags };
 }
 
-/** Petted: sits up, eyes squeezed happy, swaying with hands clasped. */
+/**
+ * Petted, and delighted: he leans his head up into your hand, then wriggles with glee,
+ * rubbing his face against it from side to side, eyes squeezed shut, chittering, hands
+ * rubbing together, the bushy tail swishing.
+ */
 function happy(input: ActInput): Act {
   const { t, clock } = input;
   const flags = noFlags();
   flags.pawUp = true;
   const p = sitUp();
-  breathe(p, clock, 2200, 1);
-  const sway = wave(t, 1300);
-  p.hroll = sway * 9;
-  p.hx += sway * 1.2;
-  p.sx += sway * 0.8;
-  p.hpitch = -6;
+  breathe(p, clock, 1500, 1.1);
+  const push = span(t, 0, 400);
+  const glee = span(t, 300, 800);
+  // A happy wriggle through the whole body; the face rubs into the hand on the beat.
+  const wiggle = wave(t, 1100) * glee;
+  p.sx += 1.5 * push + wiggle * 1.6;
+  p.sy -= 1.2 * push;
+  p.hx += 1.5 * push + wiggle * 2;
+  p.hy -= 3 * push;
+  p.hpitch = lerp(6, -16, push) + Math.abs(wiggle) * 6;
   p.hyaw = 62;
-  p.happy = 1;
+  p.hturn = wiggle * 22;
+  p.hroll = wiggle * 12;
+  if (input.gaze) lookAt(p, { yaw: input.gaze.yaw * 0.3, pitch: Math.min(0, input.gaze.pitch) }, 0.3 * (1 - glee));
+  p.happy = span(t, 80, 400);
   p.lids = 0.9;
-  p.mouth = 0.18;
-  p.earN = -0.2;
-  p.earF = -0.2;
-  setPaw(p, 'frontNear', 7.5 + sway, -22, -40);
-  setPaw(p, 'frontFar', 5.5 + sway, -22.5, -40);
-  p.tailA = 238 + sway * 8;
+  // Chittering: quick little mouth movements.
+  p.mouth = 0.1 + 0.14 * (0.5 + 0.5 * wave(t, 360)) * glee;
+  p.earN = -0.2 + wiggle * 0.1;
+  p.earF = -0.2 - wiggle * 0.1;
+  // Hands rubbing together in front of the chest.
+  const u = (t / 420) * Math.PI * 2;
+  const hands = lerp(-22, -24, glee);
+  setPaw(p, 'frontNear', 8 + Math.cos(u) * 1.6 * glee + wiggle, hands + Math.sin(u) * 1.2 * glee, -45 + Math.sin(u) * 20 * glee);
+  setPaw(p, 'frontFar', 6 + Math.cos(u + Math.PI) * 1.6 * glee + wiggle, hands - 0.5 + Math.sin(u + Math.PI) * 1.2 * glee, -45 + Math.sin(u + Math.PI) * 20 * glee);
+  p.tailA = 238 + wiggle * 6;
+  p.tailSide = 0.35 + wave(t, 900) * 0.35 * glee;
   return { pose: p, flags };
 }
-

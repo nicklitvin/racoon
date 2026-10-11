@@ -1,6 +1,6 @@
 # Racoon
 
-A raccoon that lives on your screen. It wanders all over your screen, sits down to groom and yawn, and naps when nothing is happening. Shake your mouse and it jumps out and chases the cursor, pounces when the cursor stops, then sits looking confused. Get the cursor too close and it may run off or hide behind the edge of the screen. If you opt in, it also comes to watch you type, peeking up over the bottom edge with its eyes following your rhythm.
+A raccoon that lives on your screen. It wanders all over your screen, sits down to groom and yawn, and naps when nothing is happening. Now and then it gets the zoomies and dashes about, leaping as it goes. Shake your mouse and it jumps out and chases the cursor, leaping with excitement, pounces when the cursor stops, then sits looking confused. Click it to pet it, and stroke it to keep it happy. Get the cursor too close and it may run off or hide behind the edge of the screen. If you opt in, it also comes to watch you type, peeking up over the bottom edge with its eyes following your rhythm.
 
 It runs two ways from one codebase:
 
@@ -23,7 +23,7 @@ npm test           # unit tests
 | Action | How |
 | --- | --- |
 | Move the raccoon | Drag it: wherever you grab it, you end up holding it by the scruff |
-| Startle it | Click it |
+| Pet it | Click it, then stroke it by moving the pointer over it to keep it purring |
 | Open settings | Double-click it, left-click the tray icon (Windows), or tray menu > Settings… |
 | Hide it for a while | Tray menu > uncheck *Show raccoon* |
 | Quit | Tray menu > Quit |
@@ -96,11 +96,11 @@ Two rules keep this portable and testable: **`src/core` never imports React, the
 
 ### Behaviour
 
-`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek** and **dragged**.
+`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek, dragged, petted** and **zoomies**. While chasing or dashing about at full tilt, it leaps now and then (`motion.leapMs`, `motion.leapEvery`), flying straight on through each leap.
 
 - **Wandering:** the whole work area is the raccoon's world; there is no floor and no gravity. After each pause it picks something to do: walk to a random point anywhere on screen, sit and groom or yawn, or just turn round and look about. After about 3 calm minutes it yawns and falls asleep. Dropping it after a drag leaves it exactly where you let go.
 - **Organic movement:** walks follow a gently curved path with ease-in-out speed, and each walk varies a little in distance, curve and top speed. Everything else (chasing, fleeing, pouncing) goes through velocity with limited acceleration ("arrive" steering). Nothing ever teleports; the tests check this on every simulated frame.
-- **Tuning:** all timings and distances live in `DEFAULT_CONFIG` in `src/core/behavior/config.ts`, grouped by behaviour. For wandering: `wander.walkDistance`, `pauseMs`, `speedJitter`, `curve`, `sitChance`, `sitMs`, `lookAroundChance` and `sleepAfterMs`. These are developer settings, compiled in; they aren't in the user's `settings.json`.
+- **Tuning:** all timings and distances live in `DEFAULT_CONFIG` in `src/core/behavior/config.ts`, grouped by behaviour. For wandering: `wander.walkDistance`, `pauseMs`, `speedJitter`, `curve`, `sitChance`, `sitMs`, `lookAroundChance`, `zoomiesChance`, `zoomiesDashes` and `sleepAfterMs`. These are developer settings, compiled in; they aren't in the user's `settings.json`.
 - **Deterministic:** time only advances when `update(dt, world)` is called, and randomness is injected, so the tests replay exact scenarios.
 
 ### Reactions to the cursor

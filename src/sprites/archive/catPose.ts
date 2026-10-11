@@ -259,6 +259,7 @@ export function catPoseFor(animation: AnimationName, t: number, keystrokes = 0):
       return pose;
     }
 
+    case 'leap':
     case 'jump': {
       // A pounce: crouch and wiggle (anticipation), stretch long in the air, squash on landing.
       const pose = standing();

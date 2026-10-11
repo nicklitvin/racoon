@@ -150,14 +150,55 @@ describe.each(SPECIES)('lifelike %s', (_name, build, act) => {
     const d = driver(build, act);
     for (let i = 0; i < 30; i++) d.step({ animation: 'walk', heading: 0, velocity: { x: 85, y: 0 } });
     const yaws: number[] = [];
+    const bends: number[] = [];
     let shown!: Shown;
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 70; i++) {
       shown = d.step({ animation: 'walk', heading: Math.PI, velocity: { x: -85, y: 0 } });
       yaws.push(shown.view.yaw);
+      bends.push(shown.view.bend);
     }
     for (let i = 1; i < yaws.length; i++) expect(Math.abs(yaws[i]! - yaws[i - 1]!)).toBeLessThan(0.35);
     expect(Math.max(...yaws.map(Math.sin))).toBeGreaterThan(0.9);
     expect(Math.cos(shown.view.yaw)).toBeLessThan(-0.99);
+    // The shoulders lead round (turning towards you is turning to his right) and the hips
+    // follow, bowing the spine, which straightens out again once he's round.
+    expect(Math.max(...bends)).toBeGreaterThan(0.5);
+    expect(Math.max(...bends)).toBeLessThanOrEqual(build.flex + 1e-6);
+    expect(Math.abs(shown.view.bend)).toBeLessThan(0.05);
+  });
+
+  it('steps round on his paws when turning on the spot', () => {
+    const d = driver(build, act);
+    for (let i = 0; i < 60; i++) d.step({ animation: 'idle', heading: 0 });
+    let lifted = 0;
+    for (let i = 0; i < 50; i++) {
+      const shown = d.step({ animation: 'idle', heading: Math.PI });
+      if (LEGS.some((leg) => paw(shown.pose, leg).y < -0.5)) lifted++;
+    }
+    expect(lifted).toBeGreaterThan(5);
+  });
+
+  it('leaps clear of the ground and lands on his front paws', () => {
+    const d = driver(build, act);
+    const velocity = { x: 650, y: 0 };
+    for (let i = 0; i < 60; i++) d.step({ animation: 'chase', velocity });
+    let airborne = 0;
+    let highest = 0;
+    for (let i = 0; i < 33; i++) {
+      const shown = d.step({ animation: 'leap', velocity });
+      const lowest = Math.max(...LEGS.map((leg) => paw(shown.pose, leg).y));
+      if (lowest < -0.5) airborne++;
+      highest = Math.min(highest, shown.pose.sy);
+      // (The first few frames still blend out of the gallop.)
+      if (i < 8) continue;
+      for (const leg of LEGS) {
+        const j = legJoints(build, shown.pose, leg);
+        const [upper, lower] = leg.startsWith('front') ? build.front : build.back;
+        expect(Math.hypot(j.low.x - j.root.x, j.low.y - j.root.y), `${leg} ${i}`).toBeLessThan((upper + lower) * 1.12);
+      }
+    }
+    expect(airborne).toBeGreaterThan(10);
+    expect(highest).toBeLessThan(build.shoulder.y - 6);
   });
 
   it('hangs from the scruff when carried, body and legs below it', () => {

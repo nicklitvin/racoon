@@ -19,14 +19,71 @@ export interface Projected extends Point {
 export class BodyView {
   readonly c: number;
   readonly s: number;
+  /** Curvature of the spine (radians per unit along it) and the stretch it bends over. */
+  private readonly k: number;
 
-  constructor(readonly yaw: number) {
+  /**
+   * `bend` curves the spine sideways (radians from hips to shoulders, + towards his right
+   * side), as when he turns: the shoulders lead and the hips follow, the body bowed between
+   * them. It bends evenly from `mid - half` to `mid + half` along the body; the head and
+   * the tail carry on straight from each end. `yaw` is the heading of the middle.
+   */
+  constructor(
+    readonly yaw: number,
+    readonly bend = 0,
+    private readonly mid = 0,
+    private readonly half = 1,
+  ) {
     this.c = Math.cos(yaw);
     this.s = Math.sin(yaw);
+    this.k = bend / (2 * Math.max(1, half));
   }
 
-  /** A point (or, the map being linear, a direction) in the animal's frame, on screen. */
+  /** How far the body has turned at `a` along it, from the heading of its middle (radians). */
+  turnAt(a: number): number {
+    return this.k * Math.max(-this.half, Math.min(this.half, a - this.mid));
+  }
+
+  /** The heading of the body at `a` along it. */
+  yawAt(a: number): number {
+    return this.yaw + this.turnAt(a);
+  }
+
+  /** The same camera, unbent, turned as the body is at `a`: for directions and facings there. */
+  local(a: number): BodyView {
+    return this.bend === 0 ? this : new BodyView(this.yawAt(a));
+  }
+
+  /** Where a point of the straight body goes once the spine bends: along and sideways. */
+  private warp(a: number, z: number): [number, number] {
+    if (this.k === 0) return [a, z];
+    const u = a - this.mid;
+    const inside = Math.max(-this.half, Math.min(this.half, u));
+    const phi = this.k * inside;
+    const cos = Math.cos(phi);
+    const sin = Math.sin(phi);
+    // Along the arc of the spine, then straight on past its ends.
+    const along = Math.sin(phi) / this.k + (u - inside) * cos;
+    const aside = (1 - cos) / this.k + (u - inside) * sin;
+    return [this.mid + along - z * sin, aside + z * cos];
+  }
+
+  /** A point in the animal's frame, on screen. */
   at(a: number, y: number, z = 0): Projected {
+    const [wa, wz] = this.warp(a, z);
+    return this.project(wa, y, wz);
+  }
+
+  /** A direction in the animal's frame, at `a` along the body (the middle if not given), on screen. */
+  vec(a: number, y: number, z = 0, where = this.mid): Projected {
+    const phi = this.turnAt(where);
+    if (phi === 0) return this.project(a, y, z);
+    const cos = Math.cos(phi);
+    const sin = Math.sin(phi);
+    return this.project(a * cos - z * sin, y, a * sin + z * cos);
+  }
+
+  private project(a: number, y: number, z: number): Projected {
     const across = a * this.c - z * this.s;
     const towards = a * this.s + z * this.c;
     return { x: across, y: y + towards * DEPTH, z: towards - y * DEPTH };
@@ -34,7 +91,8 @@ export class BodyView {
 
   /** How far towards the viewer a point is along the floor (ignoring its height). */
   towards(a: number, z = 0): number {
-    return a * this.s + z * this.c;
+    const [wa, wz] = this.warp(a, z);
+    return wa * this.s + wz * this.c;
   }
 
   pt(p: Point, z = 0): Projected {
@@ -46,9 +104,9 @@ export class BodyView {
     return this.c;
   }
 
-  /** How much a surface facing `normal` (animal frame) faces the viewer, -1..1. */
+  /** How much a surface facing `normal` (animal frame, unbent) faces the viewer, -1..1. */
   facing(a: number, y: number, z: number): number {
-    const d = this.at(a, y, z);
+    const d = this.project(a, y, z);
     const l = Math.hypot(a, y, z) || 1;
     // The view ray runs towards the viewer and up: (0, -DEPTH, 1) in (across, y, towards).
     return d.z / (l * Math.hypot(1, DEPTH));

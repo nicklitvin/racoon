@@ -7,7 +7,7 @@ import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d } from './mo
 export type Mode = 'idle' | 'walk' | 'sit' | 'sleep' | 'react';
 
 /** What the raccoon is reacting to, while in the "react" mode. */
-export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged' | 'petted';
+export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged' | 'petted' | 'zoomies';
 
 /** Little symbol drawn above the raccoon's head. Only sleep shows one. */
 export type Emote = '' | 'z';
@@ -63,7 +63,8 @@ type State =
   | { mode: 'react'; reaction: 'hide'; edge: -1 | 1; phase: 'in' | 'wait' | 'out'; targetX: number; until: number; giveUpAt: number }
   | { mode: 'react'; reaction: 'peek'; phase: 'approach' | 'sink' | 'watch' | 'rise'; sink: number }
   | { mode: 'react'; reaction: 'dragged' }
-  | { mode: 'react'; reaction: 'petted'; until: number };
+  | { mode: 'react'; reaction: 'petted'; until: number }
+  | { mode: 'react'; reaction: 'zoomies'; target: Point; dashes: number };
 
 const SUBSTEP_S = 1 / 60;
 const MAX_FRAME_MS = 1000;
@@ -72,7 +73,11 @@ export const PEEK_SINK = 0.45;
 /** Peak speed of an ease-in-out-sine move is this many times its average speed. */
 const EASE_PEAK = Math.PI / 2;
 /** How long one pat keeps him happy; each further pat restarts it. */
-const PETTED_MS = 1600;
+const PETTED_MS = 2200;
+/** Stroking him (the pointer moving over him) keeps him happy at least this much longer. */
+const STROKED_MS = 900;
+/** Zoomies run this much faster than a run. */
+const ZOOMIES_SPEED = 1.3;
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const length = (v: Point) => Math.hypot(v.x, v.y);
@@ -104,6 +109,9 @@ export class Brain {
   private cursorWasNear = false;
   private speedScale = 1;
   private dragTarget: Point | null = null;
+  /** In the air in an excited leap until this time, and when the next one may come. */
+  private leapUntil = 0;
+  private nextLeapAt = 0;
   private input: WorldInput;
 
   constructor(
@@ -160,6 +168,12 @@ export class Brain {
     if (this.reaction === 'dragged') return;
     this.calmMs = 0;
     this.state = { mode: 'react', reaction: 'petted', until: this.now + PETTED_MS };
+  }
+
+  /** The pointer moving over him while he's being petted: he enjoys it for longer. */
+  stroke(): void {
+    const s = this.state;
+    if (s.mode === 'react' && s.reaction === 'petted') s.until = Math.max(s.until, this.now + STROKED_MS);
   }
 
   // ---- Simulation --------------------------------------------------------------------
@@ -266,7 +280,10 @@ export class Brain {
       case 'surprised':
         this.brake(dt);
         if (this.now < s.until) return;
-        if (s.next === 'chase') this.state = { mode: 'react', reaction: 'chase', until: this.now + this.config.reactions.chaseMaxMs };
+        if (s.next === 'chase') {
+          this.state = { mode: 'react', reaction: 'chase', until: this.now + this.config.reactions.chaseMaxMs };
+          this.nextLeapAt = this.now + 600 + this.random() * 900;
+        }
         else this.idle(1000, 2500);
         return;
 
@@ -275,7 +292,11 @@ export class Brain {
           this.confused();
           return;
         }
-        this.vel = this.steer(this.pounceTarget(cursor), m.chaseSpeed * k, m.chaseAccel * k, dt, 80);
+        // Mid-leap he flies straight on.
+        if (this.leaping) return;
+        const target = this.pounceTarget(cursor);
+        this.vel = this.steer(target, m.chaseSpeed * k, m.chaseAccel * k, dt, 80);
+        this.maybeLeap(dist(this.pos, target), m.chaseSpeed * k);
         if (this.input.cursorStillMs >= this.config.reactions.pounceAfterStillMs) {
           this.state = { mode: 'react', reaction: 'pounce', target: this.pounceTarget(cursor), until: this.now + 900 };
         }
@@ -296,6 +317,23 @@ export class Brain {
         this.brake(dt);
         if (this.now >= s.until) this.idle(1500, 3000);
         return;
+
+      case 'zoomies': {
+        if (this.leaping) return;
+        const top = m.runSpeed * ZOOMIES_SPEED * k;
+        const last = s.dashes <= 1;
+        this.vel = this.steer(s.target, top, m.runAccel * k, dt, last ? 70 : 10);
+        const left = dist(this.pos, s.target);
+        this.maybeLeap(left, top);
+        if (!last && left < 40) {
+          // Swerve off somewhere new without stopping.
+          s.target = this.dashTarget();
+          s.dashes--;
+        } else if (last && left < 4 && length(this.vel) < 10) {
+          this.pause();
+        }
+        return;
+      }
 
       case 'flee':
         this.vel = this.steer(s.target, m.runSpeed * k, m.runAccel * k, dt, 50);
@@ -417,6 +455,25 @@ export class Brain {
     return { x: v.x, y: v.y * k };
   }
 
+  private get leaping(): boolean {
+    return this.now < this.leapUntil;
+  }
+
+  /**
+   * Bursting with excitement mid-run, he leaps now and then: only at full tilt, and only
+   * with room ahead to land before he gets where he's going.
+   */
+  private maybeLeap(distanceLeft: number, topSpeed: number): void {
+    const { leapMs, leapEvery } = this.config.motion;
+    const speed = length(this.vel);
+    if (this.now < this.nextLeapAt || speed < topSpeed * 0.6) return;
+    if (distanceLeft < speed * (leapMs / 1000) * 0.7) return;
+    this.leapUntil = this.now + leapMs;
+    this.nextLeapAt = this.leapUntil + pick(leapEvery, this.random);
+    // The spring of the push-off.
+    this.vel = { x: this.vel.x * 1.1, y: this.vel.y * 1.1 };
+  }
+
   private brake(dt: number): void {
     this.vel = brake2d(this.vel, this.config.motion.runAccel * dt);
   }
@@ -453,6 +510,8 @@ export class Brain {
     } else if (r < w.sitChance + w.lookAroundChance) {
       this.facing = this.facing === 1 ? -1 : 1;
       this.pause();
+    } else if (r < w.sitChance + w.lookAroundChance + w.zoomiesChance) {
+      this.zoomies();
     } else {
       this.startWalk();
     }
@@ -493,6 +552,34 @@ export class Brain {
     const ground = Math.hypot(to.x - this.pos.x, (to.y - this.pos.y) / w.floorDepth);
     const duration = (ground / (topSpeed / EASE_PEAK)) * 1000;
     this.state = { mode: 'walk', from: { ...this.pos }, via, to, elapsed: 0, duration };
+  }
+
+  /** A burst of mad energy: a few dashes about the screen, swerving and leaping as he goes. */
+  private zoomies(): void {
+    const dashes = Math.round(pick(this.config.wander.zoomiesDashes, this.random));
+    this.state = { mode: 'react', reaction: 'zoomies', target: this.dashTarget(), dashes };
+    this.nextLeapAt = this.now + 300 + this.random() * 500;
+  }
+
+  /** Somewhere well away to dash to, off in a different direction from the way he's going. */
+  private dashTarget(): Point {
+    const heading = length(this.vel) > 20 ? Math.atan2(this.vel.y, this.vel.x) : this.random() * Math.PI * 2;
+    let best = this.pos;
+    let bestRoom = -1;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      // A swerve of 60 to 150 degrees either way.
+      const swerve = (Math.PI / 3 + this.random() * Math.PI * 0.5) * (this.random() < 0.5 ? -1 : 1);
+      const angle = heading + swerve;
+      const reach = 250 + this.random() * 350;
+      const to = this.clampToArea({ x: this.pos.x + Math.cos(angle) * reach, y: this.pos.y + Math.sin(angle) * reach * this.config.wander.floorDepth });
+      const room = dist(to, this.pos);
+      if (room > bestRoom) {
+        best = to;
+        bestRoom = room;
+      }
+      if (room > 200) break;
+    }
+    return best;
   }
 
   private surprise(next: 'chase' | 'idle'): void {
@@ -558,7 +645,7 @@ export class Brain {
             animation = 'surprised';
             break;
           case 'chase':
-            animation = 'chase';
+            animation = this.leaping ? 'leap' : 'chase';
             break;
           case 'pounce':
             animation = 'jump';
@@ -582,6 +669,9 @@ export class Brain {
             break;
           case 'petted':
             animation = 'happy';
+            break;
+          case 'zoomies':
+            animation = this.leaping ? 'leap' : speed > this.config.motion.walkSpeed * 1.5 ? 'chase' : speed > 25 ? 'walk' : 'idle';
             break;
         }
         break;

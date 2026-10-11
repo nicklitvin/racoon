@@ -16,6 +16,8 @@ import { BodyView, DEPTH, worldYaw, type Projected } from './view';
  *   own pace: the body leads, the head follows, the ears swing past and settle.
  * - He faces the way he's going on the floor, up, down or across the screen, and the gait
  *   advances with ground actually covered there, so planted paws don't skate.
+ * - Turning, the shoulders swing round first and the hips follow, so the spine bows into
+ *   the turn; turning on the spot, he steps round on his paws.
  * - The tail is a chain with weight: it trails, sways and whips with the body.
  * - Carried by the scruff, the body swings like a pendulum from the pointer's movement.
  * - Little unscripted life: glances, ear flicks, blinks (and the slow cat blink), a
@@ -73,14 +75,22 @@ const MIRRORED: [PoseKey, PoseKey][] = [
   ['scapN', 'scapF'],
 ];
 /** While moving, which side is which doesn't matter, so it never swaps mid-stride. */
-const LOCOMOTION = new Set<AnimationName>(['walk', 'run', 'chase', 'jump']);
+const LOCOMOTION = new Set<AnimationName>(['walk', 'run', 'chase', 'jump', 'leap']);
 const RESTING = new Set<AnimationName>(['idle', 'sit', 'groom', 'yawn', 'sleep', 'happy', 'confused']);
 
 /** Nominal ground speeds, used when the frame doesn't say how fast he's going (previews). */
-const NOMINAL_SPEED: Partial<Record<AnimationName, number>> = { walk: 76, run: 300, chase: 560 };
+const NOMINAL_SPEED: Partial<Record<AnimationName, number>> = { walk: 76, run: 300, chase: 560, leap: 560 };
 
-/** How briskly the body swings round to a new heading: spring frequency, rad/s (critically damped). */
-const TURN_RATE = 12;
+/**
+ * How briskly the shoulders swing round to a new heading, and the hips after them: spring
+ * frequencies, rad/s (critically damped). The gap between them is how far the spine bends.
+ */
+const TURN_RATE = 10;
+const HIPS_RATE = 7.5;
+/** Turning on the spot faster than this (rad/s), he steps round rather than pivot on planted paws; he stops below the second. */
+const STEP_TURN = [1.6, 0.6] as const;
+/** How far the paws travel per radian turned on the spot, units: about half his length. */
+const TURN_STRIDE = 13;
 /** How far in front of the screen the pointer is taken to be, when working out where to look. */
 const POINTER_DEPTH = 45;
 
@@ -102,10 +112,16 @@ export class Motion {
   /** Sideways velocity and acceleration on screen, for swinging when carried. */
   private screenVx = 0;
   private accel = 0;
-  /** Heading on the floor (radians), and the one he's turning to. */
-  private yaw = 0;
-  private yawSpin = 0;
+  /** Heading on the floor (radians) of the shoulders and of the hips, and the one he's turning to. */
+  private front = 0;
+  private frontSpin = 0;
+  private rear = 0;
+  private rearSpin = 0;
   private yawTarget = 0;
+  /** Stepping round to turn on the spot. */
+  private stepping = false;
+  /** The animation the pose was last made for (stepping round shows a walk). */
+  private acted: AnimationName | null = null;
   /** Which of his sides you mostly see: 1 his right (facing right), -1 his left. */
   private viewSide: 1 | -1 = 1;
   private lastShown: Shown | null = null;
@@ -163,7 +179,8 @@ export class Motion {
     if (offsets > 0.05) return 'blend';
     // Moving over the ground: every frame, so paws stay put as the page slides him along.
     if (this.speed > 1) return 'moving';
-    if (Math.abs(angleDiff(this.yaw / DEG, this.yawTarget / DEG)) > 0.3 || Math.abs(this.yawSpin) > 0.02) return 'turn';
+    if (Math.abs(angleDiff(this.front / DEG, this.yawTarget / DEG)) > 0.3 || Math.abs(this.front - this.rear) > 0.005) return 'turn';
+    if (Math.abs(this.frontSpin) + Math.abs(this.rearSpin) > 0.02) return 'turn';
     // Slow sways are fine at the resting frame rate; only a quick swish needs every frame.
     if (this.tailMotion > 1.5) return 'tail';
     if (Math.abs(this.swingVel) > 1 || Math.abs(this.swing) > 0.5) return 'swing';
@@ -184,7 +201,7 @@ export class Motion {
     // Where he's facing: the way he's heading on the floor (walking up the screen is walking
     // away), except when carried, when he hangs three-quarters towards you.
     this.yawTarget = this.facingFor(frame);
-    this.turn(dt);
+    this.turn(dt, frame.animation);
     const view = new BodyView(this.yaw);
     if (Math.abs(view.side) > 0.35 && !LOCOMOTION.has(frame.animation)) this.viewSide = view.side > 0 ? 1 : -1;
 
@@ -201,15 +218,24 @@ export class Motion {
     this.speed = lerp(this.speed, speed, dt > 0 ? 1 - Math.exp(-dt * 12) : 1);
     this.started = true;
 
-    const changed = frame.animation !== this.animation;
-    if (changed) {
+    if (frame.animation !== this.animation) {
       this.animation = frame.animation;
       this.animationStart = timed ? now : now - frame.timeMs;
     }
     const t = timed ? now - this.animationStart : frame.timeMs;
 
-    const gait = frame.animation === 'chase' ? this.build.chase : frame.animation === 'run' ? this.build.run : this.build.walk;
-    if (dt > 0) this.phase += (this.speed * dt) / strideAt(gait, this.speed);
+    // Turning on the spot, or setting off in a new direction, the paws step round as the
+    // body turns, as if walking.
+    const spin = Math.abs(this.frontSpin + this.rearSpin) / 2;
+    const canStep = frame.animation === 'idle' || frame.animation === 'walk';
+    this.stepping = canStep && spin > STEP_TURN[this.stepping ? 1 : 0];
+    const acting: AnimationName = this.stepping ? 'walk' : frame.animation;
+    const stepSpeed = this.stepping ? Math.max(this.speed, spin * TURN_STRIDE) : this.speed;
+    const changed = acting !== this.acted;
+    this.acted = acting;
+
+    const gait = acting === 'chase' || acting === 'leap' ? this.build.chase : acting === 'run' ? this.build.run : this.build.walk;
+    if (dt > 0) this.phase += (stepSpeed * dt) / strideAt(gait, stepSpeed);
     if (!v && !timed) this.phase = (frame.timeMs / 1000) * (this.speed / strideAt(gait, this.speed));
 
     this.updateSwing(frame.animation, dt);
@@ -217,10 +243,10 @@ export class Motion {
     const gaze = frame.gaze ? this.gazeAt({ x: frame.gaze.x * unitsPerPx, y: frame.gaze.y * unitsPerPx }, view) : null;
 
     const act = this.actor({
-      animation: frame.animation,
+      animation: acting,
       t,
       phase: this.phase,
-      speed: this.speed,
+      speed: stepSpeed,
       keystrokes: frame.keystrokes,
       clock: now,
       life,
@@ -238,27 +264,56 @@ export class Motion {
     }
 
     const pose = this.inertialize(target, dt, changed);
+    // Into a sharp turn, the head drops a little and leads the way round.
+    const bend = this.bend;
+    pose.hpitch += Math.abs(bend) * 7;
+    const bent = new BodyView(this.yaw, bend, (pose.px + pose.sx) / 2, Math.abs(pose.sx - pose.px) / 2);
     this.updateTail(pose, act.flags, dt);
-    const head = this.headTurn(pose, view);
-    const scruff = view.pt(scruffAt(this.build, pose));
-    const shown: Shown = { pose, flags: act.flags, tail: this.tail, view, head, scruff };
+    const head = this.headTurn(pose, bent);
+    const scruff = bent.pt(scruffAt(this.build, pose));
+    const shown: Shown = { pose, flags: act.flags, tail: this.tail, view: bent, head, scruff };
     this.lastShown = shown;
     return shown;
   }
 
-  /** Swings the body round towards its heading: easing in and out, never snapping. */
-  private turn(dt: number): void {
+  /** Heading of the middle of the body: halfway between the shoulders and the hips. */
+  private get yaw(): number {
+    return this.rear + (this.front - this.rear) / 2;
+  }
+
+  /** How far the spine is bent round (radians, shoulders relative to hips). */
+  private get bend(): number {
+    return this.front - this.rear;
+  }
+
+  /**
+   * Swings the body round towards its heading, easing in and out, never snapping: the
+   * shoulders lead and the hips follow, so the spine bows into the turn and straightens
+   * out as he comes round.
+   */
+  private turn(dt: number, animation: AnimationName): void {
     if (dt === 0) {
-      this.yaw = this.yawTarget;
-      this.yawSpin = 0;
+      this.front = this.rear = this.yawTarget;
+      this.frontSpin = this.rearSpin = 0;
       return;
     }
+    // Hanging from the scruff the body turns as one; sitting or lying, it bends less.
+    const flex = animation === 'dangle' ? 0 : LOCOMOTION.has(animation) || animation === 'idle' ? this.build.flex : this.build.flex * 0.5;
     const steps = Math.ceil(dt / 0.008);
     const h = dt / steps;
     for (let i = 0; i < steps; i++) {
-      const d = turnBy(this.yaw, this.yawTarget);
-      this.yawSpin += (TURN_RATE * TURN_RATE * d - 2 * TURN_RATE * this.yawSpin) * h;
-      this.yaw += this.yawSpin * h;
+      const d = turnBy(this.front, this.yawTarget);
+      this.frontSpin += (TURN_RATE * TURN_RATE * d - 2 * TURN_RATE * this.frontSpin) * h;
+      this.front += this.frontSpin * h;
+      const lag = this.front - this.rear;
+      this.rearSpin += (HIPS_RATE * HIPS_RATE * lag - 2 * HIPS_RATE * this.rearSpin) * h;
+      this.rear += this.rearSpin * h;
+      // A spine only bends so far: past that, the hips are dragged round with the shoulders.
+      const over = this.front - this.rear;
+      if (Math.abs(over) > flex) {
+        this.rear = this.front - Math.sign(over) * flex;
+        this.rearSpin = this.frontSpin;
+      }
     }
   }
 
@@ -314,14 +369,19 @@ export class Motion {
    * neck to look at something. The neck bends with it, carrying the head a little sideways.
    */
   private headTurn(pose: Pose, view: BodyView): Shown['head'] {
-    const yawDeg = view.yaw / DEG;
-    const towardsYou = this.turnFor(90 - yawDeg);
+    // The neck carries on from the shoulders, which lead the body round a turn; the head
+    // leads them, looking where he's turning to.
+    const shoulders = view.yawAt(pose.sx) / DEG;
+    const lead = (view.bend / DEG) * 0.4;
+    const heading = shoulders + lead;
+    const towardsYou = this.turnFor(90 - heading);
     // Heading away from you, he looks where he's going.
-    const most = 1.25 * Math.abs(pose.hyaw) * (1 - clamp(-view.s * 1.4, 0, 1));
+    const most = 1.25 * Math.abs(pose.hyaw) * (1 - clamp(-Math.sin(heading * DEG) * 1.4, 0, 1));
     const local = clamp(clamp((towardsYou * pose.hyaw) / 90, -most, most) + pose.hturn, -125, 125);
-    pose.hx -= (1 - Math.cos(local * DEG)) * 1.6;
+    const neck = lead + local;
+    pose.hx -= (1 - Math.cos(neck * DEG)) * 1.6;
     const reach = this.build.species === 'cat' ? 3.2 : 2.6;
-    return { yaw: yawDeg + local, z: Math.sin(local * DEG) * reach };
+    return { yaw: shoulders + neck, z: Math.sin(neck * DEG) * reach };
   }
 
   /** An angle to turn through, the short way round; from straight behind, towards the side you see. */

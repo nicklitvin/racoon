@@ -9,6 +9,8 @@ export const ANIMATION_NAMES = [
   'walk',
   'run',
   'jump',
+  /** A bounding leap mid-run, from sheer excitement. */
+  'leap',
   'sit',
   'groom',
   'yawn',

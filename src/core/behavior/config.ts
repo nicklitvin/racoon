@@ -17,6 +17,10 @@ export interface MotionConfig {
   accel: number;
   runAccel: number;
   chaseAccel: number;
+  /** How long an excited leap mid-run lasts; he flies straight on through it. */
+  leapMs: number;
+  /** Time between one leap and the next while chasing or dashing about. */
+  leapEvery: Range;
 }
 
 export interface WanderConfig {
@@ -40,6 +44,10 @@ export interface WanderConfig {
   sitMs: Range;
   /** Chance that the next activity is just turning round and looking about. */
   lookAroundChance: number;
+  /** Chance that the next activity is a mad dash about the screen, leaping as he goes ("zoomies"). */
+  zoomiesChance: number;
+  /** How many dashes, each in a new direction, before he stops. */
+  zoomiesDashes: Range;
   /** Calm time after which he yawns and falls asleep. */
   sleepAfterMs: number;
 }
@@ -66,6 +74,8 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     accel: 380,
     runAccel: 1500,
     chaseAccel: 2600,
+    leapMs: 520,
+    leapEvery: { min: 900, max: 2600 },
   },
   wander: {
     walkDistance: { min: 120, max: 520 },
@@ -76,6 +86,8 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     sitChance: 0.25,
     sitMs: { min: 3000, max: 7000 },
     lookAroundChance: 0.15,
+    zoomiesChance: 0.06,
+    zoomiesDashes: { min: 2, max: 4 },
     sleepAfterMs: 3 * 60_000,
   },
   reactions: {

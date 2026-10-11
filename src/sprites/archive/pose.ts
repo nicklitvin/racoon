@@ -104,6 +104,7 @@ export function poseFor(animation: AnimationName, t: number, keystrokes = 0): Po
       return pose;
     }
 
+    case 'leap':
     case 'jump': {
       const pose = standing();
       pose.y = -6 * bump(t, 400);

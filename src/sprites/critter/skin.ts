@@ -269,7 +269,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const fore = Math.max(pose.sx, pose.fnx, pose.ffx) + 6;
     const half = Math.max(8, (fore - rear) / 2) * (1 - lift * 0.4);
     const across = build.stance.hip * 2 + 2.5;
-    const e = ellipseOf(view.at((rear + fore) / 2, 0), [view.at(half, 0), view.at(0, 0, across)]);
+    const e = ellipseOf(view.at((rear + fore) / 2, 0), [view.vec(half, 0), view.vec(0, 0, across)]);
     set(shadow, 'cx', n(e.cx));
     set(shadow, 'cy', n(e.cy));
     set(shadow, 'rx', n(e.rx));
@@ -317,7 +317,8 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const parts = legs[leg];
     const j = legJoints(build, pose, leg);
     const front = leg.startsWith('front');
-    const [w0, w1, w2, w3] = limbWidths(leg, view);
+    const here = view.local(j.root.x);
+    const [w0, w1, w2, w3] = limbWidths(leg, here);
     const root = view.pt(j.root, j.z.root);
     const mid = view.pt(j.mid, j.z.mid);
     const low = view.pt(j.low, j.z.low);
@@ -336,16 +337,16 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const up = { x: toe.y, y: -toe.x };
     const centreLocal = add(j.paw, add(scale(toe, pl * 0.45), scale(up, ph * 0.95)));
     const centre = view.pt(centreLocal, j.z.paw);
-    const pad = ellipseOf(centre, [view.pt(scale(toe, pl)), view.pt(scale(up, ph)), view.at(0, 0, pl * 0.78)]);
+    const pad = ellipseOf(centre, [view.vec(toe.x * pl, toe.y * pl, 0, j.paw.x), view.vec(up.x * ph, up.y * ph, 0, j.paw.x), view.vec(0, 0, pl * 0.78, j.paw.x)]);
     set(parts.paw, 'd', ellipsePath(pad));
     // Two tiny toe lines on the side you see.
     const side = Math.sign(j.z.paw) || 1;
-    const showing = view.c * side;
+    const showing = view.local(j.paw.x).c * side;
     if (showing > 0.25) {
       const tipLocal = add(centreLocal, scale(toe, pl));
       const a = view.pt(add(tipLocal, add(scale(toe, -pl * 0.55), scale(up, ph * 0.1))), j.z.paw + side * pl * 0.3);
       const b = view.pt(add(tipLocal, add(scale(toe, -pl * 0.2), scale(up, ph * 0.05))), j.z.paw + side * pl * 0.3);
-      const down = view.pt(scale(up, -0.9));
+      const down = view.vec(up.x * -0.9, up.y * -0.9, 0, j.paw.x);
       set(parts.toes, 'd', `M${fmt(a)}l${n(down.x)},${n(down.y)}M${fmt(b)}l${n(down.x * 0.9)},${n(down.y * 0.9)}`);
       set(parts.toes, 'opacity', n(clamp01((showing - 0.25) * 3)));
     } else {
@@ -417,7 +418,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
         const s = sectionAt(a0 + lerp(-1.8, 0.6, Math.abs(th) / reach));
         const c = Math.cos(th);
         const sn = Math.sin(th);
-        const facing = view.facing(s.up.x * (c / s.hh), s.up.y * (c / s.hh), sn / s.w);
+        const facing = view.local(s.p.x).facing(s.up.x * (c / s.hh), s.up.y * (c / s.hh), sn / s.w);
         if (facing > 0.1) {
           pts.push(view.pt(add(s.p, scale(s.up, s.hh * c)), s.w * sn));
           if (pts.length > best.length) best = pts.slice();
@@ -431,8 +432,13 @@ export function createSkin(doc: Document, build: Build, className: string, label
     // A paler chest and throat: a patch on the front of the chest, showing as it turns to you.
     const chest = sections[SECTIONS - 1]!;
     const bibLocal = add(chest.p, add(scale(chest.t, frontCap * 0.3), scale(chest.up, -chest.hh * 0.42)));
-    const bib = ellipseOf(view.pt(bibLocal), [view.pt(scale(chest.t, frontCap * 1.1)), view.pt(scale(chest.up, chest.hh * 0.72)), view.at(0, 0, chest.w * 0.8)]);
-    const towardsYou = view.facing(chest.t.x * 0.85 - chest.up.x * 0.5, chest.t.y * 0.85 - chest.up.y * 0.5, 0);
+    const at = chest.p.x;
+    const bib = ellipseOf(view.pt(bibLocal), [
+      view.vec(chest.t.x * frontCap * 1.1, chest.t.y * frontCap * 1.1, 0, at),
+      view.vec(chest.up.x * chest.hh * 0.72, chest.up.y * chest.hh * 0.72, 0, at),
+      view.vec(0, 0, chest.w * 0.8, at),
+    ]);
+    const towardsYou = view.local(at).facing(chest.t.x * 0.85 - chest.up.x * 0.5, chest.t.y * 0.85 - chest.up.y * 0.5, 0);
     set(belly, 'd', ellipsePath(bib));
     set(belly, 'opacity', n(clamp01((towardsYou + 0.5) / 0.3)));
   }
@@ -447,8 +453,9 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const farSide: Point[] = [];
     for (const s of sections) {
       // The view direction in the animal's frame: towards you and up.
-      const upDot = s.up.x * view.s - s.up.y * DEPTH;
-      const th = Math.atan2(-s.w * upDot, s.hh * view.c);
+      const here = view.local(s.p.x);
+      const upDot = s.up.x * here.s - s.up.y * DEPTH;
+      const th = Math.atan2(-s.w * upDot, s.hh * here.c);
       const on = (angle: number) => view.pt(add(s.p, scale(s.up, s.hh * Math.cos(angle))), s.w * Math.sin(angle));
       near.push(on(th));
       farSide.push(on(th + Math.PI));
@@ -456,7 +463,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const sides = curve([...near, ...farSide.reverse()], true, 0.9);
     const ellipses: Ellipse[] = [];
     const cap = (s: Section, along: number) =>
-      ellipseOf(view.pt(s.p), [view.pt(scale(s.t, along)), view.pt(scale(s.up, s.hh)), view.at(0, 0, s.w)]);
+      ellipseOf(view.pt(s.p), [view.vec(s.t.x * along, s.t.y * along, 0, s.p.x), view.vec(s.up.x * s.hh, s.up.y * s.hh, 0, s.p.x), view.vec(0, 0, s.w, s.p.x)]);
     ellipses.push(cap(sections[0]!, rearCap), cap(sections[sections.length - 1]!, frontCap));
     if (every > 0) {
       for (let i = every; i < sections.length - 1; i += every) ellipses.push(cap(sections[i]!, 0.6));
@@ -473,7 +480,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const lift = { x: 0, y: -1.2 };
     const r0 = raccoon ? 7.6 : 6.9;
     // Turned, the skin of the neck twists: it narrows a touch and folds on the inside of the turn.
-    const turn = (shown.head.yaw - (view.yaw * 180) / Math.PI) * (Math.PI / 180);
+    const turn = (shown.head.yaw - (view.yawAt(frame.s.x) * 180) / Math.PI) * (Math.PI / 180);
     const twist = Math.abs(Math.sin(turn));
     set(neck, 'd', tube([base, add(middle, lift), join], [r0, r0 * (0.86 - 0.06 * twist), R * 0.6]));
     if (twist > 0.3 && !raccoon) {
@@ -495,7 +502,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
     // belly, and the back of the nearer elbow. From in front or behind: the inner edge of
     // each leg, which parts it from its partner.
     const sideOn = clamp01(Math.abs(view.c) * 1.6 - 0.2);
-    const towardsBody = view.pt(sub(frame.s, frame.p));
+    const towardsBody = view.vec(frame.s.x - frame.p.x, frame.s.y - frame.p.y);
     const where = (leg: LegName) => placed.find((q) => q.el === legs[leg].group)!;
     for (const [a, b] of [
       ['backNear', 'backFar'],
@@ -514,7 +521,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
         }
         const hind = leg.startsWith('back');
         const j = legJoints(build, pose, leg);
-        const [w0, w1] = limbWidths(leg, view);
+        const [w0, w1] = limbWidths(leg, view.local(j.root.x));
         const top = add(j.root, add(scale(frame.up, hind ? 2.6 : 3.2), scale(frame.along, hind ? 0.5 : -1.5)));
         const down = hind ? 0.3 : 0.4;
         const spine = [

@@ -25,6 +25,8 @@ export interface PetElements {
 const MAX_REST_MS = 250;
 /** Pointer travel that turns a press into a drag rather than a click. */
 const DRAG_THRESHOLD_PX = 4;
+/** Pointer travel over him that counts as stroking. */
+const STROKE_PX = 3;
 /** Once lifted, how long he takes to slide round in your grip until you hold him by the scruff. */
 const SCRUFF_SETTLE_MS = 220;
 /**
@@ -72,6 +74,8 @@ export class PetRuntime {
   private readonly clickThrough: ClickThroughController;
 
   private cursor: Point | null = null;
+  /** Where the pointer last was over the page, to tell when it strokes him. */
+  private lastHover: Point | null = null;
   /** Brain-facing size: the part of the drawing above the feet. */
   private size = { width: 0, height: 0 };
   /** How far the drawing reaches below the feet, in px. */
@@ -243,7 +247,6 @@ export class PetRuntime {
       this.brain.release();
     } else {
       this.brain.poke();
-      this.spawnHearts();
     }
     this.wake();
     const rect = this.hitRect();
@@ -255,6 +258,11 @@ export class PetRuntime {
     // Fully hidden (behind an edge): nothing to grab, so never hold the mouse.
     if (rect) this.clickThrough.pointerMoved(p, rect);
     else this.clickThrough.pointerLeft();
+    // Stroking him after a pat (the pointer moving over him) keeps him purring.
+    const last = this.lastHover;
+    this.lastHover = p;
+    const over = rect && p.x >= rect.x && p.x <= rect.x + rect.width && p.y >= rect.y && p.y <= rect.y + rect.height;
+    if (over && last && !this.drag && Math.hypot(p.x - last.x, p.y - last.y) >= STROKE_PX) this.brain.stroke();
   }
 
   // ---- Loop --------------------------------------------------------------------------
@@ -411,24 +419,6 @@ export class PetRuntime {
     this.lastFacing = 0;
     this.lastTransform = '';
     this.applyScale();
-  }
-
-  /** A few hearts that float up from his head and fade; each removes itself when done. */
-  private spawnHearts(): void {
-    const { pet } = this.els;
-    const anchorY = this.renderer.anchor?.y ?? 1;
-    for (let i = 0; i < 3; i++) {
-      const heart = document.createElement('span');
-      heart.className = 'heart';
-      heart.textContent = '❤';
-      heart.setAttribute('aria-hidden', 'true');
-      // Just above his head: his head sits about two-thirds of the way up from his feet.
-      heart.style.bottom = `${(1 - anchorY) * 100 + anchorY * 55}%`;
-      heart.style.setProperty('--dx', `${(i - 1) * 22 + (Math.random() * 10 - 5)}px`);
-      heart.style.animationDelay = `${i * 110}ms`;
-      heart.addEventListener('animationend', () => heart.remove(), { once: true });
-      pet.append(heart);
-    }
   }
 
   /** The visible part of the raccoon: the drawn figure clipped to the stage. */

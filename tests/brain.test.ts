@@ -72,6 +72,23 @@ function inBounds(s: PetSnapshot) {
   );
 }
 
+describe('Brain: zoomies', () => {
+  it('now and then dashes about, swerving and leaping, then settles down', () => {
+    const brain = makeBrain(3, { wander: { zoomiesChance: 1, sitChance: 0, lookAroundChance: 0 } });
+    runUntil(brain, (s) => s.reaction === 'zoomies');
+    const snaps: PetSnapshot[] = [];
+    runUntil(brain, (s) => (snaps.push(s), s.reaction !== 'zoomies'), world(), 15_000);
+    const during = snaps.filter((s) => s.reaction === 'zoomies');
+    expect(during.some((s) => s.animation === 'leap')).toBe(true);
+    expect(Math.max(...during.map(speed))).toBeGreaterThan(DEFAULT_CONFIG.motion.runSpeed);
+    // Off in more than one direction.
+    const headings = during.filter((s) => speed(s) > 100).map((s) => Math.atan2(s.velocity.y, s.velocity.x));
+    expect(Math.max(...headings) - Math.min(...headings)).toBeGreaterThan(1);
+    expect(snaps.every(inBounds)).toBe(true);
+    expect(snaps.at(-1)!.mode).toBe('idle');
+  });
+});
+
 describe('Brain: wandering', () => {
   it('starts idle at the bottom middle of the screen', () => {
     const snap = makeBrain().update(0, world());
@@ -206,6 +223,22 @@ describe('Brain: cursor reactions', () => {
     expect(after.mode).toBe('idle');
   });
 
+  it('leaps now and then from sheer excitement while chasing, flying straight on', () => {
+    const brain = makeBrain();
+    runUntil(brain, (s) => s.reaction === 'chase', excited());
+    // Keep the cursor running away round the screen so he's at full tilt.
+    const fleeing = (t: number) => excited({ x: 800 + Math.cos(t / 900) * 650, y: 450 + Math.sin(t / 900) * 300 });
+    const snaps = run(brain, 8000, fleeing);
+    const leaps = snaps.filter((s, i) => s.animation === 'leap' && snaps[i - 1]?.animation !== 'leap').length;
+    expect(leaps).toBeGreaterThanOrEqual(2);
+    for (let i = 1; i < snaps.length; i++) {
+      if (snaps[i]!.animation !== 'leap' || snaps[i - 1]!.animation !== 'leap') continue;
+      const a = snaps[i - 1]!.velocity;
+      const b = snaps[i]!.velocity;
+      expect(Math.abs(Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y))).toBeLessThan(0.01);
+    }
+  });
+
   it('wakes up to chase', () => {
     const brain = makeBrain(5, { wander: { sleepAfterMs: 5_000 } });
     runUntil(brain, (s) => s.mode === 'sleep', world(), 120_000);
@@ -328,6 +361,19 @@ describe('Brain: dragging and the world changing', () => {
     expect(run(brain, 1200).at(-1)!.reaction).toBe('petted');
     const { snap: after } = runUntil(brain, (s) => s.reaction !== 'petted');
     expect(after.mode).toBe('idle');
+  });
+
+  it('stroking it after a pat keeps it happy for as long as you keep stroking', () => {
+    const brain = makeBrain();
+    brain.poke();
+    for (let i = 0; i < 40; i++) {
+      brain.stroke();
+      expect(run(brain, 100).at(-1)!.reaction).toBe('petted');
+    }
+    runUntil(brain, (s) => s.reaction !== 'petted', world(), 3000);
+    // Stroking alone, without a pat first, doesn't start it.
+    brain.stroke();
+    expect(run(brain, STEP)[0]!.reaction).not.toBe('petted');
   });
 
   it('stays on screen when the display shrinks', () => {

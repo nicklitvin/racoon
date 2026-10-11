@@ -30,6 +30,8 @@ export interface Build {
    * (cats walk with their paws almost in a line), and the body's width as a fraction of its depth.
    */
   stance: { shoulder: number; hip: number; frontPaw: number; backPaw: number; girth: number };
+  /** How far the spine bends round sideways in a turn, shoulders against hips (radians). */
+  flex: number;
   /** Paw size (half length, half height). */
   pawFront: [number, number];
   pawBack: [number, number];
@@ -56,6 +58,8 @@ export const CAT_BUILD: Build = {
   frontWidth: [5.2, 3.2, 2.15, 2],
   backWidth: [7.6, 3.6, 2.3, 2],
   stance: { shoulder: 4.4, hip: 4.9, frontPaw: 3, backPaw: 3.5, girth: 0.95 },
+  // Cats are famously bendy: one can turn round in its own length.
+  flex: 1.3,
   pawFront: [2.9, 2],
   pawBack: [3.2, 2.1],
   tail: { segments: 14, segment: 3.1, base: 3, tip: 2.2, root: { x: -7.5, y: -1.8 } },
@@ -109,6 +113,7 @@ export const RACCOON_BUILD: Build = {
   frontWidth: [4.8, 3, 2.4, 2.2],
   backWidth: [7.4, 3.8, 2.6, 2.3],
   stance: { shoulder: 5.4, hip: 6.4, frontPaw: 4.4, backPaw: 5.2, girth: 1.1 },
+  flex: 0.95,
   pawFront: [3.2, 1.9],
   pawBack: [3.6, 2],
   tail: { segments: 10, segment: 3.4, base: 5, tip: 4, root: { x: -8.5, y: -1.5 } },
