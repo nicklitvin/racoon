@@ -11,6 +11,15 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     date: '2026-10-11',
+    title: 'A fox and an otter',
+    changes: [
+      'A fox: a red fox in black stockings, an arctic fox in its winter coat, or one in ink. It walks with the light step of a cat, carries its white-tipped brush low behind, and sleeps curled up in it.',
+      'An otter that swims instead of walking. It paddles about your screen in its own little patch of water, with ripples and a wake behind it. When it’s excited it porpoises, and it treads water to look about. It rests floating on its back with its paws on its chest.',
+      'The cats’ tails no longer show a cut end where they leave the body. A sitting cat’s haunch reads as one smooth curve, and standing at ease its tail hangs in a relaxed curve.',
+    ],
+  },
+  {
+    date: '2026-10-11',
     title: 'Real gallops, a living tail',
     changes: [
       'Running and galloping, each paw lands in turn, the way cats and raccoons really run, instead of two at a time.',

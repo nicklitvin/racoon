@@ -128,8 +128,10 @@ export function catAct(input: ActInput): Act {
       p.sx += sway * 0.8;
       p.hx += sway * 1.2;
       breathe(p, clock, 3200, 0.8);
-      p.tailA += noise1(clock / 2600, 3) * 10;
-      p.tailBend += noise1(clock / 1900, 5) * 1.5;
+      // Relaxed, the tail hangs from the rump in a loose curve, the end swept up: a J.
+      p.tailA = 116 + noise1(clock / 2600, 3) * 10;
+      p.tailBend = 2.4 + noise1(clock / 1900, 5) * 1.2;
+      p.tailCurl = 16;
       alive(p, input);
       gaze(p, input);
       return { pose: p, flags };

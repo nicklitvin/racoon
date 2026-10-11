@@ -423,6 +423,7 @@ html[data-host='web'][data-theme='dark'] {
   --k-leg: var(--k-fur);
   --k-head: var(--k-fur);
   --k-muzzle: var(--k-head);
+  --k-chin: var(--k-muzzle);
   --k-ear: var(--k-head);
   --k-cheek: var(--k-head);
   --k-tail: var(--k-fur);
@@ -447,6 +448,10 @@ html[data-host='web'][data-theme='dark'] {
   --k-back: transparent;
   --k-whisker: var(--k-line);
   --k-halo: rgba(255, 255, 255, 0.8);
+  /* Water, for swimmers: the pool, the rings and wake on it, and foam where it meets fur. */
+  --k-water: #86c1e0;
+  --k-ripple: #6fb0d6;
+  --k-foam: #f4fbff;
   filter: drop-shadow(0 0 1.1px var(--k-halo));
 }
 
@@ -461,6 +466,11 @@ html[data-host='web'][data-theme='dark'] {
 .critter .k-far-side .k-p:not(.k-upper),
 .critter .k-far-upper .k-upper {
   fill: var(--f, var(--k-far));
+}
+
+/* Dark socks stay dark on the far side. */
+.critter .k-far-side .k-legfur {
+  fill: var(--f, var(--k-leg-far, var(--k-far)));
 }
 
 .critter .k-far-side .k-toes {
@@ -478,6 +488,9 @@ html[data-host='web'][data-theme='dark'] {
 .critter .k-muzzlefur {
   fill: var(--f, var(--k-muzzle));
 }
+.critter .k-chinfur {
+  fill: var(--f, var(--k-chin));
+}
 .critter .k-earfur {
   fill: var(--f, var(--k-ear));
 }
@@ -494,6 +507,32 @@ html[data-host='web'][data-theme='dark'] {
 
 .critter .k-shadow {
   fill: var(--r-shadow);
+}
+
+.critter .k-pool-stop {
+  stop-color: var(--k-water);
+}
+
+.critter .k-ripple,
+.critter .k-wake {
+  fill: none;
+  stroke: var(--k-ripple);
+  stroke-width: 0.7;
+  stroke-linecap: round;
+}
+
+.critter .k-wake {
+  stroke-width: 1;
+}
+
+.critter .k-waterline,
+.critter .k-bow {
+  fill: none;
+  stroke: var(--k-foam);
+  stroke-width: 0.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
 }
 
 .critter .k-backfur {
@@ -641,6 +680,9 @@ html[data-host='web'][data-theme='dark'] {
   --k-iris: #24201f;
   --k-pupil: #24201f;
   --k-halo: transparent;
+  --k-water: #dfe7ea;
+  --k-ripple: #24201f;
+  --k-foam: #24201f;
 }
 
 /* Shadow: a black silhouette; only the eyes catch the light. */
@@ -701,6 +743,81 @@ html[data-host='web'][data-theme='dark'] {
   --k-ring: #3f3c43;
   --k-back: #87868c;
   --k-shade: rgba(20, 20, 40, 0.14);
+}
+
+/* Red fox: russet coat, white chin, chest and tail tip, black stockings and ear backs. */
+.critter.coat-fox {
+  --k-fur: #d8692c;
+  --k-far: #a9491b;
+  --k-line: #55260f;
+  --k-leg: #2f2420;
+  --k-leg-far: #1f1714;
+  --k-ear: #3a2b24;
+  --k-ear-in: #f3e4d4;
+  --k-cheek: #f8f2ea;
+  --k-chin: #f8f2ea;
+  --k-belly: #f8f2ea;
+  --k-ring: #f8f2ea;
+  --k-iris: #e2a628;
+  --k-nose: #1e1817;
+  --k-back: #c9591f;
+  --k-shade: rgba(110, 40, 10, 0.16);
+}
+
+/* Arctic fox in its winter coat: white all over, dark eyes and nose. */
+.critter.coat-arctic {
+  --k-fur: #f3f1ec;
+  --k-far: #cfcbc3;
+  --k-line: #4a4850;
+  --k-ear-in: #ead8d2;
+  --k-cheek: #fbfaf7;
+  --k-chin: #fbfaf7;
+  --k-belly: #fbfaf7;
+  --k-ring: #fbfaf7;
+  --k-back: #e7e4de;
+  --k-iris: #8a6232;
+  --k-nose: #2a2629;
+  --k-shade: rgba(40, 60, 90, 0.14);
+}
+
+/* A fox's hind legs are dark only from the hock down. */
+.critter.coat-fox .k-leg-hind .k-legfur:not(.k-foot):not(.k-paw) {
+  fill: var(--f, var(--k-fur));
+}
+.critter.coat-fox .k-leg-hind.k-far-side .k-legfur:not(.k-foot):not(.k-paw) {
+  fill: var(--f, var(--k-far));
+}
+
+.critter.coat-fox-ink {
+  --k-leg: #24201f;
+  --k-leg-far: #24201f;
+  --k-ear: #24201f;
+  --k-ring: #fbf8f1;
+}
+
+/* River otter: glossy brown, paler at the throat and muzzle, with pale whiskers. */
+.critter.coat-otter {
+  --k-fur: #6e4b32;
+  --k-far: #4e3423;
+  --k-line: #2b1b12;
+  --k-head: #72503a;
+  --k-muzzle: #b59a7f;
+  --k-chin: #d6c4ae;
+  --k-belly: #b4977b;
+  --k-back: #5f412c;
+  --k-tail: #664530;
+  --k-ear: #5f412c;
+  --k-ear-in: #3c281c;
+  --k-iris: #2a1b13;
+  --k-pupil: #0b0806;
+  --k-nose: #1f1714;
+  --k-whisker: #efe6da;
+  --k-shade: rgba(40, 20, 10, 0.18);
+}
+
+.critter.coat-otter-ink {
+  --k-muzzle: #fbf8f1;
+  --k-iris: #24201f;
 }
 
 .critter.coat-raccoon-ink {

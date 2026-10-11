@@ -2,6 +2,8 @@
 
 A raccoon that lives on your screen. It wanders all over your screen, sits down to groom and yawn, and naps when nothing is happening. Now and then it gets the zoomies and dashes about, leaping as it goes. Shake your mouse and it jumps out and chases the cursor, leaping with excitement, pounces when the cursor stops, then sits looking confused. Click it to pet it, and stroke it to keep it happy. Get the cursor too close and it may run off or hide behind the edge of the screen. If you opt in, it also comes to watch you type, peeking up over the bottom edge with its eyes following your rhythm.
 
+You don't have to have a raccoon: the settings also offer cats, foxes and an otter, each in a few art styles. The otter swims about your screen instead of walking, in its own little patch of water: it paddles along with its head up, porpoises when it's excited, treads water to look about and floats on its back to rest.
+
 It runs two ways from one codebase:
 
 - **Desktop** (Electron + React + TypeScript): a transparent, click-through overlay above all your windows. Built for Windows first; everything OS-specific is behind one adapter, and the macOS adapter is already written.
@@ -73,7 +75,7 @@ src/                      The page (React). Runs in Electron and in a browser
     types.ts              Animation names, timing specs and the RaccoonRenderer interface
     animations.ts         Timing for every animation (fps, length, loop, eyes)
     index.ts              The pets the settings offer
-    critter/              The lifelike raccoon and cat: rig, gaits, poses, motion, drawing
+    critter/              The lifelike raccoon, cat, fox and otter: rig, gaits, poses, motion, drawing
     archive/              Retired pets (3D arena, cartoon, plush, classic, cartoon cat)
   runtime/petRuntime.ts   Connects core logic to the DOM; runs the animation loop
   host/                   "Where am I running?": Electron bridge or browser fallback
@@ -142,7 +144,9 @@ In the browser build, typing reactions are always on, since there's no system-wi
 Every pet is the same rig in `src/sprites/critter/`, drawn as inline SVG:
 
 - `build.ts` holds each animal's proportions, stance and gaits.
-- `catAct.ts` and `raccoonAct.ts` give a pose for every animation, based on how the real animal holds itself. A pose is plain numbers: hips, shoulders, head, where each paw is, the tail's shape, ears, eyes and mouth. Legs are worked out from where the paws are, so a paw can stay planted.
+- `catAct.ts`, `raccoonAct.ts`, `foxAct.ts` and `otterAct.ts` give a pose for every animation, based on how the real animal holds itself. A pose is plain numbers: hips, shoulders, head, where each paw is, the tail's shape, ears, eyes and mouth. Legs are worked out from where the paws are, so a paw can stay planted.
+  - The fox moves like a cat, so `foxAct` takes the cat's poses, scaled to its longer legs, and changes how it carries its tail.
+  - The otter (`swims: true` in its build) lives in water: the floor is the surface of a pond. Swimming, only its head and back are out of the water, and its paws paddle below. Its rests are on its back (`roll` in the pose turns the body over). Running and chasing, it swims with its whole body, and its excited leaps are porpoising arcs.
 - `motion.ts` makes the movement continuous:
   - Animations blend into each other.
   - He faces the way he's going on the floor, including up and down the screen. On the move his body follows the path, bent along its curves; turning on the spot, the shoulders lead, the hips follow and he steps round.
@@ -153,7 +157,7 @@ Every pet is the same rig in `src/sprites/critter/`, drawn as inline SVG:
   - Glances, ear flicks and blinks.
   - The head turns on the neck to look at the pointer. The eyes keep up with it; the head holds still through small movements and swings after bigger ones a beat behind.
 - `view.ts` is the camera. The screen is a floor seen from a little above, so a step towards you shows lower on the screen. The brain uses the same idea (`wander.floorDepth`), so walking up or down the screen goes at the same pace on the floor as walking across it.
-- `skin.ts` draws the pose from any side. The body is a solid built from slices along the spine, drawn by its true outline. Legs hang from either side, and parts are layered by how near you they are. The head is a small 3D model.
+- `skin.ts` draws the pose from any side. The body is a solid built from slices along the spine, drawn by its true outline. Legs hang from either side, and parts are layered by how near you they are. The head is a small 3D model; each species' face, ears and eyes are in small tables at the end of the file. For a swimmer, it also draws the water: a pool, spreading rings and a wake. A mask, cut wherever the animal is out of the water, fades whatever is below the surface into it.
 
 To add an animation:
 
@@ -166,10 +170,10 @@ To add an animation:
    - `loop: false` holds the final pose.
    - `eyes`: `'open'` (blinks now and then), `'closed'` or `'wide'`.
    - `driver: 'keystrokes'`: driven by key presses instead of time (used by `peek`).
-3. Add a `case` to `catAct()` and `raccoonAct()`. Start from `stand()`, `sit()` or `curl()` and change what moves. Pose him facing right; when you see him from his other side, his left and right paws swap automatically.
+3. Add a `case` to `catAct()`, `raccoonAct()` and `otterAct()` (the fox follows the cat). Start from `stand()`, `sit()` or `curl()` (for the otter, `swim()`, `onBack()` or `tread()`) and change what moves. Pose him facing right; when you see him from his other side, his left and right paws swap automatically.
 4. Pick it in `Brain.snapshot()` (`src/core/behavior/brain.ts`).
 
-TypeScript points out anything missing. `tests/critter.test.ts` checks every animation for bad numbers, that planted paws never slide in any walking direction, that he faces the way he walks, peeks with his paws on the edge, and hangs below his scruff when carried.
+TypeScript points out anything missing. `tests/critter.test.ts` checks every animation for bad numbers, that planted paws never slide in any walking direction, that he faces the way he walks, peeks with his paws on the edge, and hangs below his scruff when carried. For the otter it checks that it swims at the surface with its paws below it, floats on its back to rest, and porpoises clear of the water.
 
 The art styles are just CSS, the `look-*` and `coat-*` classes in `src/styles.css`.
 

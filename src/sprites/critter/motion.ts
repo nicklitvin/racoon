@@ -44,6 +44,10 @@ export interface Shown {
   head: { yaw: number; z: number };
   /** The scruff on screen (drawing units from the feet): where he's held, and what he swings from. */
   scruff: Projected;
+  /** Wall-clock time, ms, for things that ripple on by themselves (water). */
+  clock: number;
+  /** How fast he's going over the floor, units/s: across the screen, and towards you. */
+  drift: Point;
 }
 
 type Actor = (input: ActInput) => Act;
@@ -100,6 +104,20 @@ const TAIL_LIFE: Partial<Record<AnimationName, number>> = {
 const WRAP_PAST = 0.55;
 /** How long a sideways swing takes to travel from one tail joint to the next, s. */
 const TAIL_RIPPLE = 0.03;
+
+/** How far the head swings out sideways as the neck turns, units. */
+const NECK_REACH: Record<Build['species'], number> = { cat: 3.2, fox: 3.4, raccoon: 2.6, otter: 2.4 };
+
+/**
+ * Each species' tail: how much it wanders on its own, and how slowly. A cat's or a fox's is
+ * expressive; a raccoon's is a heavy brush; an otter's is a thick rudder that mostly trails.
+ */
+const TAIL_TEMPER: Record<Build['species'], { amount: number; pace: number }> = {
+  cat: { amount: 1, pace: 1 },
+  fox: { amount: 0.8, pace: 1.15 },
+  raccoon: { amount: 0.9, pace: 1.3 },
+  otter: { amount: 0.45, pace: 1.5 },
+};
 
 /** Nominal ground speeds, used when the frame doesn't say how fast he's going (previews). */
 const NOMINAL_SPEED: Partial<Record<AnimationName, number>> = { walk: 76, run: 300, chase: 560, leap: 560 };
@@ -158,6 +176,8 @@ export class Motion {
   /** Sideways velocity and acceleration on screen, for swinging when carried. */
   private screenVx = 0;
   private accel = 0;
+  /** Velocity over the floor (across, towards you), units/s. */
+  private drift: Point = { x: 0, y: 0 };
   /** Heading on the floor (radians) of the shoulders and of the hips, and the one he's turning to. */
   private front = 0;
   private frontSpin = 0;
@@ -279,6 +299,7 @@ export class Motion {
     this.screenVx = screenVx;
     this.velocity = { x: ground ? ground.x * view.c + ground.y * view.s : nominal, y: 0 };
     const speed = ground ? Math.hypot(ground.x, ground.y) : nominal;
+    this.drift = ground ?? { x: Math.cos(this.yaw) * nominal, y: Math.sin(this.yaw) * nominal };
     this.speed = lerp(this.speed, speed, dt > 0 ? 1 - Math.exp(-dt * 12) : 1);
     this.started = true;
 
@@ -340,7 +361,7 @@ export class Motion {
     this.updateTail(pose, act.flags, dt);
     const head = this.headTurn(pose, bent);
     const scruff = bent.pt(scruffAt(this.build, pose));
-    const shown: Shown = { pose, flags: act.flags, tail: this.tail, view: bent, head, scruff };
+    const shown: Shown = { pose, flags: act.flags, tail: this.tail, view: bent, head, scruff, clock: now, drift: this.drift };
     this.lastShown = shown;
     return shown;
   }
@@ -492,7 +513,7 @@ export class Motion {
     const local = clamp(clamp((towardsYou * pose.hyaw) / 90, -most, most) + pose.hturn, -125, 125);
     const neck = lead + local;
     pose.hx -= (1 - Math.cos(neck * DEG)) * 1.6;
-    const reach = this.build.species === 'cat' ? 3.2 : 2.6;
+    const reach = NECK_REACH[this.build.species];
     return { yaw: shoulders + neck, z: Math.sin(neck * DEG) * reach };
   }
 
@@ -572,9 +593,9 @@ export class Motion {
    * tail is more expressive than a raccoon's heavy brush.
    */
   private tailLife(pose: Pose, flags: PoseFlags, animation: AnimationName, now: number, dt: number): void {
-    const cat = this.build.species === 'cat';
-    const amount = (TAIL_LIFE[animation] ?? 0) * (cat ? 1 : 0.9);
-    this.moveTail(now, dt, cat);
+    const temper = TAIL_TEMPER[this.build.species];
+    const amount = (TAIL_LIFE[animation] ?? 0) * temper.amount;
+    this.moveTail(now, dt, temper.pace);
     if (amount === 0) return;
     const m = this.tailMood;
     // A little drift as well, so even holding still it's never frozen.
@@ -592,12 +613,12 @@ export class Motion {
    * slow swish across and back (once, or a few times), settling at a new angle, or a flick
    * of the tip. Each move eases in and out at its own pace, so it never repeats.
    */
-  private moveTail(now: number, dt: number, cat: boolean): void {
+  private moveTail(now: number, dt: number, pace: number): void {
     const r = this.random;
     const goal = this.tailGoal;
+    // Heavier tails move less often and more slowly.
+    const cat = pace <= 1;
     if (now >= this.nextTailMove) {
-      // Raccoons' heavy brushes move less often and more slowly.
-      const pace = cat ? 1 : 1.3;
       if (this.tailSwishes > 0) {
         // On over to the other side.
         this.tailSwishes--;
@@ -692,7 +713,8 @@ export class Motion {
         // Torques: shaking of the root (inertia), the airflow, and a little sag when floppy.
         const shake = (d.x * -rootAcc.y + d.y * rootAcc.x) * 0.0022 * (0.4 + tipward);
         const air = (d.x * flow.y - d.y * flow.x) * 0.0016 * tipward;
-        const sag = (1 - stiff) * d.x * 9 * tipward * (flags.noShadow ? 1 : 0.6);
+        // In water it floats instead.
+        const sag = (1 - stiff) * d.x * 9 * tipward * (flags.noShadow ? 1 : this.build.swims ? 0 : 0.6);
         const acc = w * w * angleDiff(a, target) - 2 * zeta * w * this.tailSpin[i]! + (shake + air) * 60 * 60 + sag * 60;
         this.tailSpin[i]! += acc * h;
         this.tailAngles[i] = a + this.tailSpin[i]! * h;
@@ -737,7 +759,8 @@ export class Motion {
       }
       points.push({
         x: prev.x + d.x * spec.segment,
-        y: flags.noShadow ? y : Math.min(y, floor),
+        // Kept off the floor; in water, it floats up to the surface, unless he's diving.
+        y: flags.noShadow ? y : this.build.swims ? Math.min(y, Math.max(lerp(root.y, -0.3 * lerp(spec.base, spec.tip, i / count), Math.min(1, (i + 1) / 3)), root.y - 4)) : Math.min(y, floor),
         z: this.tailSides[i]! * reach * ((i + 1) / count) ** 1.4,
       });
     }
@@ -785,7 +808,8 @@ export class Motion {
 
     if (now >= this.nextBlink && frame.animation !== 'sleep') {
       // Cats give a slow blink now and then when relaxed, especially at someone looking at them.
-      this.slowBlink = this.build.species === 'cat' && resting && r() < (frame.gaze ? 0.45 : 0.2);
+      const cat = this.build.species === 'cat' || this.build.species === 'fox';
+      this.slowBlink = cat && resting && r() < (frame.gaze ? 0.45 : 0.2);
       this.blink = { start: now, end: now + (this.slowBlink ? 1300 : 170) };
       this.nextBlink = now + lerp(2400, 6500, r());
     }
@@ -799,7 +823,7 @@ export class Motion {
       this.tailFlick = { start: now, end: now + 700 };
       this.nextTailFlick = now + lerp(4000, 11000, r()) * calm;
     }
-    if (now >= this.nextSniff && this.build.species === 'raccoon' && !asleep) {
+    if (now >= this.nextSniff && this.build.species !== 'cat' && !asleep) {
       this.sniff = { start: now, end: now + lerp(500, 900, r()) };
       this.nextSniff = now + lerp(4000, 10000, r());
     }

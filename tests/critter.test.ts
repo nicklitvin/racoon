@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CAT_BUILD, RACCOON_BUILD, type Build } from '../src/sprites/critter/build';
+import { CAT_BUILD, FOX_BUILD, OTTER_BUILD, RACCOON_BUILD, type Build } from '../src/sprites/critter/build';
 import { catAct } from '../src/sprites/critter/catAct';
+import { foxAct } from '../src/sprites/critter/foxAct';
+import { otterAct } from '../src/sprites/critter/otterAct';
 import { Motion, type Shown } from '../src/sprites/critter/motion';
 import { raccoonAct } from '../src/sprites/critter/raccoonAct';
 import { legJoints } from '../src/sprites/critter/rig';
@@ -9,9 +11,11 @@ import { PX_PER_UNIT } from '../src/sprites/svg';
 import { DEPTH } from '../src/sprites/critter/view';
 import { ANIMATION_NAMES, type AnimationName, type RaccoonFrame } from '../src/sprites/types';
 
+/** The animals that walk. (The otter swims: it has its own tests below.) */
 const SPECIES = [
   ['cat', CAT_BUILD, catAct],
   ['raccoon', RACCOON_BUILD, raccoonAct],
+  ['fox', FOX_BUILD, foxAct],
 ] as const;
 
 const UNITS_PER_PX = 1 / PX_PER_UNIT;
@@ -314,6 +318,143 @@ describe('lifelike raccoon stood up', () => {
     const chin = shown.pose.hy + RACCOON_BUILD.head.r;
     for (const leg of ['frontNear', 'frontFar'] as const) {
       expect(legJoints(RACCOON_BUILD, shown.pose, leg).root.y - chin).toBeGreaterThan(4);
+    }
+  });
+});
+
+describe('lifelike otter', () => {
+  const d0 = () => driver(OTTER_BUILD, otterAct);
+
+  it('stays finite through every animation, turn and drag', () => {
+    const d = d0();
+    for (const animation of ANIMATION_NAMES) {
+      for (let i = 0; i < 40; i++) {
+        const shown = d.step({
+          animation,
+          keystrokes: i,
+          heading: i < 20 ? 0 : Math.PI,
+          velocity: animation === 'dangle' ? { x: Math.sin(i) * 900, y: Math.cos(i) * 400 } : { x: 120, y: 30 },
+          gaze: i % 3 ? { x: -200 + i * 10, y: -80 } : null,
+        });
+        expect(numbers(shown).every(Number.isFinite), animation).toBe(true);
+      }
+    }
+  });
+
+  it.each([0, Math.PI, -Math.PI / 2, Math.PI / 2, (3 * Math.PI) / 4])('swims at the surface, paddling under it (direction %f)', (direction) => {
+    for (const [animation, speedPx] of [
+      ['walk', 85],
+      ['run', 340],
+      ['chase', 650],
+    ] as const) {
+      const d = d0();
+      const velocity = { x: Math.cos(direction) * speedPx, y: Math.sin(direction) * speedPx * DEPTH };
+      const heading = Math.atan2(velocity.y, velocity.x);
+      for (let i = 0; i < 90; i++) d.step({ animation, heading, velocity });
+      for (let i = 0; i < 60; i++) {
+        const { pose } = d.step({ animation, heading, velocity });
+        // The back just out of the water, the head well out of it.
+        for (const y of [pose.py, pose.sy]) {
+          expect(y, animation).toBeGreaterThan(-2);
+          expect(y, animation).toBeLessThan(7);
+        }
+        expect(pose.hy, animation).toBeLessThan(-1.5);
+        // Every paw under the water.
+        for (const leg of LEGS) expect(paw(pose, leg).y, `${animation} ${leg}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('faces the way it swims', () => {
+    for (const heading of [0, Math.PI / 2, Math.PI]) {
+      const d = d0();
+      let shown!: Shown;
+      for (let i = 0; i < 60; i++) shown = d.step({ animation: 'walk', heading, velocity: { x: Math.cos(heading) * 85, y: Math.sin(heading) * 85 } });
+      expect(Math.abs(Math.atan2(Math.sin(shown.view.yaw - heading), Math.cos(shown.view.yaw - heading)))).toBeLessThan(0.05);
+    }
+  });
+
+  it('floats on its back to rest, belly and paws up out of the water', () => {
+    const d = d0();
+    let shown!: Shown;
+    for (let i = 0; i < 120; i++) shown = d.step({ animation: 'sit' });
+    expect(shown.pose.roll).toBeGreaterThan(0.95);
+    for (const leg of LEGS) expect(paw(shown.pose, leg).y, leg).toBeLessThan(0);
+    expect(shown.pose.hy).toBeLessThan(-6);
+  });
+
+  it('treads water to look about, then lies back', () => {
+    const d = d0();
+    let shown = d.step({ animation: 'idle' });
+    for (let i = 0; i < 60; i++) shown = d.step({ animation: 'idle' });
+    // Upright, chest out of the water and hips well down in it.
+    expect(shown.pose.sy).toBeLessThan(-5);
+    expect(shown.pose.py).toBeGreaterThan(8);
+    expect(shown.pose.roll).toBeLessThan(0.05);
+    for (let i = 0; i < 300; i++) shown = d.step({ animation: 'idle' });
+    expect(shown.pose.roll).toBeGreaterThan(0.95);
+  });
+
+  it('porpoises: an arc right out of the water and back in', () => {
+    const d = d0();
+    const velocity = { x: 650, y: 0 };
+    for (let i = 0; i < 60; i++) d.step({ animation: 'chase', velocity });
+    const heights: number[] = [];
+    for (let i = 0; i < 27; i++) {
+      const { pose } = d.step({ animation: 'leap', velocity });
+      heights.push((pose.py + pose.sy) / 2);
+    }
+    const top = Math.min(...heights);
+    expect(top).toBeLessThan(-6);
+    expect(heights.at(-1)!).toBeGreaterThan(top + 6);
+  });
+
+  it('peeks over the edge facing you, out of the water', () => {
+    const d = d0();
+    let shown = d.step({ animation: 'peek', heading: Math.PI / 2 });
+    for (let i = 0; i < 90; i++) shown = d.step({ animation: 'peek', heading: Math.PI / 2, keystrokes: i });
+    expect(shown.flags.noShadow).toBe(true);
+    for (const leg of ['frontNear', 'frontFar'] as const) {
+      expect(Math.abs(pawOnScreen(OTTER_BUILD, shown, leg).y - (OTTER_BUILD.peekEdge - 0.3))).toBeLessThan(0.6);
+    }
+    const head = shown.view.at(shown.pose.hx, shown.pose.hy, shown.head.z);
+    expect(head.y).toBeLessThan(OTTER_BUILD.peekEdge - 2);
+  });
+
+  it('hangs from the scruff when carried, out of the water', () => {
+    const d = d0();
+    for (let i = 0; i < 30; i++) d.step({ animation: 'idle' });
+    let shown!: Shown;
+    for (let i = 0; i < 60; i++) shown = d.step({ animation: 'dangle', velocity: { x: Math.sin(i / 5) * 300, y: 0 } });
+    expect(shown.flags.noShadow).toBe(true);
+    expect(shown.view.at(shown.pose.px, shown.pose.py).y).toBeGreaterThan(shown.scruff.y + 15);
+  });
+
+  it('follows a curving path with its body, bent round the curve', () => {
+    const d = d0();
+    let shown!: Shown;
+    for (let i = 0; i < 120; i++) {
+      const a = i * 0.016 * 2.5;
+      const velocity = { x: Math.cos(a) * 340, y: Math.sin(a) * 340 * DEPTH };
+      shown = d.step({ animation: 'run', heading: Math.atan2(velocity.y, velocity.x), velocity });
+      if (i < 40) continue;
+      expect(shown.view.bend, `frame ${i}`).toBeGreaterThan(0.05);
+    }
+  });
+
+  it('builds legs that reach their paws in every pose', () => {
+    for (const animation of ANIMATION_NAMES) {
+      const d = d0();
+      for (let i = 0; i < 200; i++) {
+        const moving = animation === 'walk' || animation === 'run' || animation === 'chase' || animation === 'leap';
+        const shown = d.step({ animation, velocity: { x: moving ? 340 : 0, y: 0 } });
+        if (i < 40) continue;
+        for (const leg of LEGS) {
+          const j = legJoints(OTTER_BUILD, shown.pose, leg);
+          const [upper, lower] = leg.startsWith('front') ? OTTER_BUILD.front : OTTER_BUILD.back;
+          expect(Math.hypot(j.low.x - j.root.x, j.low.y - j.root.y), `${animation} ${leg} ${i}`).toBeLessThan((upper + lower) * 1.12);
+        }
+      }
     }
   });
 });

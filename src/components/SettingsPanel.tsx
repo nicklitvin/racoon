@@ -37,6 +37,8 @@ interface TypePickerProps {
 const GROUPS: { species: Species; title: string }[] = [
   { species: 'raccoon', title: 'Raccoons' },
   { species: 'cat', title: 'Cats' },
+  { species: 'fox', title: 'Foxes' },
+  { species: 'otter', title: 'Otters' },
 ];
 
 /** A small still of the pet, drawn once. */

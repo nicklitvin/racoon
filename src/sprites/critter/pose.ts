@@ -79,6 +79,11 @@ export const POSE_KEYS = [
   'rot',
   /** Vertical squash (< 1) and stretch (> 1) about the feet, for landings and leaps. */
   'squash',
+  /**
+   * Rolled over onto his back, 0..1: belly up, paws in the air (an otter floating). The body
+   * turns over about the spine; the head stays the right way up.
+   */
+  'roll',
 ] as const;
 
 export type PoseKey = (typeof POSE_KEYS)[number];
