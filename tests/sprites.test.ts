@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Animator } from '../src/core/animator';
 import { seededRandom } from '../src/core/behavior/motion';
 import { ANIMATIONS } from '../src/sprites/animations';
-import { PEEK_EDGE_Y, poseFor } from '../src/sprites/pose';
-import { pawPosition, RIG, toWorld, type LegName, type Pose } from '../src/sprites/rig';
+import { PEEK_EDGE_Y, poseFor } from '../src/sprites/archive/pose';
+import { pawPosition, RIG, toWorld, type LegName, type Pose } from '../src/sprites/archive/rig';
 import { ANIMATION_NAMES, type AnimationName } from '../src/sprites/types';
 
 const LEGS: LegName[] = ['frontNear', 'frontFar', 'backNear', 'backFar'];

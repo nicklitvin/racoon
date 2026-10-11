@@ -1,4 +1,4 @@
-import type { Point } from '../core/geometry';
+import type { Point } from '../../core/geometry';
 
 /**
  * The raccoon's skeleton, in drawing units. The raccoon faces right with his feet at

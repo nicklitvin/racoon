@@ -1,8 +1,8 @@
-import { ANIMATIONS } from './animations';
+import { ANIMATIONS } from '../animations';
 import { poseFor } from './pose';
 import { legRoot, legRotation, RIG, type LegName, type Pose } from './rig';
-import { n, PX_PER_UNIT, svgWriter } from './svg';
-import type { RaccoonFrame, RaccoonRenderer } from './types';
+import { n, PX_PER_UNIT, svgWriter } from '../svg';
+import type { RaccoonFrame, RaccoonRenderer } from '../types';
 
 /** How far back in time the "trailing" parts (tail tip, head, ears) look, in ms. */
 const LAG_MS = 90;

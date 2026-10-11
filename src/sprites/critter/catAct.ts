@@ -2,6 +2,7 @@ import { CAT_BUILD as B } from './build';
 import { gaitFor, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
 import { bump, clamp01, easeOut, frac, lerp, noise1, smoother, span, wave } from './kit';
 import { blankPose, setPaw, type Pose } from './pose';
+import { DEPTH } from './view';
 
 /**
  * How a real cat holds itself for each behaviour. Everything is relative to the feet,
@@ -57,6 +58,7 @@ function sit(): Pose {
   p.tailBend = -12;
   p.tailCurl = 6;
   p.tailStiff = 0.6;
+  p.tailSide = 0.55;
   return p;
 }
 
@@ -83,6 +85,7 @@ function curl(): Pose {
   p.tailBend = 0;
   p.tailCurl = -12;
   p.tailStiff = 0.8;
+  p.tailSide = 0.5;
   p.earN = -0.15;
   p.earF = -0.15;
   return p;
@@ -158,6 +161,9 @@ export function catAct(input: ActInput): Act {
         p.scapN = clamp01(Math.sin(u * Math.PI * 2 + 0.6)) * amp;
         p.scapF = clamp01(Math.sin((u - 0.5) * Math.PI * 2 + 0.6)) * amp;
         p.tailA += wave(input.phase, 1, 0.1) * 4 * amp;
+        // Swaying side to side, and carried a little off to one side so the hook of the
+        // question mark shows from behind and in front.
+        p.tailSide = 0.3 + wave(input.phase, 1, 0.35) * 0.12 * amp;
         p.lookX = 0.25;
         alive(p, input, 0.5);
         return { pose: p, flags };
@@ -349,7 +355,11 @@ function yawn(input: ActInput): Act {
   return { pose: p, flags };
 }
 
-/** Standing up behind the bottom edge, front paws on it, watching you type. */
+/**
+ * Peeking at you over the bottom edge, front paws on it either side of the face, watching
+ * you type. He faces you, so the pose is laid out for that view: a step towards you shows
+ * DEPTH lower on the screen, which the paws and head allow for to sit on the edge.
+ */
 function peek(input: ActInput): Act {
   const { keystrokes, clock } = input;
   const flags = noFlags();
@@ -357,19 +367,24 @@ function peek(input: ActInput): Act {
   flags.pawUp = true;
   const p = stand();
   const edge = B.peekEdge;
-  p.px = -5;
-  p.py = -21;
-  p.sx = 4.5;
-  p.sy = -41;
-  p.arch = 2.5;
-  p.hx = 8.5;
-  p.hy = edge - 15.5;
-  p.hpitch = 6;
-  p.hyaw = 78;
-  setPaw(p, 'frontNear', 10.5, edge - 1.6, 100);
-  setPaw(p, 'frontFar', 3, edge - 1.6, 100);
-  setPaw(p, 'backNear', -3, 0, 40);
-  setPaw(p, 'backFar', -6, 0, 40);
+  const R = B.head.r;
+  p.px = -6;
+  p.py = -14;
+  p.sx = -1;
+  p.sy = -27;
+  p.arch = 2;
+  p.hx = 3;
+  // Chin on the edge, between the paws.
+  p.hy = edge - R * 0.82 - 3 * DEPTH;
+  p.hpitch = 4;
+  p.hyaw = 90;
+  // Paws on the edge, out either side of the chin.
+  const pawA = 6;
+  p.fspread = 7.4;
+  setPaw(p, 'frontNear', pawA, edge - 0.3 - pawA * DEPTH, 92);
+  setPaw(p, 'frontFar', pawA, edge - 0.3 - pawA * DEPTH, 92);
+  setPaw(p, 'backNear', -4, 0, 40);
+  setPaw(p, 'backFar', -4, 0, 40);
   p.tailA = 160;
   p.tailBend = 0;
   p.tailStiff = 0.3;
@@ -428,10 +443,7 @@ function dangle(input: ActInput): Act {
   const flags = noFlags();
   flags.noShadow = true;
   const p = stand();
-  const scruff = { x: 8, y: -54 };
   p.rot = swing;
-  p.rotX = scruff.x;
-  p.rotY = scruff.y;
   p.sx = 6;
   p.sy = -44;
   p.px = 0;
@@ -447,8 +459,8 @@ function dangle(input: ActInput): Act {
     const a = (hang * Math.PI) / 180;
     return { x: x - Math.sin(a) * length, y: y + Math.cos(a) * length, lean };
   };
-  const fn = drop(9, -40, 18, -20);
-  const ff = drop(5.5, -40, 18, -20);
+  const fn = drop(12, -40, 18, -20);
+  const ff = drop(9.5, -40, 18, -20);
   const bn = drop(1, -16, 20, 30);
   const bf = drop(-2, -16, 20, 30);
   const kick = Math.max(0, wave(clock, 2600)) * 1.5;
@@ -489,6 +501,7 @@ function happy(input: ActInput): Act {
   setPaw(p, 'frontNear', 5.5 + knead(0) * 1.5, -knead(0) * 3, 4 - knead(0) * 40);
   setPaw(p, 'frontFar', 3 + knead(0.5) * 1.5, -knead(0.5) * 3, 4 - knead(0.5) * 40);
   p.tailA = 262;
+  p.tailSide = 0;
   p.tailBend = 1.4;
   p.tailCurl = 10 + Math.sin(clock / 45) * 2;
   p.tailStiff = 0.7;

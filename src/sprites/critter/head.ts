@@ -27,6 +27,8 @@ export class HeadView {
   private readonly sy: number;
   private readonly cr: number;
   private readonly sr: number;
+  private readonly ct: number;
+  private readonly st: number;
 
   constructor(
     readonly centre: Point,
@@ -36,7 +38,11 @@ export class HeadView {
     yaw: number,
     /** Tilt, degrees, clockwise on screen. */
     roll: number,
+    /** How far the camera looks down on the head, degrees. */
+    tilt = 0,
   ) {
+    this.ct = Math.cos(tilt * DEG);
+    this.st = Math.sin(tilt * DEG);
     this.cp = Math.cos(pitch * DEG);
     this.sp = Math.sin(pitch * DEG);
     this.cy = Math.cos(yaw * DEG);
@@ -50,8 +56,10 @@ export class HeadView {
     const f2 = v.f * this.cp + v.u * this.sp;
     const u2 = v.u * this.cp - v.f * this.sp;
     const x = f2 * this.cy - v.s * this.sy;
-    const z = f2 * this.sy + v.s * this.cy;
-    const y = -u2;
+    const z0 = f2 * this.sy + v.s * this.cy;
+    // Seen from a little above: nearer points sit lower, and the top of the head shows.
+    const y = -u2 * this.ct + z0 * this.st;
+    const z = z0 * this.ct + u2 * this.st;
     return { x: x * this.cr - y * this.sr, y: x * this.sr + y * this.cr, z };
   }
 

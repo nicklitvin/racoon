@@ -39,9 +39,13 @@ export function targetHeading(current: number, { velocity, facing, animation }: 
   return current;
 }
 
-/** Turns smoothly from `current` towards `target` the short way round. */
+/**
+ * Turns smoothly from `current` towards `target` the short way round. Turning right round,
+ * he turns through facing you (down the screen) rather than turning his back.
+ */
 export function turnTowards(current: number, target: number, dtMs: number): number {
-  const diff = wrapAngle(target - current);
+  let diff = wrapAngle(target - current);
+  if (Math.abs(diff) > Math.PI - 0.3 && Math.sin(current + diff / 2) < 0) diff -= Math.sign(diff) * Math.PI * 2;
   if (Math.abs(diff) < SETTLED_RAD) return wrapAngle(target);
   return wrapAngle(current + diff * (1 - Math.exp((-TURN_RATE * dtMs) / 1000)));
 }

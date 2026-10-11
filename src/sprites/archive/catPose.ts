@@ -1,6 +1,6 @@
-import type { Point } from '../core/geometry';
+import type { Point } from '../../core/geometry';
 import type { LegName } from './rig';
-import type { AnimationName } from './types';
+import type { AnimationName } from '../types';
 
 /**
  * The black cat's poses, drawn side-on and facing right with the feet at (0, 0);

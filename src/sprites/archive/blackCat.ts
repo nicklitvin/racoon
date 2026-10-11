@@ -1,8 +1,8 @@
-import type { Point } from '../core/geometry';
+import type { Point } from '../../core/geometry';
 import { CAT, bodyPoint, catPoseFor, headCentre, legRoot, smooth, spineLength, tailAngles, tailPoints, type CatPose } from './catPose';
 import type { LegName } from './rig';
-import { n, PX_PER_UNIT, svgWriter } from './svg';
-import type { AnimationName, AnimationSpec, RaccoonFrame, RaccoonRenderer } from './types';
+import { n, PX_PER_UNIT, svgWriter } from '../svg';
+import type { AnimationName, AnimationSpec, RaccoonFrame, RaccoonRenderer } from '../types';
 
 /**
  * How each part eases into a new animation: a delay and a duration in ms. Parts start

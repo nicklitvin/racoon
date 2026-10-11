@@ -92,6 +92,11 @@ export interface RaccoonRenderer {
    * into a new pose), so it must be redrawn every frame even if the frame is unchanged.
    */
   isSettling?(): boolean;
+  /**
+   * Where he's held when picked up (the scruff), in px from his feet at the current scale,
+   * as last drawn. Without it, he's held wherever he was grabbed.
+   */
+  holdPoint?(): { x: number; y: number } | null;
   setScale(scale: number): void;
   /** Cheap to call every tick: only touches what changed. */
   draw(frame: RaccoonFrame): void;

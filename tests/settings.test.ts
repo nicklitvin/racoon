@@ -15,9 +15,15 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ keyboardReactions: true }).keyboardReactions).toBe(true);
   });
 
-  it('accepts every raccoon type, defaulting to the 3D one', () => {
-    expect(DEFAULT_SETTINGS.raccoonType).toBe('arena');
+  it('accepts every pet type, defaulting to the storybook raccoon', () => {
+    expect(DEFAULT_SETTINGS.raccoonType).toBe('raccoon-storybook');
     for (const type of RACCOON_TYPES) expect(normalizeSettings({ raccoonType: type }).raccoonType).toBe(type);
+  });
+
+  it('moves anyone on a retired pet to the default', () => {
+    for (const retired of ['arena', 'cartoon', 'plush', 'classic', 'cat']) {
+      expect(normalizeSettings({ raccoonType: retired }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
+    }
   });
 
   it('drops unknown and retired keys', () => {

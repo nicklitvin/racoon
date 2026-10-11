@@ -1,5 +1,4 @@
-import type { Point } from '../../core/geometry';
-import type { LegName } from '../rig';
+import type { LegName } from './pose';
 import type { AnimationName } from '../types';
 import type { Build } from './build';
 import { bob, step, strideAt, type Gait } from './gait';
@@ -39,8 +38,11 @@ export interface ActInput {
   /** Clock for slow background wobble (breathing), ms. */
   clock: number;
   life: Life;
-  /** Something to look at (the pointer), relative to the feet, x forward; null if nothing nearby. */
-  gaze: Point | null;
+  /**
+   * Something to look at (the pointer), null if nothing is near: how far to turn the head on
+   * the neck towards his right side, and how far to nod down, in degrees.
+   */
+  gaze: { yaw: number; pitch: number } | null;
   /** Side swing while being carried, degrees, from the pendulum. */
   swing: number;
 }
@@ -79,19 +81,16 @@ export function walkBob(pose: Pose, gait: Gait, phase: number, amp: number): voi
 }
 
 /**
- * Turns the head and eyes to `target` (relative to the feet), within what a neck allows.
- * `weight` 0..1 blends from the pose's own head turn.
+ * Turns the head towards something, within what a neck allows, and lets the eyes make up
+ * the rest. `weight` 0..1 blends from the pose's own head turn.
  */
-export function lookAt(pose: Pose, target: Point, weight: number): void {
-  const dx = target.x - pose.hx;
-  const dy = target.y - pose.hy;
-  const d = Math.hypot(dx, dy) || 1;
-  // In front: a three-quarter view turning towards profile. Behind: looking back over the shoulder.
-  const ahead = dx / d;
-  const yaw = clamp(lerp(70, 18, (ahead + 1) / 2) + (ahead < -0.3 ? 40 * (-ahead - 0.3) : 0), 10, 125);
-  const pitch = clamp((Math.atan2(dy, Math.abs(dx) + 40) * 180) / Math.PI * 0.8, -30, 35);
-  pose.hyaw = lerp(pose.hyaw, yaw, weight);
+export function lookAt(pose: Pose, target: { yaw: number; pitch: number }, weight: number): void {
+  const yaw = clamp(target.yaw, -110, 110);
+  const pitch = clamp(target.pitch, -30, 35);
+  pose.hturn = lerp(pose.hturn, yaw, weight);
+  // Really looking at something replaces just turning his face to you.
+  pose.hyaw = lerp(pose.hyaw, 0, weight);
   pose.hpitch = lerp(pose.hpitch, pitch, weight);
-  pose.lookX = lerp(pose.lookX, clamp(ahead * 0.6, -0.7, 0.7), weight);
-  pose.lookY = lerp(pose.lookY, clamp(dy / d, -0.8, 0.8), weight);
+  pose.lookX = lerp(pose.lookX, clamp((target.yaw - yaw) / 40, -0.6, 0.6) + 0.1, weight);
+  pose.lookY = lerp(pose.lookY, clamp((target.pitch - pitch) / 25 + pitch / 60, -0.8, 0.8), weight);
 }

@@ -33,6 +33,7 @@ export function createCritter(
   const motion = new Motion(build, actor, 7 + ++seeds * 31);
   const { view } = build;
   let scale = 1;
+  let scruff: { x: number; y: number } | null = null;
   return {
     element: skin.svg,
     figure: skin.figure,
@@ -42,13 +43,16 @@ export function createCritter(
     turnsItself: true,
     animations: TIMING,
     isSettling: () => motion.settling,
+    holdPoint: () => (scruff ? { x: scruff.x * PX_PER_UNIT * scale, y: scruff.y * PX_PER_UNIT * scale } : null),
     setScale(next) {
       scale = next;
       skin.svg.setAttribute('width', n(view.width * PX_PER_UNIT * scale));
       skin.svg.setAttribute('height', n(view.height * PX_PER_UNIT * scale));
     },
     draw(frame) {
-      skin.draw(motion.update(frame, 1 / (PX_PER_UNIT * scale)));
+      const shown = motion.update(frame, 1 / (PX_PER_UNIT * scale));
+      scruff = shown.scruff;
+      skin.draw(shown);
     },
   };
 }

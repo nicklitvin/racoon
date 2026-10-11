@@ -456,6 +456,16 @@ html[data-host='web'][data-theme='dark'] {
 .critter .k-farfur {
   fill: var(--f, var(--k-far));
 }
+
+/* Legs on the far side of the body, or behind it, are in shadow. */
+.critter .k-far-side .k-p:not(.k-upper),
+.critter .k-far-upper .k-upper {
+  fill: var(--f, var(--k-far));
+}
+
+.critter .k-far-side .k-toes {
+  display: none;
+}
 .critter .k-legfur {
   fill: var(--f, var(--k-leg));
 }
@@ -503,6 +513,10 @@ html[data-host='web'][data-theme='dark'] {
   stroke: var(--k-contour);
   stroke-width: calc(var(--k-lw) * 0.9);
   stroke-linecap: round;
+}
+
+.critter .k-contour.k-soft {
+  stroke-width: calc(var(--k-lw) * 0.6);
 }
 
 .critter .k-toes {

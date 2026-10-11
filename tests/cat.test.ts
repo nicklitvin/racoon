@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ANIMATIONS } from '../src/sprites/animations';
-import { CAT, CAT_PEEK_EDGE_Y, catPoseFor, headCentre, type CatPose } from '../src/sprites/catPose';
+import { CAT, CAT_PEEK_EDGE_Y, catPoseFor, headCentre, type CatPose } from '../src/sprites/archive/catPose';
 import { ANIMATION_NAMES, type AnimationName } from '../src/sprites/types';
 
 function samples(name: AnimationName, count = 40): CatPose[] {

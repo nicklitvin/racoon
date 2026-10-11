@@ -26,6 +26,12 @@ export interface WanderConfig {
   speedJitter: number;
   /** How far a walk bows to one side, as a fraction of its length, so paths aren't ruler-straight. */
   curve: number;
+  /**
+   * The screen is a floor seen from a little above, so a step towards or away from you
+   * covers this fraction of the screen distance of a step across. Walks up and down the
+   * screen go that much slower, so his pace looks the same every way he walks.
+   */
+  floorDepth: number;
   /** Standing still between one activity and the next. */
   pauseMs: Range;
   /** Chance that the next activity is sitting down (grooming, yawning or resting). */
@@ -65,6 +71,7 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     walkDistance: { min: 120, max: 520 },
     speedJitter: 0.15,
     curve: 0.2,
+    floorDepth: 0.55,
     pauseMs: { min: 2500, max: 7000 },
     sitChance: 0.25,
     sitMs: { min: 3000, max: 7000 },

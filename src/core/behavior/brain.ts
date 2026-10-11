@@ -275,7 +275,7 @@ export class Brain {
           this.confused();
           return;
         }
-        this.vel = steer2d(this.pos, this.vel, this.pounceTarget(cursor), m.chaseSpeed * k, m.chaseAccel * k, dt, 80);
+        this.vel = this.steer(this.pounceTarget(cursor), m.chaseSpeed * k, m.chaseAccel * k, dt, 80);
         if (this.input.cursorStillMs >= this.config.reactions.pounceAfterStillMs) {
           this.state = { mode: 'react', reaction: 'pounce', target: this.pounceTarget(cursor), until: this.now + 900 };
         }
@@ -283,7 +283,7 @@ export class Brain {
       }
 
       case 'pounce':
-        this.vel = steer2d(this.pos, this.vel, s.target, m.pounceSpeed * k, m.chaseAccel * 1.6 * k, dt, 40);
+        this.vel = this.steer(s.target, m.pounceSpeed * k, m.chaseAccel * 1.6 * k, dt, 40);
         if ((dist(this.pos, s.target) < 4 && length(this.vel) < 30) || this.now >= s.until) this.confused();
         return;
 
@@ -298,7 +298,7 @@ export class Brain {
         return;
 
       case 'flee':
-        this.vel = steer2d(this.pos, this.vel, s.target, m.runSpeed * k, m.runAccel * k, dt, 50);
+        this.vel = this.steer(s.target, m.runSpeed * k, m.runAccel * k, dt, 50);
         if (dist(s.target, this.pos) < 4 && length(this.vel) < 10) {
           this.idle(1500, 3000);
           if (cursor) this.facing = cursor.x < this.pos.x ? -1 : 1;
@@ -310,7 +310,7 @@ export class Brain {
           const speed = s.phase === 'in' ? m.runSpeed : m.walkSpeed;
           const accel = s.phase === 'in' ? m.runAccel : m.accel;
           const target = { x: s.targetX, y: this.pos.y };
-          this.vel = steer2d(this.pos, this.vel, target, speed * k, accel * k, dt, 50);
+          this.vel = this.steer(target, speed * k, accel * k, dt, 50);
           if (Math.abs(s.targetX - this.pos.x) < 4 && length(this.vel) < 10) {
             if (s.phase === 'out') {
               this.idle(1000, 2500);
@@ -340,7 +340,7 @@ export class Brain {
         if (s.phase === 'approach') {
           // Head for the bottom edge, straight down from wherever he is.
           const target = { x: clamp(this.pos.x, this.area.minX, this.area.maxX), y: floor };
-          this.vel = steer2d(this.pos, this.vel, target, m.walkSpeed * 2 * k, m.accel * 2 * k, dt, 60);
+          this.vel = this.steer(target, m.walkSpeed * 2 * k, m.accel * 2 * k, dt, 60);
           if (dist(this.pos, target) < 3 && length(this.vel) < 8) s.phase = 'sink';
           return;
         }
@@ -403,6 +403,18 @@ export class Brain {
     }
     if (s.mode === 'react' && s.reaction === 'peek' && s.phase !== 'approach') return;
     if (Math.abs(this.vel.x) > 12) this.facing = this.vel.x < 0 ? -1 : 1;
+  }
+
+  /**
+   * Steers towards `target` with the speed and acceleration measured over the floor, so
+   * dashing up or down the screen (away from or towards you) is as quick as across it
+   * looks, rather than twice as quick.
+   */
+  private steer(target: Point, maxSpeed: number, accel: number, dt: number, slowRadius: number): Point {
+    const k = this.config.wander.floorDepth;
+    const flat = (p: Point) => ({ x: p.x, y: p.y / k });
+    const v = steer2d(flat(this.pos), flat(this.vel), flat(target), maxSpeed, accel, dt, slowRadius);
+    return { x: v.x, y: v.y * k };
   }
 
   private brake(dt: number): void {
@@ -477,7 +489,9 @@ export class Brain {
       y: (this.pos.y + to.y) / 2 + normal.y * bow,
     });
     const topSpeed = this.config.motion.walkSpeed * (1 + (this.random() * 2 - 1) * w.speedJitter) * this.speedScale;
-    const duration = (distance / (topSpeed / EASE_PEAK)) * 1000;
+    // Ground covered, not screen distance: up and down the screen is towards and away from you.
+    const ground = Math.hypot(to.x - this.pos.x, (to.y - this.pos.y) / w.floorDepth);
+    const duration = (ground / (topSpeed / EASE_PEAK)) * 1000;
     this.state = { mode: 'walk', from: { ...this.pos }, via, to, elapsed: 0, duration };
   }
 

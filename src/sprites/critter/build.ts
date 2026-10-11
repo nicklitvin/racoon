@@ -25,6 +25,11 @@ export interface Build {
   /** Limb radii from the top joint down to the paw: [top, middle joint, lower joint, paw]. */
   frontWidth: [number, number, number, number];
   backWidth: [number, number, number, number];
+  /**
+   * Sideways, from the middle of the body: where the legs hang from and where the paws fall
+   * (cats walk with their paws almost in a line), and the body's width as a fraction of its depth.
+   */
+  stance: { shoulder: number; hip: number; frontPaw: number; backPaw: number; girth: number };
   /** Paw size (half length, half height). */
   pawFront: [number, number];
   pawBack: [number, number];
@@ -50,6 +55,7 @@ export const CAT_BUILD: Build = {
   farOffset: -3.2,
   frontWidth: [5.2, 3.2, 2.15, 2],
   backWidth: [7.6, 3.6, 2.3, 2],
+  stance: { shoulder: 4.4, hip: 4.9, frontPaw: 3, backPaw: 3.5, girth: 0.95 },
   pawFront: [2.9, 2],
   pawBack: [3.2, 2.1],
   tail: { segments: 14, segment: 3.1, base: 3, tip: 2.2, root: { x: -7.5, y: -1.8 } },
@@ -102,6 +108,7 @@ export const RACCOON_BUILD: Build = {
   farOffset: -3,
   frontWidth: [4.8, 3, 2.4, 2.2],
   backWidth: [7.4, 3.8, 2.6, 2.3],
+  stance: { shoulder: 5.4, hip: 6.4, frontPaw: 4.4, backPaw: 5.2, girth: 1.1 },
   pawFront: [3.2, 1.9],
   pawBack: [3.6, 2],
   tail: { segments: 10, segment: 3.4, base: 5, tip: 4, root: { x: -8.5, y: -1.5 } },

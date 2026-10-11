@@ -1,5 +1,7 @@
 import type { Point } from '../../core/geometry';
-import type { LegName } from '../rig';
+
+/** The four legs: near is his right side, far his left. */
+export type LegName = 'frontNear' | 'frontFar' | 'backNear' | 'backFar';
 
 /**
  * A pose for the lifelike animals: plain numbers only, so any two poses can be eased into
@@ -18,12 +20,17 @@ export const POSE_KEYS = [
   'arch',
   /** 0..1 chest rise with each breath. */
   'breath',
-  /** Centre of the head, and its turn: pitch nods down, yaw turns towards you, roll tilts. */
+  /**
+   * Centre of the head, and its turn: pitch nods down, yaw turns the face towards you (as
+   * seen side-on: whichever way he's facing, 90 shows you his face), roll tilts.
+   */
   'hx',
   'hy',
   'hpitch',
   'hyaw',
   'hroll',
+  /** Extra turn of the head on the neck towards his own right side, degrees (looking at something). */
+  'hturn',
   // Paws: position and the lean of the hand or foot bone (degrees from upright, + = joint behind paw).
   'fnx',
   'fny',
@@ -37,6 +44,9 @@ export const POSE_KEYS = [
   'bfx',
   'bfy',
   'bfa',
+  /** Front and hind paws set wider apart than the shoulders and hips (sideways, each way). */
+  'fspread',
+  'bspread',
   /** Tail at rest: base direction (screen degrees, 180 = straight back), bend per segment, extra curl at the tip. */
   'tailA',
   'tailBend',
@@ -45,6 +55,8 @@ export const POSE_KEYS = [
   'tailKink',
   /** 0 floppy .. 1 held stiffly in its rest shape. */
   'tailStiff',
+  /** The tail curving round his near side (sitting, curled up), -1..1; also its sideways sway. */
+  'tailSide',
   /** Fur standing on end (fright), 0..1. */
   'puff',
   /** Ears: 0 upright, 1 pricked forward, -1 flat back. */
@@ -63,10 +75,8 @@ export const POSE_KEYS = [
   /** Shoulder blades riding up above the back as the front legs take weight. */
   'scapN',
   'scapF',
-  /** Whole body rotation about a pivot (being carried by the scruff). */
+  /** Whole body rotation about the scruff, screen degrees (being carried). */
   'rot',
-  'rotX',
-  'rotY',
   /** Vertical squash (< 1) and stretch (> 1) about the feet, for landings and leaps. */
   'squash',
 ] as const;

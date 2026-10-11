@@ -1,17 +1,11 @@
 import type { RaccoonType } from '../../shared/settings';
-import { createArenaRaccoon } from './arenaRaccoon';
-import { createBlackCat } from './blackCat';
-import { createCartoonRaccoon } from './cartoonRaccoon';
 import { CAT_BUILD, RACCOON_BUILD } from './critter/build';
 import { catAct } from './critter/catAct';
 import { createCritter } from './critter';
 import { raccoonAct } from './critter/raccoonAct';
-import { createSvgRaccoon } from './svgRaccoon';
 import type { RaccoonRenderer } from './types';
 
 export { ANIMATIONS } from './animations';
-export { poseFor } from './pose';
-export { createArenaRaccoon, createBlackCat, createCartoonRaccoon, createSvgRaccoon };
 export type { AnimationName, EyeStyle, RaccoonFrame, RaccoonRenderer } from './types';
 
 export type Species = 'raccoon' | 'cat';
@@ -28,9 +22,8 @@ const lifelikeCat = (look: string, label: string) => (doc: Document = document) 
 const lifelikeRaccoon = (look: string, label: string) => (doc: Document = document) =>
   createCritter(doc, RACCOON_BUILD, raccoonAct, look, label);
 
-/** Every pet the settings offer, with its label and renderer. */
+/** Every pet the settings offer, with its label and renderer. Retired ones are in ./archive. */
 export const RACCOON_STYLES: Record<RaccoonType, PetStyle> = {
-  arena: { species: 'raccoon', label: 'Arena (3D)', description: 'Seen from above like a strategy game, turning any way he goes.', create: (doc) => createArenaRaccoon(doc) },
   'raccoon-storybook': {
     species: 'raccoon',
     label: 'Storybook raccoon',
@@ -43,9 +36,6 @@ export const RACCOON_STYLES: Record<RaccoonType, PetStyle> = {
     description: 'A pen-and-ink drawing come to life.',
     create: lifelikeRaccoon('look-ink coat-raccoon-ink', 'raccoon'),
   },
-  cartoon: { species: 'raccoon', label: 'Cartoon', description: 'Round, chubby and bouncy.', create: (doc) => createCartoonRaccoon(doc) },
-  plush: { species: 'raccoon', label: 'Plush', description: 'A big-headed, big-eyed cuddly toy.', create: (doc) => createCartoonRaccoon(doc, 'plush') },
-  classic: { species: 'raccoon', label: 'Classic', description: 'The original, simpler raccoon.', create: createSvgRaccoon },
   'cat-storybook': {
     species: 'cat',
     label: 'Storybook tabby',
@@ -64,5 +54,4 @@ export const RACCOON_STYLES: Record<RaccoonType, PetStyle> = {
     description: 'A black silhouette with glowing eyes, all in the movement.',
     create: lifelikeCat('look-shadow coat-black', 'black cat'),
   },
-  cat: { species: 'cat', label: 'Cartoon black cat', description: 'A hand-drawn cartoon cat with smooth, springy moves.', create: (doc) => createBlackCat(doc) },
 };

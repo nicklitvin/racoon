@@ -2,6 +2,7 @@ import { RACCOON_BUILD as B } from './build';
 import { gaitFor, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
 import { bump, clamp01, easeOut, lerp, noise1, smoother, span, wave } from './kit';
 import { blankPose, setPaw, type Pose } from './pose';
+import { DEPTH } from './view';
 
 /**
  * How a real raccoon holds itself. Raccoons are built low in front and high at the hips,
@@ -59,6 +60,7 @@ function sitUp(): Pose {
   p.tailBend = 1;
   p.tailCurl = 6;
   p.tailStiff = 0.6;
+  p.tailSide = 0.35;
   return p;
 }
 
@@ -84,6 +86,7 @@ function curl(): Pose {
   p.tailBend = 0;
   p.tailCurl = -8;
   p.tailStiff = 0.8;
+  p.tailSide = 0.5;
   p.earN = -0.1;
   p.earF = -0.1;
   return p;
@@ -142,6 +145,9 @@ export function raccoonAct(input: ActInput): Act {
       p.hpitch = 14;
       p.hyaw = 24;
       p.tailA = 172 + wave(input.phase, 1, 0.2) * 5 * amp;
+      // The bushy tail swings from side to side with the waddle.
+      // Carried a little off to one side, so from behind you see its rings, not just its tip.
+      p.tailSide = 0.28 + wave(input.phase, 1, 0.3) * 0.2 * amp;
       p.tailStiff = 0.4;
       p.lookX = 0.2;
       alive(p, input, 0.5);
@@ -318,7 +324,7 @@ function pounce(input: ActInput): Act {
   return { pose: p, flags };
 }
 
-/** Peeking over the bottom edge: hands gripping it, nose and eyes just over the top. */
+/** Peeking at you over the bottom edge: hands gripping it either side of the face, nose and eyes over the top. */
 function peek(input: ActInput): Act {
   const { keystrokes, clock } = input;
   const flags = noFlags();
@@ -326,19 +332,22 @@ function peek(input: ActInput): Act {
   flags.pawUp = true;
   const p = stand();
   const edge = B.peekEdge;
-  p.px = -4;
-  p.py = -18;
-  p.sx = 3;
-  p.sy = -36;
+  const R = B.head.r;
+  p.px = -5;
+  p.py = -12;
+  p.sx = -1;
+  p.sy = -23;
   p.arch = 3;
-  p.hx = 6;
-  p.hy = edge - 13;
-  p.hpitch = 8;
-  p.hyaw = 80;
-  setPaw(p, 'frontNear', 11, edge - 1.4, 95);
-  setPaw(p, 'frontFar', 1, edge - 1.4, 95);
-  setPaw(p, 'backNear', -2, 0, 74);
-  setPaw(p, 'backFar', -5, 0, 74);
+  p.hx = 3;
+  p.hy = edge - R * 0.8 - 3 * DEPTH;
+  p.hpitch = 6;
+  p.hyaw = 90;
+  const pawA = 6;
+  p.fspread = 6;
+  setPaw(p, 'frontNear', pawA, edge - 0.3 - pawA * DEPTH, 95);
+  setPaw(p, 'frontFar', pawA, edge - 0.3 - pawA * DEPTH, 95);
+  setPaw(p, 'backNear', -3, 0, 74);
+  setPaw(p, 'backFar', -3, 0, 74);
   p.tailA = 165;
   p.tailBend = 0;
   breathe(p, clock, 3000, 0.5);
@@ -392,10 +401,7 @@ function dangle(input: ActInput): Act {
   const flags = noFlags();
   flags.noShadow = true;
   const p = stand();
-  const scruff = { x: 6, y: -54 };
   p.rot = swing;
-  p.rotX = scruff.x;
-  p.rotY = scruff.y;
   p.sx = 5;
   p.sy = -40;
   p.px = 0;

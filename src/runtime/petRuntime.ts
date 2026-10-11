@@ -25,6 +25,8 @@ export interface PetElements {
 const MAX_REST_MS = 250;
 /** Pointer travel that turns a press into a drag rather than a click. */
 const DRAG_THRESHOLD_PX = 4;
+/** Once lifted, how long he takes to slide round in your grip until you hold him by the scruff. */
+const SCRUFF_SETTLE_MS = 220;
 /**
  * Screen size (longer side, px) that activity thresholds are tuned for. Smaller screens,
  * like phones, get proportionally more sensitive so a finger swipe counts as "fast".
@@ -46,9 +48,13 @@ function specsFor(renderer: RaccoonRenderer): Record<AnimationName, AnimationSpe
 
 interface DragState {
   pointerId: number;
+  /** Where he was grabbed, from his feet. */
   offset: Point;
   start: Point;
+  pointer: Point;
   moved: boolean;
+  /** When he was lifted (the drag began). */
+  liftedAt: number;
 }
 
 /**
@@ -191,7 +197,7 @@ export class PetRuntime {
     this.els.pet.setPointerCapture(e.pointerId);
     const p = { x: e.clientX, y: e.clientY };
     const feet = this.snap.position;
-    this.drag = { pointerId: e.pointerId, offset: { x: p.x - feet.x, y: p.y - feet.y }, start: p, moved: false };
+    this.drag = { pointerId: e.pointerId, offset: { x: p.x - feet.x, y: p.y - feet.y }, start: p, pointer: p, moved: false, liftedAt: 0 };
     this.clickThrough.dragStarted();
   }
 
@@ -199,14 +205,34 @@ export class PetRuntime {
     const drag = this.drag;
     if (!drag || e.pointerId !== drag.pointerId) return;
     const p = { x: e.clientX, y: e.clientY };
+    drag.pointer = p;
     if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) >= DRAG_THRESHOLD_PX) {
       drag.moved = true;
+      drag.liftedAt = performance.now();
       this.brain.grab();
     }
     if (drag.moved) {
-      this.brain.dragTo({ x: p.x - drag.offset.x, y: p.y - drag.offset.y });
+      this.dragToPointer(performance.now());
       this.wake();
     }
+  }
+
+  /**
+   * Carries him with the pointer. Lifted, he's always held by the scruff: wherever you
+   * grabbed him, he slides round in your grip until the scruff is under the pointer, and
+   * stays held there as his body swings and settles beneath it.
+   */
+  private dragToPointer(now: number): void {
+    const drag = this.drag;
+    if (!drag?.moved) return;
+    const hold = this.renderer.holdPoint?.() ?? null;
+    let offset = drag.offset;
+    if (hold) {
+      const t = Math.min(1, (now - drag.liftedAt) / SCRUFF_SETTLE_MS);
+      const k = t * t * (3 - 2 * t);
+      offset = { x: drag.offset.x + (hold.x - drag.offset.x) * k, y: drag.offset.y + (hold.y - drag.offset.y) * k };
+    }
+    this.brain.dragTo({ x: drag.pointer.x - offset.x, y: drag.pointer.y - offset.y });
   }
 
   private onPointerUp(e: PointerEvent): void {
@@ -244,6 +270,8 @@ export class PetRuntime {
 
     this.cursorTracker.evaluate(now);
     this.typingTracker.evaluate(now);
+    // The scruff moves as he settles into hanging, even with the pointer still.
+    this.dragToPointer(now);
     const snap = this.brain.update(dt, this.worldInput(now));
     this.snap = snap;
     this.animator.play(snap.animation);

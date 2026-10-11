@@ -105,7 +105,9 @@ describe('Brain: wandering', () => {
         if (snap!.mode !== 'walk') break;
         walk.push(snap!);
       }
-      const speeds = walk.map(speed);
+      // Speed over the floor: up and down the screen is towards and away from you.
+      const { floorDepth } = DEFAULT_CONFIG.wander;
+      const speeds = walk.map((s) => Math.hypot(s.velocity.x, s.velocity.y / floorDepth));
       expect(speeds[0]).toBeLessThan(10);
       expect(speeds.at(-1)).toBeLessThan(10);
       peaks.push(Math.max(...speeds));

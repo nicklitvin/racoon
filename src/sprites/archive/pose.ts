@@ -1,6 +1,6 @@
-import { PEEK_SINK } from '../core/behavior/brain';
+import { PEEK_SINK } from '../../core/behavior/brain';
 import { plantedLeg, RIG, type Leg, type Pose } from './rig';
-import type { AnimationName } from './types';
+import type { AnimationName } from '../types';
 
 /**
  * Every animation as a pure function of time (and key presses, for peek): no DOM,

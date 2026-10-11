@@ -1,7 +1,7 @@
 import { poseFor } from './pose';
 import { legRoot, legRotation, RIG, type LegName } from './rig';
-import { n, PX_PER_UNIT, svgWriter } from './svg';
-import type { RaccoonFrame, RaccoonRenderer } from './types';
+import { n, PX_PER_UNIT, svgWriter } from '../svg';
+import type { RaccoonFrame, RaccoonRenderer } from '../types';
 
 /** Ring segments of the tail, root to tip, in tail coordinates (the tail points left and up). */
 const TAIL_RINGS: [x: number, y: number, r: number, cls: string][] = [

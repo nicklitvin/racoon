@@ -1,4 +1,4 @@
-import type { LegName } from '../rig';
+import type { LegName } from './pose';
 import { frac, lerp, smoother } from './kit';
 
 /**
@@ -48,7 +48,9 @@ export function step(gait: Gait, leg: LegName, phase: number, stride: number, ho
   const front = leg.startsWith('front');
   const i = front ? 0 : 1;
   const u = frac(phase - gait.offsets[leg]);
-  const sweep = gait.duty * stride * amp;
+  // The paw must travel back exactly as far as the body moves over it, whatever `amp` is,
+  // or it skates. `amp` only softens the lift.
+  const sweep = gait.duty * stride;
   const beta = gait.duty;
   // A paw out in front leans the bone back towards the body; as the body passes over it the
   // bone tilts forward, then rolls up onto the toes.

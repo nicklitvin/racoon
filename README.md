@@ -22,7 +22,7 @@ npm test           # unit tests
 
 | Action | How |
 | --- | --- |
-| Move the raccoon | Drag it |
+| Move the raccoon | Drag it: wherever you grab it, you end up holding it by the scruff |
 | Startle it | Click it |
 | Open settings | Double-click it, left-click the tray icon (Windows), or tray menu > Settings… |
 | Hide it for a while | Tray menu > uncheck *Show raccoon* |
@@ -72,9 +72,9 @@ src/                      The page (React). Runs in Electron and in a browser
   sprites/                The art
     types.ts              Animation names, timing specs and the RaccoonRenderer interface
     animations.ts         Timing for every animation (fps, length, loop, eyes)
-    rig.ts                The skeleton: joint positions and the kinematics poses use
-    pose.ts               Every animation as a pure function of time -> pose
-    svgRaccoon.ts         The SVG renderer: builds the drawing once, applies poses
+    index.ts              The pets the settings offer
+    critter/              The lifelike raccoon and cat: rig, gaits, poses, motion, drawing
+    archive/              Retired pets (3D arena, cartoon, plush, classic, cartoon cat)
   runtime/petRuntime.ts   Connects core logic to the DOM; runs the animation loop
   host/                   "Where am I running?": Electron bridge or browser fallback
   components/             React: the pet page and the settings panel
@@ -138,7 +138,20 @@ In the browser build, typing reactions are always on, since there's no system-wi
 
 ## Adding or changing animations
 
-The raccoon is inline SVG, drawn by `createSvgRaccoon()` in `src/sprites/svgRaccoon.ts`. It's built from simple shapes hung off a small skeleton (`src/sprites/rig.ts`): hip, shoulders, neck, tail root and four legs. An animation is a pure function from time to a `Pose` (body pitch and bounce, leg angles, head and tail angles, where the eyes look, ears, mouth) in `src/sprites/pose.ts`; the renderer turns a pose into SVG transforms. The drawing faces right and is mirrored when the raccoon faces left. Colours are CSS variables (`--r-fur`, `--r-dark`, ...) in `src/styles.css`.
+Every pet is the same rig in `src/sprites/critter/`, drawn as inline SVG:
+
+- `build.ts` holds each animal's proportions, stance and gaits.
+- `catAct.ts` and `raccoonAct.ts` give a pose for every animation, based on how the real animal holds itself. A pose is plain numbers: hips, shoulders, head, where each paw is, the tail's shape, ears, eyes and mouth. Legs are worked out from where the paws are, so a paw can stay planted.
+- `motion.ts` makes the movement continuous:
+  - Animations blend into each other.
+  - He faces the way he's going on the floor, including up and down the screen.
+  - Paws advance by the ground actually covered, so they never skate.
+  - The tail is a chain of springs.
+  - Carried, he hangs from the scruff and swings like a pendulum.
+  - Glances, ear flicks and blinks.
+  - The head turns on the neck to look at the pointer.
+- `view.ts` is the camera. The screen is a floor seen from a little above, so a step towards you shows lower on the screen. The brain uses the same idea (`wander.floorDepth`), so walking up or down the screen goes at the same pace on the floor as walking across it.
+- `skin.ts` draws the pose from any side. The body is a solid built from slices along the spine, drawn by its true outline. Legs hang from either side, and parts are layered by how near you they are. The head is a small 3D model.
 
 To add an animation:
 
@@ -151,25 +164,14 @@ To add an animation:
    - `loop: false` holds the final pose.
    - `eyes`: `'open'` (blinks now and then), `'closed'` or `'wide'`.
    - `driver: 'keystrokes'`: driven by key presses instead of time (used by `peek`).
-3. Add a `case` to `poseFor()` in `src/sprites/pose.ts`. Start from `standing()` or `sitting(t)` and change what moves. `plantedLeg()` sizes a leg so its paw just reaches the ground.
+3. Add a `case` to `catAct()` and `raccoonAct()`. Start from `stand()`, `sit()` or `curl()` and change what moves. Pose him facing right; when you see him from his other side, his left and right paws swap automatically.
 4. Pick it in `Brain.snapshot()` (`src/core/behavior/brain.ts`).
 
-TypeScript points out anything missing. `npm test` checks every pose for bad numbers, keeps it inside the drawing's box, and checks that standing and sitting paws stay on the ground.
+TypeScript points out anything missing. `tests/critter.test.ts` checks every animation for bad numbers, that planted paws never slide in any walking direction, that he faces the way he walks, peeks with his paws on the edge, and hangs below his scruff when carried.
 
-**Another art style:** behaviour code only ever names animations, and the page only talks to the `RaccoonRenderer` interface (`src/sprites/types.ts`). To swap the art, write another renderer and add it to `RACCOON_STYLES` in `src/sprites/index.ts`; nothing in `src/core` changes.
+The art styles are just CSS, the `look-*` and `coat-*` classes in `src/styles.css`.
 
-**The lifelike pets** (storybook, ink sketch and shadow) share one rig in `src/sprites/critter/`:
-- `catAct.ts` and `raccoonAct.ts` give a pose for every animation, based on how the real animal holds itself.
-- `build.ts` holds each animal's proportions and gaits.
-- `motion.ts` makes the movement continuous:
-  - Animations blend into each other.
-  - Paws are planted by the distance actually covered.
-  - The tail is a chain of springs.
-  - A pendulum swing while carried.
-  - Glances, ear flicks and blinks.
-- `skin.ts` draws the pose. Its head is a small 3D model projected onto the page, so it can turn to look at you.
-
-The art styles are just CSS, the `look-*` and `coat-*` classes in `src/styles.css`. `tests/critter.test.ts` checks that planted paws never slide.
+**Another art style:** behaviour code only ever names animations, and the page only talks to the `RaccoonRenderer` interface (`src/sprites/types.ts`). To swap the art, write another renderer and add it to `RACCOON_STYLES` in `src/sprites/index.ts`; nothing in `src/core` changes. The retired renderers in `src/sprites/archive/` still work: to bring one back, give it a type in `shared/settings.ts` and an entry in `RACCOON_STYLES`.
 
 ## Building and packaging
 

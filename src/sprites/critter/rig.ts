@@ -1,7 +1,7 @@
 import type { Point } from '../../core/geometry';
-import type { LegName } from '../rig';
+import type { LegName } from './pose';
 import type { Build } from './build';
-import { add, angleOf, DEG, dir, ik, rotate, scale, sub, unit } from './kit';
+import { add, angleOf, DEG, dir, ik, lerp, rotate, scale, sub, unit } from './kit';
 import { paw, type Pose } from './pose';
 
 /**
@@ -61,6 +61,8 @@ export function tailRest(build: Build, pose: Pose): number[] {
 export interface LegJoints {
   /** Where the leg hangs from: hip or shoulder (shifted for the far side). */
   root: Point;
+  /** Sideways position of each joint (out of the right side), root to paw. */
+  z: { root: number; mid: number; low: number; paw: number };
   /** Knee or elbow. */
   mid: Point;
   /** Hock or wrist. */
@@ -74,16 +76,31 @@ export function legJoints(build: Build, pose: Pose, leg: LegName): LegJoints {
   const front = leg.startsWith('front');
   const far = leg.endsWith('Far');
   const frame = spineFrame(pose);
-  const base = front ? frame.s : frame.p;
-  // The far shoulder and hip sit a touch higher and behind, as seen in perspective.
-  const root = far ? add(base, add(scale(frame.along, build.farOffset * 0.6), scale(frame.up, 0.8))) : base;
+  const root = front ? frame.s : frame.p;
   const [upper, lower, end] = front ? build.front : build.back;
   const p = paw(pose, leg);
   // The hand or foot bone runs from the paw up to the wrist or hock at the given lean.
   const low = add(p, scale(dir(-90 - p.a), end));
   // Elbows point back, knees point forward.
   const mid = ik(root, low, upper, lower, front ? 1 : -1);
-  return { root, mid, low, paw: p, lean: p.a };
+  const side = far ? -1 : 1;
+  const { stance } = build;
+  const rootZ = side * (front ? stance.shoulder : stance.hip);
+  const pawZ = side * ((front ? stance.frontPaw : stance.backPaw) + (front ? pose.fspread : pose.bspread));
+  const z = { root: rootZ, mid: lerp(rootZ, pawZ, 0.55), low: lerp(rootZ, pawZ, 0.9), paw: pawZ };
+  return { root, z, mid, low, paw: p, lean: p.a };
+}
+
+/**
+ * The scruff: the loose skin at the back of the neck, between the shoulders and the back
+ * of the skull. Where a mother cat carries a kitten, and where he's held when picked up.
+ */
+export function scruffAt(build: Build, pose: Pose): Point {
+  const frame = spineFrame(pose);
+  const shoulderTop = bodyAt(frame, pose, frame.length + 1, 7);
+  const R = build.head.r;
+  const headBack = { x: pose.hx - R * 0.75, y: pose.hy - R * 0.35 };
+  return { x: lerp(shoulderTop.x, headBack.x, 0.45), y: lerp(shoulderTop.y, headBack.y, 0.45) };
 }
 
 export const radians = (deg: number) => deg * DEG;

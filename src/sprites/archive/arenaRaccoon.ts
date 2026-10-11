@@ -1,8 +1,8 @@
-import { ANIMATIONS } from './animations';
+import { ANIMATIONS } from '../animations';
 import { poseFor } from './pose';
 import { RIG, toWorld, type LegName, type Pose } from './rig';
-import { n, PX_PER_UNIT, svgWriter } from './svg';
-import type { RaccoonFrame, RaccoonRenderer } from './types';
+import { n, PX_PER_UNIT, svgWriter } from '../svg';
+import type { RaccoonFrame, RaccoonRenderer } from '../types';
 
 /**
  * The "arena" raccoon: a chunky toy seen from above at an angle, like the units in
