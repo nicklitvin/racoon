@@ -1,7 +1,8 @@
 // User settings, shared by the Electron main process (which stores them) and the renderer.
 
 /**
- * The pets to choose from: raccoons, cats, foxes and otters in a few art styles. The first
+ * The pets to choose from: raccoons, cats, foxes and otters in a few art styles, and 2D
+ * chibi versions of each. The first
  * one is the default. Retired types (arena, cartoon, plush, classic, cat) fall back to it.
  */
 export const RACCOON_TYPES = [
@@ -15,6 +16,11 @@ export const RACCOON_TYPES = [
   'fox-sketch',
   'otter-storybook',
   'otter-sketch',
+  'raccoon-chibi',
+  'cat-chibi',
+  'cat-chibi-tuxedo',
+  'fox-chibi',
+  'otter-chibi',
 ] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 

@@ -759,13 +759,21 @@ export class Motion {
       }
       points.push({
         x: prev.x + d.x * spec.segment,
-        // Kept off the floor; in water, it floats up to the surface, unless he's diving.
-        y: flags.noShadow ? y : this.build.swims ? Math.min(y, Math.max(lerp(root.y, -0.3 * lerp(spec.base, spec.tip, i / count), Math.min(1, (i + 1) / 3)), root.y - 4)) : Math.min(y, floor),
+        // Kept off the floor; in water, it floats just under the surface, unless he's diving,
+        // and lies along it rather than standing up out of it.
+        y: flags.noShadow ? y : this.build.swims ? this.floatTail(y, root.y, lerp(spec.base, spec.tip, i / count), i) : Math.min(y, floor),
         z: this.tailSides[i]! * reach * ((i + 1) / count) ** 1.4,
       });
     }
     this.tail = points;
     this.tailMotion = motion / 60;
+  }
+
+  /** Where a swimmer's tail point at `y` floats: its top just at the surface. */
+  private floatTail(y: number, rootY: number, r: number, i: number): number {
+    const level = lerp(rootY, 0.45 * r, Math.min(1, (i + 1) / 3));
+    const deepest = Math.max(level, rootY - 4);
+    return rootY > -3 ? clamp(y, Math.min(level, deepest) - 1.2, deepest) : Math.min(y, deepest);
   }
 
   private blinkAmount(): number {

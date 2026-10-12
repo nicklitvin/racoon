@@ -34,11 +34,12 @@ interface TypePickerProps {
   onChange: (value: RaccoonType) => void;
 }
 
-const GROUPS: { species: Species; title: string }[] = [
-  { species: 'raccoon', title: 'Raccoons' },
-  { species: 'cat', title: 'Cats' },
-  { species: 'fox', title: 'Foxes' },
-  { species: 'otter', title: 'Otters' },
+const GROUPS: { group: Species | 'chibi'; title: string }[] = [
+  { group: 'raccoon', title: 'Raccoons' },
+  { group: 'cat', title: 'Cats' },
+  { group: 'fox', title: 'Foxes' },
+  { group: 'otter', title: 'Otters' },
+  { group: 'chibi', title: 'Chibi' },
 ];
 
 /** A small still of the pet, drawn once. */
@@ -63,11 +64,11 @@ function TypePicker({ value, onChange }: TypePickerProps) {
   return (
     <fieldset className="field type-picker">
       <legend>Pet</legend>
-      {GROUPS.map(({ species, title }) => (
-        <div key={species} className="type-group">
+      {GROUPS.map(({ group, title }) => (
+        <div key={group} className="type-group">
           <h2 className="type-group-title">{title}</h2>
           <div className="type-grid">
-            {RACCOON_TYPES.filter((type) => RACCOON_STYLES[type].species === species).map((type) => {
+            {RACCOON_TYPES.filter((type) => (RACCOON_STYLES[type].group ?? RACCOON_STYLES[type].species) === group).map((type) => {
               const style = RACCOON_STYLES[type];
               return (
                 <label key={type} className={type === value ? 'type-option selected' : 'type-option'} title={style.description}>

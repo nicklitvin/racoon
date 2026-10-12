@@ -10,6 +10,15 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-12',
+    title: 'Chibi pets, and better water',
+    changes: [
+      'Chibi pets: flat 2D cartoon versions of the raccoon, a ginger and a tuxedo cat, the fox and the otter. They have big heads, bean bodies and stubby legs, flip round when they turn, and have little z’s, hearts and question marks floating over them. The chibi otter paddles about in its own little pond and floats on its back holding a shell.',
+      'The otter’s water now looks like water: a proper pool round it, with whatever’s under the surface seen through it, instead of a grey ghost of its body.',
+      'The otter’s tail lies along the surface instead of sticking up out of the water, and follows it round when it dives.',
+    ],
+  },
+  {
     date: '2026-10-11',
     title: 'A fox and an otter',
     changes: [

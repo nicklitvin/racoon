@@ -219,8 +219,10 @@ function porpoise(t: number): Pose {
   const hp = onBody(centre, pitch, -length / 2 - 6, -2.5);
   setPaw(p, 'backNear', hp.x, hp.y, 120 - pitch);
   setPaw(p, 'backFar', hp.x + B.farOffset, hp.y + 0.6, 120 - pitch);
-  p.tailA = 178;
-  p.tailStiff = 0.6;
+  // The tail follows the body round its arc, after it into the water.
+  p.tailA = lerp(176, 138, smooth(u));
+  p.tailBend = 0.4;
+  p.tailStiff = 0.55;
   p.earN = -0.7;
   p.earF = -0.7;
   p.lids = -0.2;

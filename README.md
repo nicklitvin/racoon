@@ -4,6 +4,8 @@ A raccoon that lives on your screen. It wanders all over your screen, sits down 
 
 You don't have to have a raccoon: the settings also offer cats, foxes and an otter, each in a few art styles. The otter swims about your screen instead of walking, in its own little patch of water: it paddles along with its head up, porpoises when it's excited, treads water to look about and floats on its back to rest.
 
+There are also 2D chibi versions of each (raccoon, ginger and tuxedo cats, fox, otter): flat cartoon pets with big heads, bean bodies and stubby legs, who bounce about with little floating hearts, z's and question marks. The chibi otter paddles about in its own little pond and floats on its back holding a shell.
+
 It runs two ways from one codebase:
 
 - **Desktop** (Electron + React + TypeScript): a transparent, click-through overlay above all your windows. Built for Windows first; everything OS-specific is behind one adapter, and the macOS adapter is already written.
@@ -76,6 +78,7 @@ src/                      The page (React). Runs in Electron and in a browser
     animations.ts         Timing for every animation (fps, length, loop, eyes)
     index.ts              The pets the settings offer
     critter/              The lifelike raccoon, cat, fox and otter: rig, gaits, poses, motion, drawing
+    chibi/                The flat 2D chibi pets: builds, poses and drawing
     archive/              Retired pets (3D arena, cartoon, plush, classic, cartoon cat)
   runtime/petRuntime.ts   Connects core logic to the DOM; runs the animation loop
   host/                   "Where am I running?": Electron bridge or browser fallback
@@ -157,7 +160,7 @@ Every pet is the same rig in `src/sprites/critter/`, drawn as inline SVG:
   - Glances, ear flicks and blinks.
   - The head turns on the neck to look at the pointer. The eyes keep up with it; the head holds still through small movements and swings after bigger ones a beat behind.
 - `view.ts` is the camera. The screen is a floor seen from a little above, so a step towards you shows lower on the screen. The brain uses the same idea (`wander.floorDepth`), so walking up or down the screen goes at the same pace on the floor as walking across it.
-- `skin.ts` draws the pose from any side. The body is a solid built from slices along the spine, drawn by its true outline. Legs hang from either side, and parts are layered by how near you they are. The head is a small 3D model; each species' face, ears and eyes are in small tables at the end of the file. For a swimmer, it also draws the water: a pool, spreading rings and a wake. A mask, cut wherever the animal is out of the water, fades whatever is below the surface into it.
+- `skin.ts` draws the pose from any side. The body is a solid built from slices along the spine, drawn by its true outline. Legs hang from either side, and parts are layered by how near you they are. The head is a small 3D model; each species' face, ears and eyes are in small tables at the end of the file. For a swimmer, it also draws the water, laid over the animal: a pool sized to reach round everything under the surface (and what shows through it from deep down), spreading rings and a wake. Whatever is out of the water is cut out of the pool along the animal's own outline, so what's under the surface is seen through the water.
 
 To add an animation:
 
@@ -176,6 +179,15 @@ To add an animation:
 TypeScript points out anything missing. `tests/critter.test.ts` checks every animation for bad numbers, that planted paws never slide in any walking direction, that he faces the way he walks, peeks with his paws on the edge, and hangs below his scruff when carried. For the otter it checks that it swims at the surface with its paws below it, floats on its back to rest, and porpoises clear of the water.
 
 The art styles are just CSS, the `look-*` and `coat-*` classes in `src/styles.css`.
+
+**The chibis** (`src/sprites/chibi/`) are a separate, simpler renderer: flat side-on shapes rather than the 3D rig.
+
+- `species.ts` holds each one's proportions: body, head, where the legs join, tail shape and stride.
+- `pose.ts` gives a pose for every animation in plain numbers (body, head, paws, tail, ears, eyes, mouth, and floating marks like z's and hearts). The otter has its own set: swimming, treading water, floating on its back and porpoising.
+- `index.ts` keeps them moving: the stride advances by the ground covered, animations blend into each other, and turning round it flips through side-on.
+- `draw.ts` draws the pose with bold outlines; coats are the `chibi-coat-*` classes in `src/styles.css`.
+
+To add an animation for them too, add a `case` to `walkerPose()` and `otterPose()` in `chibi/pose.ts`. `tests/chibi.test.ts` checks every animation for bad numbers, that it stays in its box, its paws stay planted and step in diagonal pairs, it turns to face the way it goes, peeks over the edge, hangs from its scruff, and that the otter swims, floats on its back and porpoises.
 
 **Another art style:** behaviour code only ever names animations, and the page only talks to the `RaccoonRenderer` interface (`src/sprites/types.ts`). To swap the art, write another renderer and add it to `RACCOON_STYLES` in `src/sprites/index.ts`; nothing in `src/core` changes. The retired renderers in `src/sprites/archive/` still work: to bring one back, give it a type in `shared/settings.ts` and an entry in `RACCOON_STYLES`.
 

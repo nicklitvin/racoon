@@ -449,8 +449,9 @@ html[data-host='web'][data-theme='dark'] {
   --k-whisker: var(--k-line);
   --k-halo: rgba(255, 255, 255, 0.8);
   /* Water, for swimmers: the pool, the rings and wake on it, and foam where it meets fur. */
-  --k-water: #86c1e0;
-  --k-ripple: #6fb0d6;
+  --k-water: #6eb4dc;
+  --k-deep: #3f8dbf;
+  --k-ripple: #e9f6fd;
   --k-foam: #f4fbff;
   filter: drop-shadow(0 0 1.1px var(--k-halo));
 }
@@ -513,6 +514,18 @@ html[data-host='web'][data-theme='dark'] {
   stop-color: var(--k-water);
 }
 
+.critter .k-pool-deep {
+  stop-color: var(--k-deep);
+}
+
+.critter .k-glint {
+  fill: none;
+  stroke: var(--k-foam);
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+
 .critter .k-ripple,
 .critter .k-wake {
   fill: none;
@@ -529,10 +542,10 @@ html[data-host='web'][data-theme='dark'] {
 .critter .k-bow {
   fill: none;
   stroke: var(--k-foam);
-  stroke-width: 0.8;
+  stroke-width: 0.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.9;
+  opacity: 0.75;
 }
 
 .critter .k-backfur {
@@ -680,8 +693,9 @@ html[data-host='web'][data-theme='dark'] {
   --k-iris: #24201f;
   --k-pupil: #24201f;
   --k-halo: transparent;
-  --k-water: #dfe7ea;
-  --k-ripple: #24201f;
+  --k-water: #f3f1ea;
+  --k-deep: #e4e8e8;
+  --k-ripple: #a29d97;
   --k-foam: #24201f;
 }
 
@@ -1215,4 +1229,290 @@ html[data-view='settings'] .settings {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* --- Chibi pets: flat 2D, bold outlines, big heads. --- */
+.chibi {
+  --c-fur: #9a9ca6;
+  --c-far: #7c7e88;
+  --c-light: #f6f3ec;
+  --c-belly: #c9cbd1;
+  --c-dark: #34343c;
+  --c-band: #3c3c45;
+  --c-line: #2b2630;
+  --c-inner: #f2a9b4;
+  --c-nose: #2b2630;
+  --c-blush: #ff8fa6;
+  --c-eye: #231f26;
+  --c-mouth: #7a2f3a;
+  --c-tongue: #ff9aae;
+  --c-water: #74c0ea;
+  --c-water-front: #5aafe0;
+  --c-foam: #f4fbff;
+  filter: drop-shadow(0 0 1.2px var(--halo));
+}
+
+.chibi .c-shadow {
+  fill: var(--r-shadow);
+}
+
+.chibi .c-fur,
+.chibi .c-limb {
+  fill: var(--c-fur);
+  stroke: none;
+}
+
+.chibi .c-far .c-limb,
+.chibi .c-far-limb {
+  stroke: var(--c-far);
+}
+
+.chibi .c-limb {
+  fill: none;
+  stroke: var(--c-fur);
+  stroke-linecap: round;
+}
+
+.chibi .c-limb-edge {
+  fill: none;
+  stroke: var(--c-line);
+  stroke-linecap: round;
+}
+
+.chibi .c-sock {
+  stroke: var(--c-dark);
+}
+
+.chibi .c-line,
+.chibi .c-outline {
+  stroke: var(--c-line);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.chibi .c-outline,
+.chibi .c-tail .c-line {
+  fill: none;
+}
+
+.chibi .c-line-soft {
+  stroke: var(--c-line);
+  stroke-width: 0.6;
+  stroke-opacity: 0.4;
+}
+
+.chibi .c-light {
+  fill: var(--c-light);
+}
+
+.chibi .c-belly {
+  fill: var(--c-belly);
+}
+
+.chibi .c-chest {
+  fill: var(--c-light);
+}
+
+.chibi .c-band,
+.chibi .c-mask,
+.chibi .c-tip-dark {
+  fill: var(--c-band);
+}
+
+.chibi .c-tip {
+  fill: var(--c-light);
+}
+
+.chibi .c-stripe {
+  fill: none;
+  stroke: var(--c-band);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.chibi .c-ear-far .c-fur {
+  fill: var(--c-far);
+}
+
+.chibi .c-ear-inner {
+  fill: var(--c-inner);
+}
+
+.chibi .c-eye,
+.chibi .c-nose {
+  fill: var(--c-eye);
+}
+
+.chibi .c-nose {
+  fill: var(--c-nose);
+}
+
+.chibi .c-eye-white {
+  fill: #fff;
+  stroke: var(--c-line);
+  stroke-width: 0.7;
+}
+
+.chibi .c-glint {
+  fill: #fff;
+}
+
+.chibi .c-lid,
+.chibi .c-mouth-line {
+  fill: none;
+  stroke: var(--c-line);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chibi .c-mouth {
+  fill: var(--c-mouth);
+}
+
+.chibi .c-tongue {
+  fill: var(--c-tongue);
+}
+
+.chibi .c-blush {
+  fill: var(--c-blush);
+}
+
+.chibi .c-whisker {
+  fill: none;
+  stroke: var(--c-line);
+  stroke-width: 0.5;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.chibi .c-shell-fill {
+  fill: #ffd9c4;
+}
+
+.chibi .c-shell-ribs {
+  fill: none;
+  stroke: #d99a84;
+  stroke-width: 0.6;
+  stroke-linecap: round;
+}
+
+.chibi .c-water {
+  fill: var(--c-water);
+  stroke: var(--c-foam);
+  stroke-width: 0.8;
+}
+
+.chibi .c-water-front {
+  fill: var(--c-water-front);
+  fill-opacity: 0.86;
+  stroke: none;
+}
+
+.chibi .c-crest,
+.chibi .c-ripple,
+.chibi .c-wake {
+  fill: none;
+  stroke: var(--c-foam);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.chibi .c-ripple {
+  stroke-width: 0.7;
+}
+
+.chibi .c-drop {
+  fill: var(--c-foam);
+  stroke: var(--c-water-front);
+  stroke-width: 0.4;
+}
+
+.chibi .c-mark {
+  font: 700 9px 'Comic Sans MS', 'Chalkboard SE', 'Segoe Print', sans-serif;
+  fill: var(--c-line);
+  stroke: #fff;
+  stroke-width: 1.4;
+  paint-order: stroke;
+}
+
+.chibi .c-alarm {
+  font-size: 13px;
+  fill: #e0483e;
+}
+
+.chibi .c-puzzled {
+  font-size: 12px;
+  fill: #4f7ed6;
+}
+
+.chibi .c-heart {
+  fill: #ff6f8e;
+  stroke: #fff;
+  stroke-width: 0.8;
+  paint-order: stroke;
+}
+
+.chibi-coat-raccoon {
+  --c-fur: #9a9ca6;
+  --c-far: #7a7c86;
+  --c-belly: #c4c6cd;
+  --c-band: #34343c;
+  --c-inner: #4a4650;
+}
+
+.chibi-coat-ginger {
+  --c-fur: #f3a04e;
+  --c-far: #d9853a;
+  --c-belly: #fbe3c2;
+  --c-band: #d2702a;
+  --c-light: #fdf3e3;
+  --c-nose: #e9798d;
+}
+
+.chibi-coat-tuxedo {
+  --c-fur: #2f2d35;
+  --c-far: #1f1d24;
+  --c-belly: #f7f5f0;
+  --c-band: #2f2d35;
+  --c-light: #f7f5f0;
+  --c-line: #141217;
+  --c-nose: #f08da0;
+}
+
+/* A tuxedo cat's white shirt front and socks. */
+.chibi-coat-tuxedo .c-belly {
+  fill: var(--c-light);
+}
+
+.chibi-coat-tuxedo .c-band {
+  fill: none;
+}
+
+.chibi-coat-tuxedo .c-stripe {
+  stroke: none;
+}
+
+.chibi-coat-tuxedo .c-ear-far .c-fur {
+  fill: #19171d;
+}
+
+.chibi-coat-fox {
+  --c-fur: #f08a3c;
+  --c-far: #d1702a;
+  --c-belly: #fbe8d6;
+  --c-band: #2b2630;
+  --c-light: #fdf8f2;
+  --c-dark: #3a2b2a;
+  --c-inner: #fbe8d6;
+}
+
+.chibi-coat-otter {
+  --c-fur: #9a6a45;
+  --c-far: #7e5434;
+  --c-belly: #d9bc98;
+  --c-light: #ecd9bf;
+  --c-band: #6e4a2f;
+  --c-inner: #6e4a2f;
+  --c-nose: #3a2620;
 }

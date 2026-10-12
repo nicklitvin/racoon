@@ -89,31 +89,43 @@ export function createSkin(doc: Document, build: Build, className: string, label
   const fox = species === 'fox';
   // Cats and foxes share almond eyes with slit pupils, and the cat's poses.
   const catlike = cat || fox;
+  const figure = make('g', { class: 'raccoon-figure', id: `${id}-figure` }, svg);
   const water = build.swims ? makeWater() : null;
-  const figure = make('g', { class: 'raccoon-figure' }, svg);
   const surface = water ? make('g', { class: 'k-surface' }, svg) : null;
   const waterline = surface ? make('path', { class: 'k-waterline' }, surface) : null;
   const bow = surface ? make('path', { class: 'k-bow' }, surface) : null;
 
   /**
-   * A swimmer's own little patch of water, under it: a soft pool, rings spreading out from
-   * it, and a wake behind as it goes. Whatever of the animal is under the surface is drawn
-   * faded into the water, by a mask with the parts above the surface cut out of it.
+   * A swimmer's own little pond, laid over it: a pool of water, rings spreading out across
+   * it, and a wake behind as it goes. Whatever of the animal is out of the water is cut out
+   * of all that, so what's under the surface is seen through the water, the way it is in a
+   * real pond; and further off, where the pool fades out, it fades out with it.
    */
   function makeWater() {
-    const group = make('g', { class: 'k-pond' }, svg);
+    const box = { maskUnits: 'userSpaceOnUse', x: -400, y: -400, width: 800, height: 800 };
+    const group = make('g', { class: 'k-pond', mask: `url(#${id}-wet)` }, svg);
     const gradient = make('radialGradient', { id: `${id}-pool` }, defs);
-    make('stop', { offset: '0', class: 'k-pool-stop', 'stop-opacity': '0.5' }, gradient);
-    make('stop', { offset: '0.55', class: 'k-pool-stop', 'stop-opacity': '0.3' }, gradient);
+    make('stop', { offset: '0', class: 'k-pool-deep', 'stop-opacity': '0.72' }, gradient);
+    make('stop', { offset: '0.62', class: 'k-pool-stop', 'stop-opacity': '0.62' }, gradient);
+    make('stop', { offset: '0.86', class: 'k-pool-stop', 'stop-opacity': '0.4' }, gradient);
     make('stop', { offset: '1', class: 'k-pool-stop', 'stop-opacity': '0' }, gradient);
     const pool = make('ellipse', { class: 'k-pool', fill: `url(#${id}-pool)` }, group);
+    const glints = make('path', { class: 'k-glint' }, group);
     const ripples = [0, 1, 2].map(() => make('ellipse', { class: 'k-ripple' }, group));
     const wake = make('path', { class: 'k-wake' }, group);
-    const mask = make('mask', { id: `${id}-sea`, maskUnits: 'userSpaceOnUse', x: -400, y: -400, width: 800, height: 800 }, defs);
-    // Grey shows what's under the water faintly; white is what's out of it.
-    make('rect', { x: -400, y: -400, width: 800, height: 800, fill: '#5c5c5c' }, mask);
-    const above = make('path', { fill: '#fff', stroke: '#fff', 'stroke-width': 2.4, 'stroke-linejoin': 'round' }, mask);
-    return { group, pool, ripples, wake, above };
+    // The water: everywhere but what's out of it, cut round the animal's own outline.
+    const up = make('mask', { id: `${id}-up`, ...box }, defs);
+    const dry = make('path', { fill: '#fff', stroke: '#fff', 'stroke-width': 2.4, 'stroke-linejoin': 'round' }, up);
+    const black = make('filter', { id: `${id}-black` }, defs);
+    make('feColorMatrix', { type: 'matrix', values: '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0' }, black);
+    const wet = make('mask', { id: `${id}-wet`, ...box }, defs);
+    make('rect', { x: -400, y: -400, width: 800, height: 800, fill: '#fff' }, wet);
+    make('use', { href: `#${id}-figure`, filter: `url(#${id}-black)`, mask: `url(#${id}-up)` }, wet);
+    // The animal: all of what's out of the water, less of what's under it.
+    const sea = make('mask', { id: `${id}-sea`, ...box }, defs);
+    make('rect', { x: -400, y: -400, width: 800, height: 800, fill: '#9a9a9a' }, sea);
+    const above = make('path', { fill: '#fff', stroke: '#fff', 'stroke-width': 2.4, 'stroke-linejoin': 'round' }, sea);
+    return { group, pool, glints, ripples, wake, above, dry };
   }
 
   const union = (name: string, parent: Element): Union => {
@@ -1099,7 +1111,38 @@ export function createSkin(doc: Document, build: Build, className: string, label
       set(el, 'ry', n(e.ry));
       set(el, 'transform', `rotate(${n(e.angle)} ${n(e.cx + dx)} ${n(e.cy + dy)})`);
     };
-    place(water.pool, onWater(mid, 0, half + 16, across + 12));
+    // The pool reaches round everything under the water, and a little way beyond.
+    let lo = mid - half;
+    let hi = mid + half;
+    let near = across;
+    let far = -across;
+    const under = (a0: number, y: number, z0: number, r = 0) => {
+      if (y < -r) return;
+      // Seen through the surface, a thing deep down shows nearer you on it.
+      const seen = Math.max(0, y) / DEPTH;
+      const a = a0 + view.s * seen;
+      const z = z0 + view.c * seen;
+      lo = Math.min(lo, a - r);
+      hi = Math.max(hi, a + r);
+      near = Math.max(near, z + r);
+      far = Math.min(far, z - r);
+    };
+    for (const sec of torso?.sections ?? []) under(sec.p.x, sec.p.y + sec.hh, 0, sec.w);
+    for (const pt of shown.tail) under(pt.x, pt.y, pt.z, 2);
+    for (const leg of LEGS) {
+      const j = legJoints(build, pose, leg);
+      under(j.paw.x, j.paw.y, j.z.paw, 2);
+      under(j.low.x, j.low.y, j.z.low, 2);
+    }
+    under(pose.hx, pose.hy + R, shown.head.z, R);
+    const poolAt = (lo + hi) / 2;
+    const poolHalf = (hi - lo) / 2 * 1.08 + 9;
+    const poolZ = (near + far) / 2;
+    const poolSide = ((near - far) / 2) * 1.25 + 8;
+    place(water.pool, onWater(poolAt, poolZ, poolHalf, poolSide));
+    // A couple of glints of sky on the water, off to the far side.
+    const glint = (a: number, z: number, len: number) => `M${fmt(view.at(a - len, 0, z))}Q${fmt(view.at(a, 0, z - 0.6))} ${fmt(view.at(a + len, 0, z))}`;
+    set(water.glints, 'd', glint(poolAt - poolHalf * 0.35, poolZ - poolSide * 0.62, poolHalf * 0.16) + glint(poolAt + poolHalf * 0.3, poolZ - poolSide * 0.5, poolHalf * 0.09));
 
     // Rings spread out from where he was a moment ago, and fade as they go.
     const speed = Math.hypot(drift.x, drift.y);
@@ -1107,7 +1150,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
     water.ripples.forEach((ring, i) => {
       const age = (clock / 1000 / period + i / water.ripples.length) % 1;
       const grow = age * period * 7;
-      const e = onWater(mid, 0, half + 3 + grow, across + 1 + grow);
+      const e = onWater(poolAt, poolZ, poolHalf * 0.7 + grow, poolSide * 0.7 + grow);
       place(ring, e, -drift.x * age * period, -drift.y * age * period * DEPTH);
       // Left far behind at speed, they're lost in his wake.
       const behind = clamp01(1 - (age * period * speed) / 90);
@@ -1176,7 +1219,8 @@ export function createSkin(doc: Document, build: Build, className: string, label
         if (a.y >= 0 || b.y >= 0) {
           const k = a.y / (a.y - b.y);
           const cross = { x: lerp(a.x, b.x, k), y: 0, z: lerp(a.z, b.z, k) };
-          if (ring) line += ring(cross.x, cross.z, lerp(ra, rb, k) + 0.5);
+          // The top of a leg breaks the surface inside the body, out of sight.
+          if (ring && i > 0) line += ring(cross.x, cross.z, lerp(ra, rb, k) + 0.5);
           if (a.y >= 0) a = cross;
           else b = cross;
         }
@@ -1208,7 +1252,8 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const headAt = { x: pose.hx, y: pose.hy, z: shown.head.z };
     const r0 = NECK[species];
     limb([{ ...neckBase, z: 0 }, { x: lerp(neckBase.x, headAt.x, 0.5), y: lerp(neckBase.y, headAt.y, 0.5), z: headAt.z * 0.6 }, headAt], [r0, r0 * 0.9, R * 0.75], null);
-    limb(shown.tail, tailRadii(shown.tail.length, pose), ring);
+    // The tail lies along the surface: no rings where it dips in and out.
+    limb(shown.tail, tailRadii(shown.tail.length, pose), null);
 
     // The head, with its ears and muzzle: whatever of a ball round it is above the water.
     const ball: Point[] = [];
@@ -1235,6 +1280,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
     if (ball.length > 2) shape(hull(ball));
 
     set(water.above, 'd', above);
+    set(water.dry, 'd', above);
     set(waterline, 'd', line);
   }
 

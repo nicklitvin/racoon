@@ -1,6 +1,8 @@
 import type { RaccoonType } from '../../shared/settings';
 import { CAT_BUILD, FOX_BUILD, OTTER_BUILD, RACCOON_BUILD } from './critter/build';
 import { catAct } from './critter/catAct';
+import { createChibi } from './chibi';
+import { CHIBI_CAT, CHIBI_FOX, CHIBI_OTTER, CHIBI_RACCOON, type ChibiBuild } from './chibi/species';
 import { createCritter } from './critter';
 import { foxAct } from './critter/foxAct';
 import { otterAct } from './critter/otterAct';
@@ -17,6 +19,8 @@ export interface PetStyle {
   label: string;
   description: string;
   species: Species;
+  /** The settings list them by species, except the chibis, which have a group of their own. */
+  group?: 'chibi';
   create: (doc?: Document) => RaccoonRenderer;
 }
 
@@ -27,6 +31,7 @@ const lifelikeRaccoon = (look: string, label: string) => (doc: Document = docume
 const lifelikeFox = (look: string, label: string) => (doc: Document = document) => createCritter(doc, FOX_BUILD, foxAct, look, label);
 const lifelikeOtter = (look: string, label: string) => (doc: Document = document) =>
   createCritter(doc, OTTER_BUILD, otterAct, look, label);
+const chibi = (build: ChibiBuild, coat: string, label: string) => (doc: Document = document) => createChibi(doc, build, coat, label);
 
 /** Every pet the settings offer, with its label and renderer. Retired ones are in ./archive. */
 export const RACCOON_STYLES: Record<RaccoonType, PetStyle> = {
@@ -89,5 +94,40 @@ export const RACCOON_STYLES: Record<RaccoonType, PetStyle> = {
     label: 'Ink sketch otter',
     description: 'An otter in pen and ink, paddling through its own little pond.',
     create: lifelikeOtter('look-ink coat-otter-ink', 'otter'),
+  },
+  'raccoon-chibi': {
+    species: 'raccoon',
+    group: 'chibi',
+    label: 'Chibi raccoon',
+    description: 'A round little bandit with a big head, tiny paws and a stripy tail.',
+    create: chibi(CHIBI_RACCOON, 'chibi-coat-raccoon', 'raccoon'),
+  },
+  'cat-chibi': {
+    species: 'cat',
+    group: 'chibi',
+    label: 'Chibi tabby',
+    description: 'A ginger kitten, all head and whiskers.',
+    create: chibi(CHIBI_CAT, 'chibi-coat-ginger', 'ginger cat'),
+  },
+  'cat-chibi-tuxedo': {
+    species: 'cat',
+    group: 'chibi',
+    label: 'Chibi tuxedo cat',
+    description: 'Black and white and very proud of it.',
+    create: chibi(CHIBI_CAT, 'chibi-coat-tuxedo', 'tuxedo cat'),
+  },
+  'fox-chibi': {
+    species: 'fox',
+    group: 'chibi',
+    label: 'Chibi fox',
+    description: 'Big ears, white cheeks and a brush almost as big as the rest of it.',
+    create: chibi(CHIBI_FOX, 'chibi-coat-fox', 'fox'),
+  },
+  'otter-chibi': {
+    species: 'otter',
+    group: 'chibi',
+    label: 'Chibi otter',
+    description: 'Paddles round in its own little pond and floats on its back with its favourite shell.',
+    create: chibi(CHIBI_OTTER, 'chibi-coat-otter', 'otter'),
   },
 };
