@@ -7,9 +7,11 @@ import { Brain, type PetSnapshot, type WorldInput } from '../core/behavior/brain
 import { DEFAULT_CONFIG } from '../core/behavior/config';
 import { ClickThroughController } from '../core/clickThrough';
 import { isTurning, targetHeading, turnTowards } from '../core/heading';
+import { Toybox } from '../core/toys/toybox';
 import type { Host } from '../host';
 import { ANIMATIONS, RACCOON_STYLES, type AnimationName, type RaccoonRenderer } from '../sprites';
 import type { AnimationSpec } from '../sprites/types';
+import { ToyLayer } from './toyLayer';
 
 export interface PetElements {
   /** Clip box covering the work area: hides whatever is past the edges or below the floor. */
@@ -38,6 +40,10 @@ const REFERENCE_SCREEN_PX = 1600;
 const GAZE_RADIUS_PX = 420;
 /** Raccoon scale on screens much narrower than a desktop. */
 const SMALL_SCREEN_SCALE = 0.8;
+/** How many toy blocks lie about. */
+const TOY_COUNT = 3;
+/** Toy block size for drawings that don't say. */
+const TOY_SIZE = 16;
 
 /** The shared animation timings with the drawing's own changes applied. */
 function specsFor(renderer: RaccoonRenderer): Record<AnimationName, AnimationSpec> {
@@ -72,6 +78,8 @@ export class PetRuntime {
   private readonly cursorTracker = new CursorActivityTracker();
   private readonly typingTracker = new TypingActivityTracker();
   private readonly clickThrough: ClickThroughController;
+  private readonly toybox = new Toybox();
+  private readonly toyLayer: ToyLayer;
 
   private cursor: Point | null = null;
   /** Where the pointer last was over the page, to tell when it strokes him. */
@@ -105,9 +113,15 @@ export class PetRuntime {
     private settings: Settings,
   ) {
     this.clickThrough = new ClickThroughController((on) => host.setInteractive(on));
+    this.toyLayer = new ToyLayer(document, els.stage, this.toybox, {
+      thrown: (id) => this.brain.toyThrown(id),
+      wake: () => this.wake(),
+      dragStarted: () => this.clickThrough.dragStarted(),
+      dragEnded: (p) => this.clickThrough.dragEnded(p, this.grabRects()),
+    });
     this.applySettings();
     this.applyLayout();
-    this.brain = new Brain(this.worldInput(performance.now()));
+    this.brain = new Brain(this.worldInput(performance.now()), Math.random, DEFAULT_CONFIG, this.toybox);
   }
 
   start(): void {
@@ -149,6 +163,7 @@ export class PetRuntime {
     this.keyboardOff?.();
     this.keyboardOff = null;
     this.cleanups.splice(0).forEach((off) => off());
+    this.toyLayer.destroy();
     this.host.setInteractive(false);
   }
 
@@ -161,6 +176,7 @@ export class PetRuntime {
   setSettings(settings: Settings): void {
     this.settings = settings;
     this.applySettings();
+    this.syncToys();
     this.syncKeyboardSubscription();
     this.wake();
   }
@@ -249,14 +265,20 @@ export class PetRuntime {
       this.brain.poke();
     }
     this.wake();
+    this.clickThrough.dragEnded({ x: e.clientX, y: e.clientY }, this.grabRects());
+  }
+
+  /** Everything on the page you can pick up: him, and his toys. */
+  private grabRects(): Rect[] {
     const rect = this.hitRect();
-    if (rect) this.clickThrough.dragEnded({ x: e.clientX, y: e.clientY }, rect);
+    return rect ? [rect, ...this.toyLayer.rects()] : this.toyLayer.rects();
   }
 
   private updateHover(p: Point): void {
     const rect = this.hitRect();
-    // Fully hidden (behind an edge): nothing to grab, so never hold the mouse.
-    if (rect) this.clickThrough.pointerMoved(p, rect);
+    const targets = rect ? [rect, ...this.toyLayer.rects()] : this.toyLayer.rects();
+    // Nothing to grab (he's fully hidden behind an edge, and no toys): never hold the mouse.
+    if (targets.length) this.clickThrough.pointerMoved(p, targets);
     else this.clickThrough.pointerLeft();
     // Stroking him after a pat (the pointer moving over him) keeps him purring.
     const last = this.lastHover;
@@ -287,6 +309,8 @@ export class PetRuntime {
     this.headingTarget = targetHeading(this.heading, snap);
     this.heading = turnTowards(this.heading, this.headingTarget, dt);
     this.render(snap, now);
+    this.carryToy(snap);
+    this.toyLayer.render(snap.position);
     if (this.cursor) this.updateHover(this.cursor);
     this.schedule();
   };
@@ -315,7 +339,8 @@ export class PetRuntime {
 
   private isResting(): boolean {
     const turning = this.renderer.turnsItself && isTurning(this.heading, this.headingTarget);
-    return !this.drag && !turning && !this.renderer.isSettling?.() && (this.snap?.resting ?? false);
+    const toysStill = this.toybox.settled && !this.toyLayer.dragging;
+    return !this.drag && !turning && toysStill && !this.renderer.isSettling?.() && (this.snap?.resting ?? false);
   }
 
   private worldInput(now: number): WorldInput {
@@ -330,6 +355,7 @@ export class PetRuntime {
       cursorExcited: this.cursorTracker.isExcited(now),
       cursorStillMs: this.cursorTracker.stillFor(now),
       typingActive: keyboard && this.typingTracker.isActive,
+      toyReach: this.renderer.toyReach === undefined ? undefined : this.renderer.toyReach * this.scale,
     };
   }
 
@@ -345,7 +371,7 @@ export class PetRuntime {
       eyes: this.animator.eyes,
       heading: this.heading,
       velocity: snap.velocity,
-      gaze: this.gazeAt(snap.position),
+      gaze: snap.lookAt ? { x: snap.lookAt.x - snap.position.x, y: snap.lookAt.y - snap.position.y } : this.gazeAt(snap.position),
     };
     const turns = this.renderer.turnsItself === true;
     const key = `${frame.animation}|${frame.timeMs}|${frame.keystrokes}|${frame.eyes}|${turns ? this.heading.toFixed(3) : ''}`;
@@ -355,8 +381,10 @@ export class PetRuntime {
     }
 
     const wa = this.display.workArea;
-    const x = Math.round((snap.position.x - wa.x) * 10) / 10;
-    const y = Math.round((snap.position.y - wa.y) * 10) / 10;
+    // Pixel art sits on whole screen pixels, so it stays crisp; anything else moves smoothly.
+    const step = this.renderer.pixelated ? window.devicePixelRatio || 1 : 10;
+    const x = Math.round((snap.position.x - wa.x) * step) / step;
+    const y = Math.round((snap.position.y - wa.y) * step) / step;
     const anchor = this.renderer.anchor ?? { x: 0.5, y: 1 };
     const transform = `translate3d(${x}px, ${y}px, 0) translate(${-anchor.x * 100}%, ${-anchor.y * 100}%)`;
     if (transform !== this.lastTransform) {
@@ -373,6 +401,36 @@ export class PetRuntime {
       emote.dataset.emote = snap.emote;
       this.lastEmote = snap.emote;
     }
+  }
+
+  /** A toy block in his mouth or hands goes where the drawing says they are. */
+  private carryToy(snap: PetSnapshot): void {
+    const toy = this.toybox.heldBy('pet');
+    if (!toy) return;
+    const at = this.renderer.toyPoint?.() ?? { x: snap.facing * this.size.width * 0.3, y: -this.size.height * 0.4 };
+    const floor = snap.position.y + 1;
+    const bottom = snap.position.y + at.y + this.toybox.size / 2;
+    this.toybox.moveHeld(toy.id, { x: snap.position.x + at.x, y: floor }, floor - bottom);
+  }
+
+  /** Puts the toy blocks out (or tidies them away) as the settings say. */
+  private syncToys(): void {
+    if (!this.settings.toys) {
+      this.toybox.clear();
+      this.toyLayer.render(this.snap?.position ?? { x: 0, y: 0 });
+      return;
+    }
+    if (this.toybox.toys.length) return;
+    // Scattered on the floor near where he starts out, at the bottom in the middle.
+    const b = this.toybox.bounds;
+    const middle = b.x + b.width / 2;
+    const bottom = b.y + b.height;
+    const spots = [
+      { x: middle - 150, y: bottom - 40 },
+      { x: middle + 120, y: bottom - 70 },
+      { x: middle + 175, y: bottom - 22 },
+    ];
+    for (let i = 0; i < TOY_COUNT; i++) this.toybox.add(i, spots[i % spots.length]!);
   }
 
   /** The pointer relative to his feet, when it's near enough to catch his eye. */
@@ -395,6 +453,11 @@ export class PetRuntime {
     const longest = Math.max(wa.width, wa.height);
     this.cursorTracker.setSensitivity(Math.min(3, Math.max(1, REFERENCE_SCREEN_PX / longest)));
     this.applyScale();
+    // Toys lie on the same floor he walks on, low enough on it for him to reach.
+    const top = Math.min(this.size.height * 0.6, wa.height / 2);
+    this.toybox.setBounds({ x: wa.x, y: wa.y + top, width: wa.width, height: wa.height - top });
+    this.toyLayer.setOrigin({ x: wa.x, y: wa.y });
+    this.syncToys();
   }
 
   private applyScale(): void {
@@ -405,6 +468,8 @@ export class PetRuntime {
     const height = baseSize.height * scale;
     this.size = { width: baseSize.width * scale, height: height * anchor.y };
     this.belowFeet = height * (1 - anchor.y);
+    this.toybox.size = (this.renderer.toySize ?? TOY_SIZE) * scale;
+    this.toyLayer.setLook(this.renderer.toyLook ?? 'paint', this.toybox.size);
   }
 
   /** Swaps in the drawing for the chosen raccoon type. Behaviour carries on untouched. */

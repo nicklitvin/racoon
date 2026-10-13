@@ -1,6 +1,7 @@
+import { PLAY } from '../animations';
 import { OTTER_BUILD as B } from './build';
 import { LEAP_MS, lookAt, noFlags, type Act, type ActInput } from './act';
-import { bump, clamp01, easeOut, lerp, noise1, smooth, span, wave } from './kit';
+import { bump, clamp01, easeOut, keyed, lerp, noise1, smooth, span, wave } from './kit';
 import { blankPose, LEGS, POSE_KEYS, setPaw, type Pose } from './pose';
 import { DEPTH } from './view';
 
@@ -364,7 +365,53 @@ export function otterAct(input: ActInput): Act {
 
     case 'happy':
       return happy(input);
+
+    case 'bat':
+      return nudge(input);
+
+    case 'toss':
+      return toss(input);
   }
+}
+
+/** A bonk with the nose: it surges along the surface at the block and sends it skimming. */
+function nudge(input: ActInput): Act {
+  const { t, clock } = input;
+  const hit = PLAY.batHitMs;
+  const end = PLAY.batMs;
+  const p = swim();
+  const lunge = keyed(t, [[0, 0], [150, -0.4], [hit, 1], [hit + 170, 0.6], [end, 0]]);
+  p.hx += 5 * lunge;
+  p.hy += 1.5 * lunge;
+  p.hpitch += 14 * lunge;
+  p.sx += 1.5 * lunge;
+  p.px += 1 * lunge;
+  p.hyaw = 18;
+  p.earN = -0.3;
+  p.earF = -0.3;
+  p.pupil = 1;
+  p.lookX = 0.4;
+  paddle(p, clock / 900, 0.4);
+  return { pose: p, flags: noFlags() };
+}
+
+/** Ducks its head to take the block, rears up out of the water with it, and flicks it away. */
+function toss(input: ActInput): Act {
+  const { t, clock } = input;
+  const { tossGrabMs: grab, tossReleaseMs: release, tossMs: end } = PLAY;
+  const wind = release - 230;
+  const up = keyed(t, [[grab + 40, 0], [wind, 1], [release + 150, 0.8], [end, 0]]);
+  const p = mix(swim(), tread(), up);
+  p.hx += keyed(t, [[0, 0], [grab, 4], [grab + 60, 4], [wind, -3], [release, 2], [end, 0]]);
+  p.hy += keyed(t, [[0, 0], [grab, -0.5], [wind, -3], [release, -2], [end, 0]]);
+  p.hpitch = keyed(t, [[0, -4], [grab, 12], [grab + 60, 12], [wind, -35], [release, -5], [end, -4]]);
+  p.hyaw = 20;
+  p.earN = keyed(t, [[0, 0], [wind, -0.3], [release, 0.5], [end, 0]]);
+  p.earF = p.earN;
+  p.lookY = keyed(t, [[0, 0.2], [grab, 0.6], [wind, -0.5], [release + 100, -0.6], [end, 0]]);
+  p.mouth = keyed(t, [[grab - 120, 0], [grab, 0.25], [release, 0.25], [release + 120, 0.1], [end, 0]]);
+  breathe(p, clock, 3000, 0.6);
+  return { pose: p, flags: noFlags() };
 }
 
 /** A lunge at something: a dip to gather, then a surge out of the water with the paws reaching. */

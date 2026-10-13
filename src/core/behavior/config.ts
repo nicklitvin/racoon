@@ -50,6 +50,27 @@ export interface WanderConfig {
   zoomiesDashes: Range;
   /** Calm time after which he yawns and falls asleep. */
   sleepAfterMs: number;
+  /** Chance that the next activity is playing with one of the toy blocks, if there are any. */
+  playChance: number;
+}
+
+export interface PlayConfig {
+  /** How many swats and throws a game lasts. */
+  turns: Range;
+  /** Chance that a turn is picking the block up and throwing it, rather than swatting it. */
+  tossChance: number;
+  /** Chance of pouncing on a block from a little way off, rather than walking up to it. */
+  pounceChance: number;
+  /** How hard a swat sends a block along the floor, and how high it hops, px/s. */
+  batSpeed: Range;
+  batLift: Range;
+  /** How fast a throw sends a block out, and up, px/s. */
+  tossSpeed: Range;
+  tossLift: Range;
+  /** Running at least this fast (px/s), he kicks any block in his way. */
+  kickSpeed: number;
+  /** Waiting for you to throw a block you've picked up, he gives up after this long. */
+  waitMs: number;
 }
 
 export interface ReactionConfig {
@@ -63,6 +84,7 @@ export interface BehaviorConfig {
   motion: MotionConfig;
   wander: WanderConfig;
   reactions: ReactionConfig;
+  play: PlayConfig;
 }
 
 export const DEFAULT_CONFIG: BehaviorConfig = {
@@ -89,12 +111,24 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     zoomiesChance: 0.06,
     zoomiesDashes: { min: 2, max: 4 },
     sleepAfterMs: 3 * 60_000,
+    playChance: 0.14,
   },
   reactions: {
     fleeRadius: 90,
     fleeChance: 0.6,
     pounceAfterStillMs: 450,
     chaseMaxMs: 25_000,
+  },
+  play: {
+    turns: { min: 2, max: 5 },
+    tossChance: 0.45,
+    pounceChance: 0.35,
+    batSpeed: { min: 230, max: 430 },
+    batLift: { min: 140, max: 300 },
+    tossSpeed: { min: 260, max: 430 },
+    tossLift: { min: 480, max: 680 },
+    kickSpeed: 260,
+    waitMs: 9000,
   },
 };
 
@@ -106,6 +140,7 @@ export function withConfig(overrides: ConfigOverrides, base: BehaviorConfig = DE
     motion: { ...base.motion, ...overrides.motion },
     wander: { ...base.wander, ...overrides.wander },
     reactions: { ...base.reactions, ...overrides.reactions },
+    play: { ...base.play, ...overrides.play },
   };
 }
 

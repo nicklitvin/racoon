@@ -1,5 +1,7 @@
+import { PLAY } from '../../sprites/animations';
 import type { AnimationName } from '../../sprites/types';
 import { clamp, type Point, type Rect } from '../geometry';
+import { Toybox, type Toy } from '../toys/toybox';
 import { DEFAULT_CONFIG, pick, type BehaviorConfig } from './config';
 import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d, steerArc } from './motion';
 
@@ -7,7 +9,7 @@ import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d, steerArc } 
 export type Mode = 'idle' | 'walk' | 'sit' | 'sleep' | 'react';
 
 /** What the raccoon is reacting to, while in the "react" mode. */
-export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged' | 'petted' | 'zoomies';
+export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged' | 'petted' | 'zoomies' | 'play';
 
 /** Little symbol drawn above the raccoon's head. Only sleep shows one. */
 export type Emote = '' | 'z';
@@ -33,6 +35,11 @@ export interface WorldInput {
   footroom?: number;
   /** How far his feet go past the bottom edge while peeking. Defaults to PEEK_SINK of his height. */
   peekDepth?: number;
+  /**
+   * How far in front of his feet a toy sits for him to swat it or pick it up, px. Defaults
+   * to a third of his width.
+   */
+  toyReach?: number;
 }
 
 export interface PetSnapshot {
@@ -48,6 +55,36 @@ export interface PetSnapshot {
   emote: Emote;
   /** Nothing is moving; the caller can tick less often. */
   resting: boolean;
+  /**
+   * Standing still, the way he wants to face on the floor (radians, screen axes), for
+   * drawings that turn themselves: square on to a toy he's about to swat. Null leaves it be.
+   */
+  aim: number | null;
+  /** Something he's keeping his eyes on (a toy), screen px; null to look at the pointer. */
+  lookAt: Point | null;
+}
+
+/** A game with a toy block: going to it, swatting or throwing it, watching where it goes. */
+interface PlayState {
+  mode: 'react';
+  reaction: 'play';
+  toy: number;
+  phase: 'go' | 'pounce' | 'bat' | 'toss' | 'watch' | 'wait';
+  /** Which side of the block he stands, facing it: 1 on its left, facing right. */
+  side: 1 | -1;
+  /** When this phase began, and when it gives up or moves on. */
+  started: number;
+  until: number;
+  /** Swats and throws left. */
+  turns: number;
+  /** You threw it: he's after it at full tilt. */
+  excited: boolean;
+  /** This turn's swat has landed, or its throw has let go. */
+  done: boolean;
+  mayPounce: boolean;
+  /** Where a moving block will stop, worked out now and then. */
+  landing: Point | null;
+  landingAt: number;
 }
 
 type State =
@@ -64,7 +101,8 @@ type State =
   | { mode: 'react'; reaction: 'peek'; phase: 'approach' | 'sink' | 'watch' | 'rise'; sink: number }
   | { mode: 'react'; reaction: 'dragged' }
   | { mode: 'react'; reaction: 'petted'; until: number }
-  | { mode: 'react'; reaction: 'zoomies'; target: Point; dashes: number };
+  | { mode: 'react'; reaction: 'zoomies'; target: Point; dashes: number }
+  | PlayState;
 
 const SUBSTEP_S = 1 / 60;
 const MAX_FRAME_MS = 1000;
@@ -78,6 +116,10 @@ const PETTED_MS = 2200;
 const STROKED_MS = 900;
 /** Zoomies run this much faster than a run. */
 const ZOOMIES_SPEED = 1.3;
+/** Getting to a toy, he gives up after this long (it's stuck somewhere he can't reach). */
+const GO_MS = 12_000;
+/** How long he watches where a toy went before going after it. */
+const WATCH_MS = { min: 350, max: 900 };
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const length = (v: Point) => Math.hypot(v.x, v.y);
@@ -118,6 +160,8 @@ export class Brain {
     initial: WorldInput,
     private readonly random: () => number = Math.random,
     private readonly config: BehaviorConfig = DEFAULT_CONFIG,
+    /** The toy blocks he plays with. They move in step with him. */
+    readonly toys: Toybox = new Toybox(),
   ) {
     this.input = initial;
     const b = initial.bounds;
@@ -176,6 +220,23 @@ export class Brain {
     if (s.mode === 'react' && s.reaction === 'petted') s.until = Math.max(s.until, this.now + STROKED_MS);
   }
 
+  /**
+   * You threw one of his toys (or dropped it): he's off after it, unless he's asleep, in
+   * your hand or busy watching you type.
+   */
+  toyThrown(id: number): void {
+    const s = this.state;
+    const r = this.reaction;
+    if (s.mode === 'sleep' || r === 'dragged' || r === 'peek' || r === 'hide' || !this.toys.get(id)) return;
+    if (s.mode === 'react' && s.reaction === 'play' && s.toy === id) {
+      this.playPhase(s, 'go', GO_MS);
+      s.excited = true;
+      s.turns = Math.max(s.turns, 1);
+      return;
+    }
+    this.startPlay(id, true);
+  }
+
   // ---- Simulation --------------------------------------------------------------------
 
   private get bottom(): number {
@@ -206,6 +267,14 @@ export class Brain {
     this.think(dt);
     this.integrate(dt);
     this.updateFacing();
+    this.toys.step(dt);
+    this.kickToys();
+    // Whatever he's doing now, if it isn't throwing the block in his mouth, he drops it.
+    const held = this.toys.heldBy('pet');
+    const s = this.state;
+    if (held && !(s.mode === 'react' && s.reaction === 'play' && s.phase === 'toss' && s.toy === held.id)) {
+      this.toys.release(held.id, 'pet', { x: 0, y: 0, z: 0 });
+    }
   }
 
   private handleStimuli(dt: number): void {
@@ -336,6 +405,10 @@ export class Brain {
         return;
       }
 
+      case 'play':
+        this.play(s, dt);
+        return;
+
       case 'flee':
         this.vel = this.steer(s.target, m.runSpeed * k, m.runAccel * k, dt, 50);
         if (dist(s.target, this.pos) < 4 && length(this.vel) < 10) {
@@ -441,6 +514,12 @@ export class Brain {
       return;
     }
     if (s.mode === 'react' && s.reaction === 'peek' && s.phase !== 'approach') return;
+    if (s.mode === 'react' && s.reaction === 'play' && s.phase !== 'go') {
+      const toy = this.toys.get(s.toy);
+      if (s.phase === 'pounce' || s.phase === 'bat' || s.phase === 'toss' || !toy) this.facing = s.side;
+      else if (Math.abs(toy.x - this.pos.x) > 6) this.facing = toy.x < this.pos.x ? -1 : 1;
+      return;
+    }
     if (Math.abs(this.vel.x) > 12) this.facing = this.vel.x < 0 ? -1 : 1;
   }
 
@@ -514,6 +593,8 @@ export class Brain {
       this.pause();
     } else if (r < w.sitChance + w.lookAroundChance + w.zoomiesChance) {
       this.zoomies();
+    } else if (r < w.sitChance + w.lookAroundChance + w.zoomiesChance + w.playChance && this.favouriteToy()) {
+      this.startPlay(this.favouriteToy()!.id, false);
     } else {
       this.startWalk();
     }
@@ -618,6 +699,209 @@ export class Brain {
     this.state = { mode: 'react', reaction: 'flee', target };
   }
 
+  // ---- Play --------------------------------------------------------------------------
+
+  /** The block he'd go and play with: the nearest one nobody's holding. */
+  private favouriteToy(): Toy | undefined {
+    let best: Toy | undefined;
+    let bestDistance = Infinity;
+    for (const toy of this.toys.toys) {
+      if (toy.holder) continue;
+      const d = dist(toy, this.pos);
+      if (d < bestDistance) {
+        best = toy;
+        bestDistance = d;
+      }
+    }
+    return best;
+  }
+
+  private startPlay(id: number, excited: boolean): void {
+    const p = this.config.play;
+    const toy = this.toys.get(id);
+    this.state = {
+      mode: 'react',
+      reaction: 'play',
+      toy: id,
+      phase: 'go',
+      side: toy && toy.x < this.pos.x ? -1 : 1,
+      started: this.now,
+      until: this.now + GO_MS,
+      turns: Math.round(pick(p.turns, this.random)),
+      excited,
+      done: false,
+      mayPounce: this.random() < p.pounceChance,
+      landing: null,
+      landingAt: -Infinity,
+    };
+    if (excited) this.nextLeapAt = this.now + 300 + this.random() * 600;
+  }
+
+  private playPhase(s: PlayState, phase: PlayState['phase'], ms: number): void {
+    s.phase = phase;
+    s.started = this.now;
+    s.until = this.now + ms;
+    s.done = false;
+  }
+
+  private get toyReach(): number {
+    return this.input.toyReach ?? this.input.size.width / 3;
+  }
+
+  /** Where he stands to play with a block at `at`: beside it, facing it, on the floor he can reach. */
+  private playSpot(s: PlayState, at: Point): Point {
+    const reach = this.toyReach;
+    const { minX, maxX } = this.area;
+    // Coming at it from the other side, he goes round to that side.
+    if (Math.abs(this.pos.x - at.x) > reach * 1.5) s.side = this.pos.x < at.x ? 1 : -1;
+    // Against a wall, he plays from the open side.
+    if (at.x - s.side * reach < minX || at.x - s.side * reach > maxX) s.side = s.side === 1 ? -1 : 1;
+    return this.clampToArea({ x: at.x - s.side * reach, y: at.y });
+  }
+
+  /** The block is where his paw or mouth will be, in front of him. */
+  private toyInReach(s: PlayState, toy: Toy): boolean {
+    const reach = this.toyReach;
+    const front = this.pos.x + s.side * reach;
+    return !toy.holder && toy.z < this.toys.size && Math.abs(toy.x - front) < reach * 0.7 && Math.abs(toy.y - this.pos.y) < Math.max(14, reach * 0.4);
+  }
+
+  private play(s: PlayState, dt: number): void {
+    const m = this.config.motion;
+    const p = this.config.play;
+    const k = this.speedScale;
+    const toy = this.toys.get(s.toy);
+    if (!toy) {
+      this.pause();
+      return;
+    }
+    const elapsed = this.now - s.started;
+
+    switch (s.phase) {
+      case 'go': {
+        if (toy.holder === 'user') {
+          this.playPhase(s, 'wait', p.waitMs);
+          return;
+        }
+        if (this.now >= s.until) {
+          this.pause();
+          return;
+        }
+        if (this.leaping) return;
+        const resting = this.toys.isResting(toy);
+        // Still flying or sliding: he heads for where it will stop.
+        if (!resting && this.now - s.landingAt > 120) {
+          s.landing = this.toys.landing(toy.id);
+          s.landingAt = this.now;
+        }
+        const at = resting ? toy : (s.landing ?? toy);
+        const spot = this.playSpot(s, at);
+        const away = dist(this.pos, spot);
+        const fast = s.excited || !resting;
+        const top = (fast ? m.chaseSpeed : away > 260 ? m.runSpeed : m.walkSpeed * 1.6) * k;
+        const accel = (fast ? m.chaseAccel : m.runAccel) * k;
+        this.vel = this.steer(spot, top, accel, dt, 60);
+        if (fast) this.maybeLeap(away, top);
+        if (!resting) return;
+        if (s.mayPounce && away > 70 && away < 220 && Math.abs(spot.y - this.pos.y) < 60) {
+          this.playPhase(s, 'pounce', 900);
+          return;
+        }
+        if (away < 5 && length(this.vel) < 25) {
+          this.vel = { x: 0, y: 0 };
+          if (this.random() < p.tossChance) this.playPhase(s, 'toss', PLAY.tossMs);
+          else this.playPhase(s, 'bat', PLAY.batMs);
+        }
+        return;
+      }
+
+      case 'pounce': {
+        const spot = this.playSpot(s, toy);
+        this.vel = this.steer(spot, m.pounceSpeed * k, m.chaseAccel * 1.6 * k, dt, 40, false);
+        if ((dist(this.pos, spot) < 4 && length(this.vel) < 30) || this.now >= s.until) {
+          // Landed by it: give it a swat.
+          s.mayPounce = false;
+          this.playPhase(s, 'bat', PLAY.batMs);
+        }
+        return;
+      }
+
+      case 'bat': {
+        this.brake(dt);
+        if (!s.done && elapsed >= PLAY.batHitMs) {
+          s.done = true;
+          if (this.toyInReach(s, toy)) {
+            const speed = pick(p.batSpeed, this.random);
+            const v = { x: s.side * speed, y: (this.random() * 2 - 1) * speed * 0.35 * this.config.wander.floorDepth, z: pick(p.batLift, this.random) };
+            this.toys.hit(toy.id, v, s.side * (360 + this.random() * 420));
+          }
+        }
+        if (this.now >= s.until) this.playPhase(s, 'watch', pick(WATCH_MS, this.random));
+        return;
+      }
+
+      case 'toss': {
+        this.brake(dt);
+        if (!s.done && elapsed >= PLAY.tossGrabMs) {
+          // Picks it up, if it's still there.
+          if (this.toyInReach(s, toy)) this.toys.hold(toy.id, 'pet');
+          s.done = true;
+        }
+        if (elapsed >= PLAY.tossReleaseMs && toy.holder === 'pet') {
+          const speed = pick(p.tossSpeed, this.random);
+          const v = { x: s.side * speed, y: (this.random() * 2 - 1) * speed * 0.3 * this.config.wander.floorDepth, z: pick(p.tossLift, this.random) };
+          this.toys.release(toy.id, 'pet', v, s.side * (420 + this.random() * 480));
+        }
+        if (this.now >= s.until) this.playPhase(s, 'watch', pick(WATCH_MS, this.random));
+        return;
+      }
+
+      case 'watch':
+        this.brake(dt);
+        if (this.now < s.until) return;
+        s.turns--;
+        if (s.turns <= 0) {
+          this.pause();
+          return;
+        }
+        s.mayPounce = this.random() < p.pounceChance;
+        this.playPhase(s, 'go', GO_MS);
+        return;
+
+      case 'wait':
+        // You've picked it up: he waits for you to throw it, eyes on it.
+        this.brake(dt);
+        if (toy.holder !== 'user') {
+          s.excited = toy.thrownBy === 'user';
+          this.playPhase(s, 'go', GO_MS);
+        } else if (this.now >= s.until) {
+          this.confused();
+        }
+        return;
+    }
+  }
+
+  /** Charging about, he sends flying any block in his way (not the one he's playing with). */
+  private kickToys(): void {
+    const speed = length(this.vel);
+    if (speed < this.config.play.kickSpeed * this.speedScale) return;
+    const s = this.state;
+    const target = s.mode === 'react' && s.reaction === 'play' ? s.toy : null;
+    const radius = Math.max(this.toys.size, this.input.size.width * 0.16);
+    const depth = this.config.wander.floorDepth;
+    for (const toy of this.toys.toys) {
+      if (toy.id === target || toy.holder || toy.z > this.toys.size * 0.5) continue;
+      const dx = toy.x - this.pos.x;
+      const dy = (toy.y - this.pos.y) / depth;
+      const d = Math.hypot(dx, dy);
+      if (d > radius) continue;
+      // On along the way he's going, and off to whichever side it was.
+      const side = d > 0 ? { x: dx / d, y: (dy / d) * depth } : { x: 0, y: 0 };
+      const v = { x: this.vel.x * 1.15 + side.x * 90, y: this.vel.y * 1.15 + side.y * 90, z: 140 + speed * 0.2 };
+      this.toys.hit(toy.id, v, Math.sign(this.vel.x || 1) * (300 + speed * 0.6));
+    }
+  }
+
   // ---- Output ------------------------------------------------------------------------
 
   private snapshot(): PetSnapshot {
@@ -675,6 +959,10 @@ export class Brain {
           case 'zoomies':
             animation = this.leaping ? 'leap' : speed > this.config.motion.walkSpeed * 1.5 ? 'chase' : speed > 25 ? 'walk' : 'idle';
             break;
+          case 'play':
+            phase = s.phase;
+            animation = this.playAnimation(s, speed);
+            break;
         }
         break;
     }
@@ -686,6 +974,16 @@ export class Brain {
       (s.mode === 'react' &&
         (s.reaction === 'confused' || (s.reaction === 'peek' && s.phase === 'watch') || (s.reaction === 'hide' && s.phase === 'wait')));
 
+    let aim: number | null = null;
+    let lookAt: Point | null = null;
+    if (s.mode === 'react' && s.reaction === 'play') {
+      const toy = this.toys.get(s.toy);
+      if (s.phase === 'pounce' || s.phase === 'bat' || s.phase === 'toss') aim = s.side > 0 ? 0 : Math.PI;
+      else if (toy && s.phase !== 'go' && dist(toy, this.pos) > 8) aim = Math.atan2(toy.y - this.pos.y, toy.x - this.pos.x);
+      // Eyes on the block, except while it's in his mouth.
+      if (toy && toy.holder !== 'pet') lookAt = { x: toy.x, y: toy.y - toy.z - this.toys.size / 2 };
+    }
+
     return {
       position: { ...this.pos },
       velocity: { ...this.vel },
@@ -696,6 +994,24 @@ export class Brain {
       animation,
       emote,
       resting: settled && speed <= 1,
+      aim,
+      lookAt,
     };
+  }
+
+  private playAnimation(s: PlayState, speed: number): AnimationName {
+    const walk = this.config.motion.walkSpeed;
+    switch (s.phase) {
+      case 'go':
+        return this.leaping ? 'leap' : speed > walk * 1.5 ? (s.excited ? 'chase' : 'run') : speed > 25 ? 'walk' : 'idle';
+      case 'pounce':
+        return 'jump';
+      case 'bat':
+        return 'bat';
+      case 'toss':
+        return 'toss';
+      default:
+        return speed > 25 ? 'walk' : 'idle';
+    }
   }
 }

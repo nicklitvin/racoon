@@ -56,6 +56,18 @@ describe('ClickThroughController', () => {
     expect(controller.isInteractive).toBe(true);
   });
 
+  it('takes the mouse over any of several things to grab: him and his toys', () => {
+    const { controller } = setup();
+    const block = { x: 400, y: 300, width: 20, height: 20 };
+    controller.pointerMoved({ x: 410, y: 310 }, [pet, block]);
+    expect(controller.isInteractive).toBe(true);
+    controller.pointerMoved({ x: 300, y: 300 }, [pet, block]);
+    expect(controller.isInteractive).toBe(false);
+    controller.dragStarted();
+    controller.dragEnded({ x: 405, y: 305 }, [pet, block]);
+    expect(controller.isInteractive).toBe(true);
+  });
+
   it('releases the mouse when the pointer leaves the window', () => {
     const { controller } = setup();
     controller.pointerMoved({ x: 120, y: 120 }, pet);

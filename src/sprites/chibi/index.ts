@@ -1,11 +1,11 @@
 import { n, PX_PER_UNIT } from '../svg';
 import type { AnimationName, AnimationSpec, RaccoonFrame, RaccoonRenderer } from '../types';
 import { CHIBI_VIEW, createChibiSkin } from './draw';
-import { blendPose, chibiPose, poseDistance, scruffPoint, type ChibiPose } from './pose';
-import type { ChibiBuild, Pt } from './species';
+import { blendPose, chibiPose, poseDistance, scruffPoint, toyHoldPoint, type ChibiPose } from './pose';
+import { CHIBI_TOY, type ChibiBuild, type Pt } from './species';
 
 /** Resting animations redraw often enough for the breathing and the floating marks to look smooth. */
-const TIMING: Partial<Record<AnimationName, Partial<AnimationSpec>>> = {
+export const TIMING: Partial<Record<AnimationName, Partial<AnimationSpec>>> = {
   idle: { fps: 20 },
   sit: { fps: 20 },
   groom: { fps: 30 },
@@ -93,6 +93,7 @@ export function createChibi(doc: Document, build: ChibiBuild, className: string,
   const view = CHIBI_VIEW;
   let scale = 1;
   let scruff: Pt | null = null;
+  let toy: Pt | null = null;
   return {
     element: skin.svg,
     figure: skin.figure,
@@ -104,6 +105,10 @@ export function createChibi(doc: Document, build: ChibiBuild, className: string,
     animations: TIMING,
     isSettling: () => motion.settling,
     holdPoint: () => (scruff ? { x: scruff.x * motion.facing * PX_PER_UNIT * scale, y: scruff.y * PX_PER_UNIT * scale } : null),
+    toyReach: build.toyReach * PX_PER_UNIT,
+    toySize: CHIBI_TOY * PX_PER_UNIT,
+    toyLook: 'chibi',
+    toyPoint: () => (toy ? { x: toy.x * motion.facing * PX_PER_UNIT * scale, y: toy.y * PX_PER_UNIT * scale } : null),
     setScale(next) {
       scale = next;
       skin.svg.setAttribute('width', n(view.width * PX_PER_UNIT * scale));
@@ -112,6 +117,7 @@ export function createChibi(doc: Document, build: ChibiBuild, className: string,
     draw(frame) {
       const pose = motion.update(frame, 1 / (PX_PER_UNIT * scale));
       scruff = scruffPoint(build, pose);
+      toy = toyHoldPoint(build, pose);
       skin.draw(pose, frame.clockMs ?? frame.timeMs, motion.flip, motion.moving, scruff);
     },
   };

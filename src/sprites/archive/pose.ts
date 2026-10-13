@@ -180,6 +180,9 @@ export function poseFor(animation: AnimationName, t: number, keystrokes = 0): Po
       return pose;
     }
 
+    // Retired drawings never learnt to play: they stand and look pleased instead.
+    case 'bat':
+    case 'toss':
     case 'happy': {
       // Being petted: sits, eyes shut, leans his head up into the pat and wags.
       const pose = sitting(t);

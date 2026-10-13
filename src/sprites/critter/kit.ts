@@ -25,6 +25,19 @@ export const bump = (t: number) => (t <= 0 || t >= 1 ? 0 : Math.sin(Math.PI * t)
 /** Fraction of t in [a, b], eased. */
 export const span = (t: number, a: number, b: number) => smooth((t - a) / (b - a));
 export const frac = (v: number) => v - Math.floor(v);
+/**
+ * A value through keyframes ([time, value], in time order), eased in and out between each
+ * pair, and held before the first and after the last.
+ */
+export function keyed(t: number, keys: readonly (readonly [number, number])[]): number {
+  let [t0, v0] = keys[0]!;
+  if (t <= t0) return v0;
+  for (const [t1, v1] of keys) {
+    if (t <= t1) return t1 > t0 ? lerp(v0, v1, smooth((t - t0) / (t1 - t0))) : v1;
+    [t0, v0] = [t1, v1];
+  }
+  return v0;
+}
 /** A sine wave with period `ms`, from -1 to 1. */
 export const wave = (t: number, ms: number, phase = 0) => Math.sin((t / ms + phase) * Math.PI * 2);
 

@@ -4,7 +4,9 @@ A raccoon that lives on your screen. It wanders all over your screen, sits down 
 
 You don't have to have a raccoon: the settings also offer cats, foxes and an otter, each in a few art styles. The otter swims about your screen instead of walking, in its own little patch of water: it paddles along with its head up, porpoises when it's excited, treads water to look about and floats on its back to rest.
 
-There are also 2D chibi versions of each (raccoon, ginger and tuxedo cats, fox, otter): flat cartoon pets with big heads, bean bodies and stubby legs, who bounce about with little floating hearts, z's and question marks. The chibi otter paddles about in its own little pond and floats on its back holding a shell.
+There are also 2D chibi versions of each (raccoon, ginger and tuxedo cats, fox, otter): flat cartoon pets with big heads, bean bodies and stubby legs, who bounce about with little floating hearts, z's and question marks. The chibi otter paddles about in its own little pond and floats on its back holding a shell. And there are pixel-art ones (raccoon, ginger and black cats, fox, otter, and a raccoon in a handheld console's four greens), drawn in chunky whole pixels like sprites from an old game.
+
+A few wooden alphabet blocks lie about for your pet to play with. Now and then it goes over to one and swats it along the floor, or picks it up and flings it, then watches where it lands and goes after it. Running about, it kicks any block in its way. You can pick a block up and throw it yourself: your pet waits with its eyes on it while you hold it, and chases after it when you let go. (Click a block to flick it over.) You can put the blocks away in the settings.
 
 It runs two ways from one codebase:
 
@@ -71,6 +73,7 @@ src/                      The page (React). Runs in Electron and in a browser
     activity/cursor.ts    Rolling-window cursor speed, path length, erratic-ness
     activity/typing.ts    Rolling-window typing rate (timestamps only)
     animator.ts           Keeps each animation's clock and handles blinking
+    toys/toybox.ts        The toy blocks: flying, bouncing, tumbling, being held
     clickThrough.ts       Decides when the overlay should capture the mouse
     geometry.ts           Small geometry helpers
   sprites/                The art
@@ -79,8 +82,11 @@ src/                      The page (React). Runs in Electron and in a browser
     index.ts              The pets the settings offer
     critter/              The lifelike raccoon, cat, fox and otter: rig, gaits, poses, motion, drawing
     chibi/                The flat 2D chibi pets: builds, poses and drawing
+    pixel/                The pixel-art pets: a little rasteriser, palettes and drawing
+    toys.ts               The toy blocks' drawings, one for each art style
     archive/              Retired pets (3D arena, cartoon, plush, classic, cartoon cat)
   runtime/petRuntime.ts   Connects core logic to the DOM; runs the animation loop
+  runtime/toyLayer.ts     Puts the toy blocks on the page; picking them up and throwing them
   host/                   "Where am I running?": Electron bridge or browser fallback
   components/             React: the pet page, the settings panel and its "What's new" notes
   lib/                    The version (the build date) and the patch notes
@@ -98,16 +104,24 @@ Two rules keep this portable and testable: **`src/core` never imports React, the
 
 - Frameless, transparent, always on top, no taskbar or Dock entry, and **never focusable** (`focusable: false`, shown with `showInactive()`), so it can't take focus from the app you're typing in.
 - It covers the whole primary display. The raccoon's world is the display's **work area**, so it walks along the top of the taskbar or Dock. Changes to resolution, scaling or connected monitors re-fit the window, and the raccoon is kept on screen.
-- **Click-through:** the window starts with `setIgnoreMouseEvents(true, { forward: true })`, so clicks pass straight through to whatever is underneath. Using the polled cursor position and forwarded mouse moves, the page asks the main process to capture the mouse only while the pointer is over the visible part of the raccoon, and to release it as soon as the pointer leaves.
+- **Click-through:** the window starts with `setIgnoreMouseEvents(true, { forward: true })`, so clicks pass straight through to whatever is underneath. Using the polled cursor position and forwarded mouse moves, the page asks the main process to capture the mouse only while the pointer is over the visible part of the raccoon or one of its toy blocks, and to release it as soon as the pointer leaves.
 
 ### Behaviour
 
-`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek, dragged, petted** and **zoomies**. While chasing or dashing about at full tilt, it leaps now and then (`motion.leapMs`, `motion.leapEvery`), flying straight on through each leap. At speed it steers like an animal, not a hovercraft: the direction it's running can only swing round so fast (the faster it goes, the wider the turn) and it slows down to turn sharply, so it runs round in curves to a cursor behind it instead of stopping and reversing.
+`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek, dragged, petted, zoomies** and **play**. While chasing or dashing about at full tilt, it leaps now and then (`motion.leapMs`, `motion.leapEvery`), flying straight on through each leap. At speed it steers like an animal, not a hovercraft: the direction it's running can only swing round so fast (the faster it goes, the wider the turn) and it slows down to turn sharply, so it runs round in curves to a cursor behind it instead of stopping and reversing.
 
 - **Wandering:** the whole work area is the raccoon's world; there is no floor and no gravity. After each pause it picks something to do: walk to a random point anywhere on screen, sit and groom or yawn, or just turn round and look about. After about 3 calm minutes it yawns and falls asleep. Dropping it after a drag leaves it exactly where you let go.
 - **Organic movement:** walks follow a gently curved path with ease-in-out speed, and each walk varies a little in distance, curve and top speed. Everything else (chasing, fleeing, pouncing) goes through velocity with limited acceleration ("arrive" steering). Nothing ever teleports; the tests check this on every simulated frame.
 - **Tuning:** all timings and distances live in `DEFAULT_CONFIG` in `src/core/behavior/config.ts`, grouped by behaviour. For wandering: `wander.walkDistance`, `pauseMs`, `speedJitter`, `curve`, `sitChance`, `sitMs`, `lookAroundChance`, `zoomiesChance`, `zoomiesDashes` and `sleepAfterMs`. These are developer settings, compiled in; they aren't in the user's `settings.json`.
 - **Deterministic:** time only advances when `update(dt, world)` is called, and randomness is injected, so the tests replay exact scenarios.
+
+### Toys
+
+`Toybox` (`src/core/toys/toybox.ts`) holds the toy blocks, as plain data like the brain: each lies on the floor at a point, can be lifted off it, flies with gravity, bounces, slides and tumbles over a quarter turn for each side's length, and settles flat on a face. Two blocks never end up inside each other, and they bounce off the sides of the screen. It steps in time with the brain, so the tests replay games exactly.
+
+The brain plays with them (the **play** reaction): after a pause it sometimes picks the nearest block (`wander.playChance`), goes to stand beside it facing it (or pounces from a little way off), and either swats it (the `bat` animation) or picks it up and throws it (`toss`). It watches where it went, then goes after it for another turn, a few times (`play.turns`). Running fast, it kicks any other block in its way. The moment a swat lands, and when a toss picks the block up and lets go, are in `PLAY` (`src/sprites/animations.ts`); both the brain and every drawing time their moves by it. While a block is in its mouth (or a raccoon's hands), the drawing says where that is (`toyPoint()` on the renderer), and the block is carried there.
+
+You can play too: `ToyLayer` (`src/runtime/toyLayer.ts`) puts a block in your hand when you press on it, and throws it with the pointer's speed when you let go (flung up the screen it goes up into the air). The brain hears about it (`toyThrown`) and chases after it, to where it will land. Holding a block, you have the pet's attention: it waits, watching it, until you throw it. Tuning is in `DEFAULT_CONFIG.play`.
 
 ### Reactions to the cursor
 
@@ -173,7 +187,7 @@ To add an animation:
    - `loop: false` holds the final pose.
    - `eyes`: `'open'` (blinks now and then), `'closed'` or `'wide'`.
    - `driver: 'keystrokes'`: driven by key presses instead of time (used by `peek`).
-3. Add a `case` to `catAct()`, `raccoonAct()` and `otterAct()` (the fox follows the cat). Start from `stand()`, `sit()` or `curl()` (for the otter, `swim()`, `onBack()` or `tread()`) and change what moves. Pose him facing right; when you see him from his other side, his left and right paws swap automatically.
+3. Add a `case` to `catAct()`, `raccoonAct()` and `otterAct()` (the fox follows the cat), and to the chibis' poses (which the pixel pets share; see below). Start from `stand()`, `sit()` or `curl()` (for the otter, `swim()`, `onBack()` or `tread()`) and change what moves. Pose him facing right; when you see him from his other side, his left and right paws swap automatically.
 4. Pick it in `Brain.snapshot()` (`src/core/behavior/brain.ts`).
 
 TypeScript points out anything missing. `tests/critter.test.ts` checks every animation for bad numbers, that planted paws never slide in any walking direction, that he faces the way he walks, peeks with his paws on the edge, and hangs below his scruff when carried. For the otter it checks that it swims at the surface with its paws below it, floats on its back to rest, and porpoises clear of the water.
@@ -188,6 +202,15 @@ The art styles are just CSS, the `look-*` and `coat-*` classes in `src/styles.cs
 - `draw.ts` draws the pose with bold outlines; coats are the `chibi-coat-*` classes in `src/styles.css`.
 
 To add an animation for them too, add a `case` to `walkerPose()` and `otterPose()` in `chibi/pose.ts`. `tests/chibi.test.ts` checks every animation for bad numbers, that it stays in its box, its paws stay planted and step in diagonal pairs, it turns to face the way it goes, peeks over the edge, hangs from its scruff, and that the otter swims, floats on its back and porpoises.
+
+**The pixel pets** (`src/sprites/pixel/`) move exactly like the chibis (the same poses and motion), but each picture is drawn into a 64 by 54 pixel canvas and blown up, each pixel a whole number of screen pixels across, so it stays crisp.
+
+- `raster.ts` is a tiny rasteriser: shapes are signed distance functions sampled at each pixel's centre, filled with one palette colour and ringed with a one-pixel outline. Nothing is anti-aliased.
+- `draw.ts` draws a chibi pose with it: the same parts in the same order, with a lit top edge on the body and head, two-by-three pixel eyes with a glint, and pixel z's, hearts, "!" and "?".
+- `palette.ts` holds each coat as a palette. `handheld()` turns any coat into a handheld console's four greens by brightness.
+- `index.ts` is the renderer. It draws a new picture 12 times a second, like an old game, and the page places it on whole screen pixels.
+
+`tests/pixel.test.ts` checks the outlines are closed, that every animation is drawn whole inside the canvas, facing left mirrors facing right, the marks show, and nothing of a swimming otter shows under the water.
 
 **Another art style:** behaviour code only ever names animations, and the page only talks to the `RaccoonRenderer` interface (`src/sprites/types.ts`). To swap the art, write another renderer and add it to `RACCOON_STYLES` in `src/sprites/index.ts`; nothing in `src/core` changes. The retired renderers in `src/sprites/archive/` still work: to bring one back, give it a type in `shared/settings.ts` and an entry in `RACCOON_STYLES`.
 
@@ -243,4 +266,5 @@ In the browser, the page is the raccoon's whole world. Wandering, chasing, pounc
 5. Drag it and let go: it dangles while held and stays where you drop it. Click it: it startles.
 6. Settings (double-click it): change size and speed and watch them apply live. Turn on "React to typing" and type steadily for a few seconds: it peeks over the bottom edge and its eyes follow your typing. Stop typing: it comes back out after about 5 seconds.
 7. Change display scaling or resolution: it stays on screen.
-8. Quit from the tray icon.
+8. Toy blocks: wait a while and it goes over to a block, swats it or throws it, and goes after it. Pick a block up: it watches it. Throw it: it chases after it. Click a block: it flips over. Clicks next to a block still go through to the window behind.
+9. Quit from the tray icon.

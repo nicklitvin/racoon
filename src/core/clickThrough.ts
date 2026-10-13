@@ -3,8 +3,8 @@ import { inflate, pointInRect, type Point, type Rect } from './geometry';
 /**
  * Decides when the pet window should capture the mouse.
  *
- * The window is click-through until the pointer is over the raccoon (plus a
- * small margin so it's easy to grab), and stays interactive for the whole of
+ * The window is click-through until the pointer is over the raccoon or one of his toys
+ * (plus a small margin so they're easy to grab), and stays interactive for the whole of
  * a drag even if the pointer outruns the sprite. `apply` only fires on change,
  * so it's cheap to call on every mousemove.
  */
@@ -18,8 +18,8 @@ export class ClickThroughController {
     private readonly margin = 6,
   ) {}
 
-  pointerMoved(pointer: Point, target: Rect): void {
-    this.hovering = pointInRect(pointer, inflate(target, this.margin));
+  pointerMoved(pointer: Point, targets: Rect | readonly Rect[]): void {
+    this.hovering = this.over(pointer, targets);
     this.sync();
   }
 
@@ -33,14 +33,19 @@ export class ClickThroughController {
     this.sync();
   }
 
-  dragEnded(pointer: Point | null, target: Rect): void {
+  dragEnded(pointer: Point | null, targets: Rect | readonly Rect[]): void {
     this.dragging = false;
-    this.hovering = pointer !== null && pointInRect(pointer, inflate(target, this.margin));
+    this.hovering = pointer !== null && this.over(pointer, targets);
     this.sync();
   }
 
   get isInteractive(): boolean {
     return this.interactive;
+  }
+
+  private over(pointer: Point, targets: Rect | readonly Rect[]): boolean {
+    const list: readonly Rect[] = Array.isArray(targets) ? targets : [targets as Rect];
+    return list.some((target) => pointInRect(pointer, inflate(target, this.margin)));
   }
 
   private sync(): void {

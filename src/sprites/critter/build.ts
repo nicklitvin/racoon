@@ -63,7 +63,12 @@ export interface Build {
   /** Peeking: feet this far below the screen edge, paws resting on it at `peekEdge`. */
   peekSink: number;
   peekEdge: number;
+  /** How far in front of his feet a toy block sits (its middle) for him to swat or pick up. */
+  toyReach: number;
 }
+
+/** Edge of a toy block, in drawing units. */
+export const CRITTER_TOY = 13.5;
 
 export const CAT_BUILD: Build = {
   species: 'cat',
@@ -121,6 +126,7 @@ export const CAT_BUILD: Build = {
   },
   peekSink: 30,
   peekEdge: -30,
+  toyReach: 30,
 };
 
 export const RACCOON_BUILD: Build = {
@@ -178,6 +184,7 @@ export const RACCOON_BUILD: Build = {
   },
   peekSink: 26,
   peekEdge: -26,
+  toyReach: 29,
 };
 
 /**
@@ -211,6 +218,7 @@ export const FOX_BUILD: Build = {
   chase: scaleGait(CAT_BUILD.chase, FOX_SCALE.x),
   peekSink: CAT_BUILD.peekSink * FOX_SCALE.y,
   peekEdge: CAT_BUILD.peekEdge * FOX_SCALE.y,
+  toyReach: 30 * FOX_SCALE.x,
 };
 
 /**
@@ -276,4 +284,5 @@ export const OTTER_BUILD: Build = {
   },
   peekSink: 24,
   peekEdge: -24,
+  toyReach: 36,
 };

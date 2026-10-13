@@ -34,12 +34,13 @@ interface TypePickerProps {
   onChange: (value: RaccoonType) => void;
 }
 
-const GROUPS: { group: Species | 'chibi'; title: string }[] = [
+const GROUPS: { group: Species | 'chibi' | 'pixel'; title: string }[] = [
   { group: 'raccoon', title: 'Raccoons' },
   { group: 'cat', title: 'Cats' },
   { group: 'fox', title: 'Foxes' },
   { group: 'otter', title: 'Otters' },
   { group: 'chibi', title: 'Chibi' },
+  { group: 'pixel', title: 'Pixel art' },
 ];
 
 /** A small still of the pet, drawn once. */
@@ -53,7 +54,7 @@ function PetPreview({ type }: { type: RaccoonType }) {
     renderer.draw({ animation: 'idle', timeMs: 1000, keystrokes: 0, eyes: 'open', heading: 0.5 });
     // Stand every pet on the same floor, whatever empty space its drawing has below the feet.
     const below = renderer.baseSize.height * 0.5 * (1 - (renderer.anchor?.y ?? 1));
-    (renderer.element as SVGElement).style.marginBottom = `${6 - below}px`;
+    (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${6 - below}px`;
     host.replaceChildren(renderer.element);
     return () => host.replaceChildren();
   }, [type]);
@@ -121,6 +122,17 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
 
       <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
 
+      <div className="field">
+        <label className="toggle">
+          <input type="checkbox" checked={settings.toys} onChange={(e) => update({ toys: e.target.checked })} />
+          <span>Toy blocks</span>
+        </label>
+        <p className="hint">
+          A few wooden blocks to play with: your pet swats them about and throws them. Pick one up and throw it, and
+          it’ll chase after it.
+        </p>
+      </div>
+
       {/* Everything else is desktop-only: the web gear just picks the raccoon. */}
       {desktop && (
         <>
@@ -180,8 +192,8 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
       <div className="settings-footer">
         <p className="hint footer">
           {desktop
-            ? 'Tip: drag your pet to move it, click to pet it. Settings live in the tray menu.'
-            : 'Tip: drag your pet, tap to pet it, or swipe your finger (or mouse) around fast.'}
+            ? 'Tip: drag your pet to move it, click to pet it, throw it one of its blocks. Settings live in the tray menu.'
+            : 'Tip: drag your pet, tap to pet it, throw it a block, or swipe your finger (or mouse) around fast.'}
         </p>
         <VersionChip onClick={() => setNotes(true)} />
       </div>

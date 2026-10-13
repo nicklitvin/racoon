@@ -128,12 +128,16 @@ html[data-host='web'][data-theme='dark'] {
   position: absolute;
   overflow: hidden;
   pointer-events: none;
+  /* The pet and his toys stack among themselves, under the settings panel. */
+  isolation: isolate;
 }
 
 .pet {
   position: absolute;
   left: 0;
   top: 0;
+  /* Toy blocks go behind him (1) or in front (3), by which is nearer you. */
+  z-index: 2;
   /* Only the drawn raccoon takes the pointer, not the empty corners of its box. */
   pointer-events: none;
   touch-action: none;
@@ -142,6 +146,75 @@ html[data-host='web'][data-theme='dark'] {
 
 .sprite {
   line-height: 0;
+}
+
+/* ---- Toy blocks ---------------------------------------------------------------------- */
+
+/* Each block stands on the floor at its wrapper's origin: shadow there, block lifted above it. */
+.toy {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.toy-shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  background: var(--r-shadow, rgba(20, 16, 30, 0.22));
+}
+
+.toy-shadow-pixel,
+.toy-shadow-handheld {
+  border-radius: 0;
+  clip-path: polygon(15% 0, 85% 0, 100% 50%, 85% 100%, 15% 100%, 0 50%);
+}
+
+.toy-block {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.toy-art {
+  display: block;
+  flex: none;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+  filter: drop-shadow(0 0 1.2px var(--halo));
+}
+
+.toy-art:active {
+  cursor: grabbing;
+}
+
+canvas.toy-art {
+  image-rendering: pixelated;
+}
+
+/* ---- Pixel pets ---------------------------------------------------------------------- */
+
+.raccoon.pixel {
+  position: relative;
+}
+
+.pixel-canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.pixel-figure {
+  position: absolute;
+  pointer-events: auto;
 }
 
 .raccoon {

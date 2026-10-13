@@ -1,6 +1,7 @@
-import { bump, clamp, clamp01, DEG, easeOut, lerp, noise1, smooth, span, wave } from '../critter/kit';
+import { PLAY } from '../animations';
+import { bump, clamp, clamp01, DEG, easeOut, keyed, lerp, noise1, smooth, span, wave } from '../critter/kit';
 import type { AnimationName, EyeStyle } from '../types';
-import type { ChibiBuild, Pt } from './species';
+import { CHIBI_TOY, type ChibiBuild, type Pt } from './species';
 
 export const LEGS = ['frontNear', 'frontFar', 'backNear', 'backFar'] as const;
 export type LegName = (typeof LEGS)[number];
@@ -138,6 +139,18 @@ export function scruffPoint(b: ChibiBuild, p: ChibiPose): Pt {
   const th = -p.hrot * DEG;
   const l = { x: -b.head.rx * 0.5, y: -b.head.ry * 0.82 };
   return { x: h.x + l.x * Math.cos(th) - l.y * Math.sin(th), y: h.y + l.x * Math.sin(th) + l.y * Math.cos(th) };
+}
+
+/**
+ * Where a toy block he has in his mouth is (its middle): hanging from his jaws, just under
+ * the corner of his mouth.
+ */
+export function toyHoldPoint(b: ChibiBuild, p: ChibiPose): Pt {
+  const h = headCentre(b, p);
+  const th = -p.hrot * DEG;
+  const l = { x: b.head.rx * 0.78, y: b.head.ry * 0.55 };
+  const mouth = { x: h.x + l.x * Math.cos(th) - l.y * Math.sin(th), y: h.y + l.x * Math.sin(th) + l.y * Math.cos(th) };
+  return { x: mouth.x + 1, y: mouth.y + CHIBI_TOY * 0.37 };
 }
 
 /** Standing square on all fours, every paw under its shoulder or hip. */
@@ -379,6 +392,61 @@ function peek(b: ChibiBuild, input: ChibiInput): ChibiPose {
   return p;
 }
 
+/**
+ * Swatting a toy block along the floor: a crouch with the bottom up and the tail lashing,
+ * the paw cocked, a quick swipe that meets the block on the beat, and the follow-through.
+ */
+function bat(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t, clock } = input;
+  const { batHitMs: hit } = PLAY;
+  const p = stand(b);
+  const crouch = keyed(t, [[0, 0], [140, 1], [hit + 150, 1], [PLAY.batMs - 50, 0]]);
+  p.by += 1.8 * crouch;
+  p.rot -= 4 * crouch;
+  p.hrot -= 9 * crouch;
+  p.hx += 1.5 * crouch;
+  p.tailA += 16 * crouch;
+  p.tailCurl += 30 * Math.sin(clock / 70) * crouch;
+  p.ears = 0.8 * crouch;
+  plant(b, p);
+  const root = legRoot(b, p, 'frontNear');
+  const contact = b.toyReach - CHIBI_TOY / 2 - 0.5;
+  p.paws.frontNear = {
+    x: keyed(t, [[0, root.x], [150, root.x + 5], [hit, contact], [hit + 100, contact + 2.5], [PLAY.batMs - 60, root.x]]),
+    y: keyed(t, [[0, 0], [150, -12], [hit, -4], [hit + 100, -1.5], [PLAY.batMs - 60, 0]]),
+  };
+  p.pawUp = t > 40 && t < PLAY.batMs - 90 ? 1 : 0;
+  p.lookX = 0.9;
+  p.lookY = 0.8 * crouch;
+  p.mouth = 0.2 * keyed(t, [[hit - 40, 0], [hit + 20, 1], [hit + 260, 0]]);
+  p.eyes = t < hit + 200 ? 'wide' : eyesFrom(input);
+  return p;
+}
+
+/**
+ * Picking a block up in his mouth and flinging it: down to it, a toss of the head back and
+ * up as he lifts it, then a whip forward that lets it go at the top of the swing.
+ */
+function toss(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t } = input;
+  const { tossGrabMs: grab, tossReleaseMs: release, tossMs: end } = PLAY;
+  const wind = release - 220;
+  const p = stand(b);
+  p.rot = keyed(t, [[0, 0], [grab, -9], [grab + 60, -9], [wind, 10], [release, -3], [release + 150, -5], [end, 0]]);
+  p.by = keyed(t, [[0, 0], [grab, 2], [wind, -0.5], [release, 0]]);
+  p.hx = keyed(t, [[0, 0], [grab, 2.5], [grab + 60, 2.5], [wind, -3], [release, 4], [release + 150, 4.5], [end, 0]]);
+  p.hy = keyed(t, [[0, 0], [grab, 4], [grab + 60, 4], [wind, -3], [release, -2], [end, 0]]);
+  p.hrot = keyed(t, [[0, 0], [grab, -24], [grab + 60, -24], [wind, 26], [release, 6], [release + 150, -4], [end, 0]]);
+  plant(b, p);
+  p.tailA += keyed(t, [[0, 0], [wind, 25], [release, -10], [end, 0]]);
+  p.ears = keyed(t, [[0, 0.3], [wind, -0.2], [release, 0.8], [end, 0.3]]);
+  p.lookX = 0.7;
+  p.lookY = keyed(t, [[0, 0.3], [grab - 100, 0.9], [grab + 60, 0.9], [wind, -0.5], [release + 100, -0.8], [end, -0.3]]);
+  p.mouth = 0.35 * keyed(t, [[release, 0], [release + 60, 1], [end, 0]]);
+  p.eyes = t > release + 40 && t < end - 120 ? 'happy' : eyesFrom(input);
+  return p;
+}
+
 /** The pose for a land animal at this moment. */
 function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
   const { t, clock, phase } = input;
@@ -499,6 +567,10 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
     }
     case 'dangle':
       return dangle(b, input);
+    case 'bat':
+      return bat(b, input);
+    case 'toss':
+      return toss(b, input);
     case 'happy': {
       const p = stand(b);
       const hop = Math.abs(Math.sin((t / 600) * Math.PI * 2));
@@ -611,6 +683,43 @@ function porpoise(b: ChibiBuild, u: number, height: number): ChibiPose {
   return p;
 }
 
+/** A bonk with the nose: it lunges along the surface at the block and sends it skimming off. */
+function nudge(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t } = input;
+  const hit = PLAY.batHitMs;
+  const p = swim(b, 0, 0);
+  const lunge = keyed(t, [[0, 0], [150, -0.4], [hit, 1], [hit + 170, 0.6], [PLAY.batMs, 0]]);
+  p.hx += 5 * lunge;
+  p.hy += 1.5 * lunge;
+  p.hrot -= 12 * lunge;
+  p.rot -= 3 * lunge;
+  p.splash = 1.6 * bump(clamp01((t - 150) / 280));
+  p.ears = 0.6;
+  p.lookX = 0.9;
+  p.lookY = 0.5;
+  p.eyes = t < hit + 170 ? 'wide' : eyesFrom(input);
+  return p;
+}
+
+/** Ducks its head to take the block, rears up out of the water with it, and flicks it away. */
+function otterToss(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t, clock } = input;
+  const { tossGrabMs: grab, tossReleaseMs: release, tossMs: end } = PLAY;
+  const wind = release - 220;
+  const up = keyed(t, [[grab + 40, 0], [wind, 1], [release + 120, 0.7], [end, 0]]);
+  const p = mix(swim(b, 0, 0), tread(b, clock), up * 0.65);
+  p.hx += keyed(t, [[0, 0], [grab, 3.5], [wind, -2], [release, 4], [end, 0]]);
+  p.hy += keyed(t, [[0, 0], [grab, 1], [wind, -4], [release, -2], [end, 0]]);
+  p.hrot = keyed(t, [[0, 4], [grab, -10], [grab + 60, -10], [wind, 28], [release, 6], [end, 4]]);
+  p.ears = keyed(t, [[0, 0], [wind, -0.3], [release, 0.8], [end, 0]]);
+  p.lookX = 0.7;
+  p.lookY = keyed(t, [[0, 0.3], [grab, 0.8], [wind, -0.5], [release + 100, -0.8], [end, -0.3]]);
+  p.mouth = 0.35 * keyed(t, [[release, 0], [release + 60, 1], [end, 0]]);
+  p.splash = 1.2 * bump(clamp01((t - grab + 120) / 300)) + 0.8 * bump(clamp01((t - release) / 300));
+  p.eyes = t > release + 40 && t < end - 120 ? 'happy' : eyesFrom(input);
+  return p;
+}
+
 function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
   const { t, clock, phase } = input;
   switch (input.animation) {
@@ -720,6 +829,10 @@ function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       p.tailA = -90;
       return p;
     }
+    case 'bat':
+      return nudge(b, input);
+    case 'toss':
+      return otterToss(b, input);
   }
 }
 

@@ -1,6 +1,7 @@
-import { RACCOON_BUILD as B } from './build';
+import { PLAY } from '../animations';
+import { CRITTER_TOY, RACCOON_BUILD as B } from './build';
 import { gaitFor, leap, leapKind, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
-import { bump, clamp01, easeOut, lerp, noise1, smoother, span, wave } from './kit';
+import { bump, clamp01, easeOut, keyed, lerp, noise1, smoother, span, wave } from './kit';
 import { blankPose, setPaw, type Pose } from './pose';
 import { DEPTH } from './view';
 
@@ -274,7 +275,83 @@ export function raccoonAct(input: ActInput): Act {
 
     case 'happy':
       return happy(input);
+
+    case 'bat':
+      return bat(input);
+
+    case 'toss':
+      return toss(input);
   }
+}
+
+/** Shoving a toy along the floor with one hand: a crouch, a quick reach, a push. */
+function bat(input: ActInput): Act {
+  const { t } = input;
+  const hit = PLAY.batHitMs;
+  const end = PLAY.batMs;
+  const flags = noFlags();
+  flags.pawUp = t > 40 && t < end - 80;
+  const p = stand();
+  const crouch = keyed(t, [[0, 0], [140, 1], [hit + 150, 1], [end - 40, 0]]);
+  p.sy += 2 * crouch;
+  p.hy += 3 * crouch;
+  p.hpitch = lerp(10, 26, crouch);
+  p.hyaw = lerp(30, 18, crouch);
+  p.earN = lerp(0.1, 0.6, crouch);
+  p.earF = p.earN;
+  p.lookY = 0.5 * crouch;
+  p.lookX = 0.3;
+  const contact = B.toyReach - CRITTER_TOY / 2 - 0.5;
+  setPaw(
+    p,
+    'frontNear',
+    keyed(t, [[0, 15.5], [150, 19], [hit, contact], [hit + 100, contact + 2], [end - 60, 15.5]]),
+    keyed(t, [[0, 0], [150, -10], [hit, -3.5], [hit + 100, -1], [end - 60, 0]]),
+    keyed(t, [[0, B.frontLean], [150, -50], [hit, -10], [hit + 100, 20], [end - 60, B.frontLean]]),
+  );
+  p.tailSide = 0.3 * crouch;
+  return { pose: p, flags };
+}
+
+/**
+ * Throwing a toy, raccoon fashion: both hands round the block, up onto the hind legs with
+ * it held high over his head, and a two-handed throw forward. Then back down on all fours.
+ */
+function toss(input: ActInput): Act {
+  const { t } = input;
+  const { tossGrabMs: grab, tossReleaseMs: release, tossMs: end } = PLAY;
+  const wind = release - 230;
+  const down = release + 260;
+  const flags = noFlags();
+  flags.pawUp = t > grab - 120 && t < release + 200;
+  const p = stand();
+  p.px = keyed(t, [[0, B.pelvis.x], [grab, B.pelvis.x], [wind, -4], [release, -4], [down, B.pelvis.x]]);
+  p.py = keyed(t, [[0, B.pelvis.y], [grab, -21], [wind, -20], [release, -20.5], [down, B.pelvis.y]]);
+  p.sx = keyed(t, [[0, B.shoulder.x], [grab, 13.5], [wind, -1.5], [release, 2], [down, B.shoulder.x]]);
+  p.sy = keyed(t, [[0, B.shoulder.y], [grab, -15], [wind, -44], [release, -41], [down, B.shoulder.y]]);
+  p.arch = keyed(t, [[0, 4.5], [wind, 2], [down, 4.5]]);
+  p.hx = keyed(t, [[0, 25], [grab, 27], [wind, 2], [release, 6], [down, 25]]);
+  p.hy = keyed(t, [[0, -23.5], [grab, -18], [wind, -55], [release, -52], [down, -23.5]]);
+  p.hpitch = keyed(t, [[0, 10], [grab, 30], [wind, -25], [release, 0], [down, 10]]);
+  p.hyaw = keyed(t, [[0, 30], [wind, 52], [down, 30]]);
+  // The hands: round the block, then high over his head, then out in front as it goes.
+  const block = { x: B.toyReach, y: -CRITTER_TOY / 2 };
+  const hx = keyed(t, [[0, 15.5], [grab - 60, block.x], [grab + 40, block.x], [wind, 5], [release, 17], [down, 15.5]]);
+  const hy = keyed(t, [[0, 0], [grab - 60, block.y], [grab + 40, block.y], [wind, -58], [release, -40], [down, 0]]);
+  const ha = keyed(t, [[0, B.frontLean], [grab, -20], [wind, -150], [release, -60], [down, B.frontLean]]);
+  setPaw(p, 'frontNear', hx, hy, ha);
+  setPaw(p, 'frontFar', hx - 1, hy, ha);
+  const foot = keyed(t, [[0, -8.5], [grab, -8.5], [wind, -1], [release, -1], [down, -8.5]]);
+  const footLean = keyed(t, [[0, B.backLean], [wind, 72], [down, B.backLean]]);
+  setPaw(p, 'backNear', foot, 0, footLean);
+  setPaw(p, 'backFar', foot + B.farOffset, 0, footLean);
+  p.tailA = keyed(t, [[0, 152], [wind, 230], [down, 152]]);
+  p.tailStiff = 0.6;
+  p.earN = keyed(t, [[0, 0.1], [wind, -0.3], [release, 0.6], [end, 0.1]]);
+  p.earF = p.earN;
+  p.lookY = keyed(t, [[0, 0.3], [grab - 100, 0.8], [grab + 40, 0.8], [wind, -0.6], [release + 100, -0.5], [end, 0]]);
+  p.mouth = keyed(t, [[release, 0], [release + 80, 0.2], [end, 0]]);
+  return { pose: p, flags };
 }
 
 /** Sat up, rubbing and rolling his hands together, peering at them. The raccoon thing. */

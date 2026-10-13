@@ -1449,6 +1449,15 @@ const EYES: Record<Species, { at: Triple; depth: number; normal: Triple; slant: 
   otter: { at: [0.64, 0.36, 0.45], depth: 0.98, normal: [0.72, 0.4, 0.56], slant: 0, size: [0.165, 0.16] },
 };
 
+/** Where his jaws are, drawing units from his feet: the corner of the mouth, under the nose. */
+export function mouthAt(build: Build, shown: Shown): Point {
+  const { pose, view } = shown;
+  const head = new HeadView(view.at(pose.hx, pose.hy, shown.head.z), pose.hpitch, shown.head.yaw, pose.hroll, HEAD_TILT);
+  const R = build.head.r;
+  const nose = NOSE[build.species];
+  return head.at(v3(R * nose.f * 0.85, R * (nose.u - 0.35), 0));
+}
+
 /** The nose: how far forward and up its tip is and its half width, in head radii; and whisker length. */
 const NOSE: Record<Species, { f: number; u: number; w: number; whiskers: number }> = {
   cat: { f: 1.06, u: -0.14, w: 0.15, whiskers: 1.2 },

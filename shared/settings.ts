@@ -1,9 +1,9 @@
 // User settings, shared by the Electron main process (which stores them) and the renderer.
 
 /**
- * The pets to choose from: raccoons, cats, foxes and otters in a few art styles, and 2D
- * chibi versions of each. The first
- * one is the default. Retired types (arena, cartoon, plush, classic, cat) fall back to it.
+ * The pets to choose from: raccoons, cats, foxes and otters in a few art styles, 2D chibi
+ * versions of each, and pixel-art ones. The first one is the default. Retired types
+ * (arena, cartoon, plush, classic, cat) fall back to it.
  */
 export const RACCOON_TYPES = [
   'raccoon-storybook',
@@ -21,6 +21,12 @@ export const RACCOON_TYPES = [
   'cat-chibi-tuxedo',
   'fox-chibi',
   'otter-chibi',
+  'raccoon-pixel',
+  'cat-pixel',
+  'cat-pixel-black',
+  'fox-pixel',
+  'otter-pixel',
+  'raccoon-pixel-handheld',
 ] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
@@ -31,12 +37,15 @@ export interface Settings {
   keyboardReactions: boolean;
   /** Start the desktop app when you log in. */
   launchAtLogin: boolean;
+  /** A few toy blocks lying about for the pet to play with (and for you to throw for it). */
+  toys: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   raccoonType: RACCOON_TYPES[0],
   keyboardReactions: false,
   launchAtLogin: false,
+  toys: true,
 };
 
 function isRaccoonType(value: unknown): value is RaccoonType {
@@ -50,6 +59,7 @@ export function normalizeSettings(raw: unknown): Settings {
     raccoonType: isRaccoonType(r.raccoonType) ? r.raccoonType : DEFAULT_SETTINGS.raccoonType,
     keyboardReactions: r.keyboardReactions === true,
     launchAtLogin: r.launchAtLogin === true,
+    toys: r.toys !== false,
   };
 }
 

@@ -24,15 +24,18 @@ export interface HeadingInput {
   /** The behaviour's left/right facing (it turns him to look at things). */
   facing: 1 | -1;
   animation: string;
+  /** Standing, a way the behaviour wants him to face (square on to a toy), if any. */
+  aim?: number | null;
 }
 
 /** The heading he wants to turn to, given what he's doing. */
-export function targetHeading(current: number, { velocity, facing, animation }: HeadingInput): number {
+export function targetHeading(current: number, { velocity, facing, animation, aim }: HeadingInput): number {
   // Dangling from the pointer: don't spin with the drag.
   if (animation === 'dangle') return current;
   // Peeking over the bottom edge: face you, so you see his eyes follow your typing.
   if (animation === 'peek') return Math.PI / 2;
   if (Math.hypot(velocity.x, velocity.y) > MOVING_PX_PER_S) return Math.atan2(velocity.y, velocity.x);
+  if (aim !== undefined && aim !== null) return wrapAngle(aim);
   // Standing, but the behaviour turned him round (to look about, or at the cursor):
   // mirror left/right and keep the same tilt towards or away from you.
   if (facing * Math.cos(current) < -0.2) return wrapAngle(Math.PI - current);

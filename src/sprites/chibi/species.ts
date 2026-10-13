@@ -36,8 +36,13 @@ export interface ChibiBuild {
   };
   /** Feet this far below the screen edge while peeking. */
   peekSink: number;
+  /** How far in front of his feet a toy block sits for him to swat or pick up (its middle). */
+  toyReach: number;
   swims?: boolean;
 }
+
+/** Edge of a toy block, in drawing units. */
+export const CHIBI_TOY = 15;
 
 export const CHIBI_RACCOON: ChibiBuild = {
   species: 'raccoon',
@@ -56,6 +61,7 @@ export const CHIBI_RACCOON: ChibiBuild = {
     curl: -24,
   },
   peekSink: 28,
+  toyReach: 26,
 };
 
 export const CHIBI_CAT: ChibiBuild = {
@@ -75,6 +81,7 @@ export const CHIBI_CAT: ChibiBuild = {
     curl: -70,
   },
   peekSink: 26,
+  toyReach: 25,
 };
 
 export const CHIBI_FOX: ChibiBuild = {
@@ -94,6 +101,7 @@ export const CHIBI_FOX: ChibiBuild = {
     curl: 46,
   },
   peekSink: 28,
+  toyReach: 25.5,
 };
 
 export const CHIBI_OTTER: ChibiBuild = {
@@ -113,5 +121,6 @@ export const CHIBI_OTTER: ChibiBuild = {
     curl: 10,
   },
   peekSink: 26,
+  toyReach: 30,
   swims: true,
 };

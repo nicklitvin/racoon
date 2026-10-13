@@ -21,9 +21,16 @@ export const ANIMATION_NAMES = [
   'confused',
   'dangle',
   'happy',
+  /** Swatting a toy along the floor with a front paw. */
+  'bat',
+  /** Picking a toy up and flinging it. */
+  'toss',
 ] as const;
 
 export type AnimationName = (typeof ANIMATION_NAMES)[number];
+
+/** How toy blocks are drawn: painted, outlined like a cartoon, inked, or in pixels (in colour or handheld greens). */
+export type ToyLook = 'paint' | 'chibi' | 'ink' | 'pixel' | 'handheld';
 
 /** How the eyes are drawn. "open" eyes blink now and then. */
 export type EyeStyle = 'open' | 'closed' | 'wide';
@@ -99,6 +106,19 @@ export interface RaccoonRenderer {
    * as last drawn. Without it, he's held wherever he was grabbed.
    */
   holdPoint?(): { x: number; y: number } | null;
+  /** How far in front of his feet a toy block sits (its middle) for him to swat or pick up, px at scale 1. */
+  readonly toyReach?: number;
+  /** Edge of a toy block to go with this drawing, px at scale 1. */
+  readonly toySize?: number;
+  /** How toy blocks are drawn to match: painted, inked or pixel art. */
+  readonly toyLook?: ToyLook;
+  /**
+   * Where a toy block he has hold of is (its middle), in px from his feet at the current
+   * scale, as last drawn: in his mouth, or his hands.
+   */
+  toyPoint?(): { x: number; y: number } | null;
+  /** Drawn in pixels: placed on whole screen pixels, so they stay crisp. */
+  readonly pixelated?: boolean;
   setScale(scale: number): void;
   /** Cheap to call every tick: only touches what changed. */
   draw(frame: RaccoonFrame): void;

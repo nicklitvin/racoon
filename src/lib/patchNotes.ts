@@ -10,6 +10,15 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-13',
+    title: 'Toy blocks, and pixel pets',
+    changes: [
+      'Toy blocks: a few wooden alphabet blocks lie about for your pet to play with. It goes over to one and swats it along the floor, or picks it up and flings it (a raccoon throws with both hands), watches where it lands and goes after it. Charging about, it kicks any block in its way.',
+      'Throw a block yourself: pick one up and your pet waits with its eyes on it, then races after it when you let go. Click a block to flip it over. You can put the blocks away in the settings.',
+      'Pixel pets: a raccoon, a ginger tabby, a black cat, a fox and an otter in chunky pixel art, like sprites from an old game, with pixel blocks to match. There’s also a raccoon in a handheld console’s four shades of green.',
+    ],
+  },
+  {
     date: '2026-10-12',
     title: 'Chibi pets, and better water',
     changes: [

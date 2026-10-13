@@ -1,6 +1,7 @@
-import { CAT_BUILD as B } from './build';
+import { PLAY } from '../animations';
+import { CAT_BUILD as B, CRITTER_TOY } from './build';
 import { gaitFor, leap, leapKind, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
-import { bump, clamp01, easeOut, frac, lerp, noise1, smoother, span, wave } from './kit';
+import { bump, clamp01, easeOut, frac, keyed, lerp, noise1, smoother, span, wave } from './kit';
 import { blankPose, setPaw, type Pose } from './pose';
 import { DEPTH } from './view';
 
@@ -278,7 +279,77 @@ export function catAct(input: ActInput): Act {
 
     case 'happy':
       return happy(input);
+
+    case 'bat':
+      return bat(input);
+
+    case 'toss':
+      return toss(input);
   }
+}
+
+/**
+ * Swatting a toy along the floor: a crouch at the front, eyes locked on and ears pricked,
+ * the tail lashing; the paw cocks up and whips out to meet the block on the beat, then
+ * comes back down.
+ */
+function bat(input: ActInput): Act {
+  const { t, clock } = input;
+  const hit = PLAY.batHitMs;
+  const end = PLAY.batMs;
+  const flags = noFlags();
+  flags.pawUp = t > 40 && t < end - 80;
+  const p = stand();
+  const crouch = keyed(t, [[0, 0], [140, 1], [hit + 150, 1], [end - 40, 0]]);
+  p.sy += 3 * crouch;
+  p.py += 0.5 * crouch;
+  p.hy += 6 * crouch;
+  p.hx -= 1 * crouch;
+  p.hpitch = lerp(p.hpitch, 30, crouch);
+  p.hyaw = lerp(p.hyaw, 16, crouch);
+  p.earN = lerp(0.1, 0.8, crouch);
+  p.earF = p.earN;
+  p.pupil = lerp(0.4, 1, crouch);
+  p.lookX = 0.3;
+  p.lookY = 0.5 * crouch;
+  const contact = B.toyReach - CRITTER_TOY / 2 - 0.5;
+  setPaw(
+    p,
+    'frontNear',
+    keyed(t, [[0, 15.5], [150, 20], [hit, contact], [hit + 100, contact + 2.5], [end - 60, 15.5]]),
+    keyed(t, [[0, 0], [150, -13], [hit, -3.5], [hit + 100, -1], [end - 60, 0]]),
+    keyed(t, [[0, B.frontLean], [150, -70], [hit, -15], [hit + 100, 10], [end - 60, B.frontLean]]),
+  );
+  p.tailA += 10 * crouch;
+  p.tailCurl += 25 * Math.sin(clock / 80) * crouch;
+  return { pose: p, flags };
+}
+
+/**
+ * Picking a toy up in the mouth and flinging it: down to it, a toss of the head up and back
+ * as it comes up off the floor, then a flick forward that lets go at the top of the swing.
+ */
+function toss(input: ActInput): Act {
+  const { t } = input;
+  const { tossGrabMs: grab, tossReleaseMs: release, tossMs: end } = PLAY;
+  const wind = release - 230;
+  const flags = noFlags();
+  const p = stand();
+  p.sy = keyed(t, [[0, B.shoulder.y], [grab - 40, -16], [grab + 60, -16], [wind, -27], [release, -25.5], [end, B.shoulder.y]]);
+  p.py = keyed(t, [[0, B.pelvis.y], [wind, -23], [end, B.pelvis.y]]);
+  p.hx = keyed(t, [[0, 27], [grab - 40, 25.5], [grab + 60, 25.5], [wind, 21], [release, 31], [release + 200, 30], [end, 27]]);
+  p.hy = keyed(t, [[0, -34.5], [grab - 40, -19.5], [grab + 60, -19.5], [wind, -42], [release, -39], [end, -34.5]]);
+  p.hpitch = keyed(t, [[0, 8], [grab - 40, 52], [grab + 60, 52], [wind, -40], [release, -6], [release + 200, 6], [end, 8]]);
+  p.hyaw = 18;
+  p.earN = keyed(t, [[0, 0.1], [grab, 0.6], [wind, -0.3], [release, 0.5], [end, 0.1]]);
+  p.earF = p.earN;
+  p.lookY = keyed(t, [[0, 0.2], [grab - 100, 0.8], [grab + 60, 0.8], [wind, -0.4], [release + 100, -0.6], [end, 0]]);
+  p.lookX = 0.3;
+  // Jaws round the block while it's held.
+  p.mouth = keyed(t, [[grab - 120, 0], [grab, 0.25], [release, 0.25], [release + 120, 0.1], [end, 0]]);
+  p.pupil = 0.9;
+  p.tailA = keyed(t, [[0, 150], [wind, 118], [release + 200, 140], [end, 150]]);
+  return { pose: p, flags };
 }
 
 /** Crouch with a wiggle, then a flat-out leap with the front paws reaching. */

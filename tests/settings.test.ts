@@ -15,6 +15,12 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ keyboardReactions: true }).keyboardReactions).toBe(true);
   });
 
+  it('puts the toy blocks out unless they were switched off', () => {
+    expect(DEFAULT_SETTINGS.toys).toBe(true);
+    expect(normalizeSettings({}).toys).toBe(true);
+    expect(normalizeSettings({ toys: false }).toys).toBe(false);
+  });
+
   it('accepts every pet type, defaulting to the storybook raccoon', () => {
     expect(DEFAULT_SETTINGS.raccoonType).toBe('raccoon-storybook');
     for (const type of RACCOON_TYPES) expect(normalizeSettings({ raccoonType: type }).raccoonType).toBe(type);
