@@ -9,6 +9,7 @@ import { legJoints } from '../src/sprites/critter/rig';
 import { LEGS, paw } from '../src/sprites/critter/pose';
 import { PX_PER_UNIT } from '../src/sprites/svg';
 import { DEPTH } from '../src/sprites/critter/view';
+import { PLAY } from '../src/sprites/animations';
 import { ANIMATION_NAMES, type AnimationName, type RaccoonFrame } from '../src/sprites/types';
 
 /** The animals that walk. (The otter swims: it has its own tests below.) */
@@ -319,6 +320,51 @@ describe('lifelike raccoon stood up', () => {
     for (const leg of ['frontNear', 'frontFar'] as const) {
       expect(legJoints(RACCOON_BUILD, shown.pose, leg).root.y - chin).toBeGreaterThan(4);
     }
+  });
+});
+
+describe('lifelike raccoon carrying a toy', () => {
+  it('walks on his hind legs, hands up at his chest, feet taking turns, without skating', () => {
+    const d = driver(RACCOON_BUILD, raccoonAct);
+    for (let i = 0; i < 40; i++) d.step({ animation: 'carry', velocity: { x: 50, y: 0 } });
+    let both = 0;
+    const lifted = { backNear: 0, backFar: 0 };
+    for (let i = 0; i < 200; i++) {
+      const shown = d.step({ animation: 'carry', velocity: { x: 50, y: 0 } });
+      const { pose } = shown;
+      // Up on his hind legs: shoulders well above the hips, hands off the ground.
+      expect(pose.sy).toBeLessThan(pose.py - 15);
+      expect(pose.fny).toBeLessThan(-25);
+      expect(pose.ffy).toBeLessThan(-25);
+      const up = (leg: 'backNear' | 'backFar') => pose[leg === 'backNear' ? 'bny' : 'bfy'] < -0.3;
+      if (up('backNear')) lifted.backNear++;
+      if (up('backFar')) lifted.backFar++;
+      if (up('backNear') && up('backFar')) both++;
+      for (const leg of ['backNear', 'backFar'] as const) {
+        const j = legJoints(RACCOON_BUILD, shown.pose, leg);
+        const [upper, lower] = RACCOON_BUILD.back;
+        expect(Math.hypot(j.low.x - j.root.x, j.low.y - j.root.y), `${leg} ${i}`).toBeLessThan((upper + lower) * 1.05);
+      }
+    }
+    expect(lifted.backNear).toBeGreaterThan(20);
+    expect(lifted.backFar).toBeGreaterThan(20);
+    expect(both).toBe(0);
+  });
+
+  it('lifts the toy over his head to throw it, then drops back onto all fours', () => {
+    const d = driver(RACCOON_BUILD, raccoonAct);
+    for (let i = 0; i < 40; i++) d.step({ animation: 'carry', velocity: { x: 0, y: 0 } });
+    let t = 0;
+    const at = (ms: number) => {
+      let shown!: Shown;
+      for (; t <= ms; t += 16) shown = d.step({ animation: 'throw', timeMs: t });
+      return shown;
+    };
+    const wind = at(PLAY.throwReleaseMs - 230);
+    expect(wind.pose.fny).toBeLessThan(wind.pose.hy);
+    const done = at(PLAY.throwMs + 300);
+    expect(done.pose.fny).toBeGreaterThan(-1);
+    expect(done.pose.sy).toBeGreaterThan(RACCOON_BUILD.shoulder.y - 3);
   });
 });
 

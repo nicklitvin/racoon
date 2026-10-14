@@ -11,6 +11,17 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     date: '2026-10-13',
+    title: 'Naps, and a raccoon on two legs',
+    changes: [
+      'Naps: when nothing has happened for a while, your pet goes for a nap. If you’ve left the mouse pointer resting somewhere, it comes and curls up right next to it. Otherwise it finds somewhere sensible: snuggled up beside a toy block, or tucked into a bottom corner out of the way.',
+      'Raccoons now sometimes pick a toy block up in both hands, stand up and toddle off with it on their hind legs, then throw it from there.',
+      'The pixel raccoon and tabby have new proportions: a bigger head on a rounder body, a smaller tail, and white brows over the raccoon’s mask.',
+      'The pixel pets are down to the raccoon, the tabby and the otter. If you had the black cat, the fox or the green handheld raccoon, you get the nearest one still here.',
+      'Chibi and pixel pets no longer show two sets of z’s while they sleep.',
+    ],
+  },
+  {
+    date: '2026-10-13',
     title: 'Toy blocks, and pixel pets',
     changes: [
       'Toy blocks: a few wooden alphabet blocks lie about for your pet to play with. It goes over to one and swats it along the floor, or picks it up and flings it (a raccoon throws with both hands), watches where it lands and goes after it. Charging about, it kicks any block in its way.',

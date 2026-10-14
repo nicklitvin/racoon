@@ -1,10 +1,11 @@
 import { ChibiMotion, TIMING } from '../chibi';
 import { scruffPoint, toyHoldPoint } from '../chibi/pose';
-import type { ChibiBuild, Pt } from '../chibi/species';
-import type { RaccoonRenderer, ToyLook } from '../types';
+import type { Pt } from '../chibi/species';
+import type { RaccoonRenderer } from '../types';
 import { drawPixelPet, PIXEL } from './draw';
 import { rgbaTable, type Palette } from './palette';
 import { Raster } from './raster';
+import type { PixelBuild } from './species';
 
 /** Screen px per art pixel at size 1. */
 export const PIXEL_PX = 3;
@@ -18,7 +19,7 @@ const PIXEL_FPS = 12;
  * picture is rasterised into a small canvas and shown with each pixel blown up into a
  * crisp square, a whole number of screen pixels across, so it never blurs.
  */
-export function createPixel(doc: Document, build: ChibiBuild, palette: Palette, className: string, label: string, toyLook: ToyLook = 'pixel'): RaccoonRenderer {
+export function createPixel(doc: Document, build: PixelBuild, palette: Palette, className: string, label: string): RaccoonRenderer {
   const { width: W, height: H, feetX, feetY, k: K } = PIXEL;
   const root = doc.createElement('div');
   root.className = `raccoon pixel ${className}`;
@@ -39,7 +40,6 @@ export function createPixel(doc: Document, build: ChibiBuild, palette: Palette, 
   const colours = rgbaTable(palette);
   const raster = new Raster(W, H);
   const motion = new ChibiMotion(build);
-  const iris = palette.iris !== palette.eye;
 
   /** CSS px per art pixel: a whole number of device pixels. */
   let cell = PIXEL_PX;
@@ -80,7 +80,9 @@ export function createPixel(doc: Document, build: ChibiBuild, palette: Palette, 
     holdPoint: () => (scruff ? { x: scruff.x * motion.facing * K * cell, y: scruff.y * K * cell } : null),
     toyReach: build.toyReach * K * PIXEL_PX,
     toySize: PIXEL_TOY * PIXEL_PX,
-    toyLook,
+    toyLook: 'pixel',
+    carriesToys: build.species === 'raccoon',
+    drawsMarks: true,
     toyPoint: () => (toy ? { x: toy.x * motion.facing * K * cell, y: toy.y * K * cell } : null),
     setScale(next) {
       scale = next;
@@ -97,7 +99,7 @@ export function createPixel(doc: Document, build: ChibiBuild, palette: Palette, 
       shownFacing = facing;
       scruff = scruffPoint(build, pose);
       toy = toyHoldPoint(build, pose);
-      const box = drawPixelPet(raster, build, pose, clock, facing, motion.moving, scruff, { iris });
+      const box = drawPixelPet(raster, build, pose, clock, facing, motion.moving, scruff);
       paint();
       if (box) {
         figure.style.left = `${box.x0 * cell}px`;

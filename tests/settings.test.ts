@@ -32,6 +32,14 @@ describe('normalizeSettings', () => {
     }
   });
 
+  it('moves anyone on a retired pixel pet to the nearest one still here', () => {
+    expect(normalizeSettings({ raccoonType: 'cat-pixel-black' }).raccoonType).toBe('cat-pixel');
+    expect(normalizeSettings({ raccoonType: 'raccoon-pixel-handheld' }).raccoonType).toBe('raccoon-pixel');
+    expect(normalizeSettings({ raccoonType: 'fox-pixel' }).raccoonType).toBe('fox-chibi');
+    // Not fooled by names that only look like one.
+    expect(normalizeSettings({ raccoonType: 'constructor' }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
+  });
+
   it('drops unknown and retired keys', () => {
     expect(normalizeSettings({ ...DEFAULT_SETTINGS, extra: 1, size: 2, speed: 1.5, sensitivity: 2 })).toEqual(
       DEFAULT_SETTINGS,

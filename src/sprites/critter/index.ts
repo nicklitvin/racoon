@@ -64,6 +64,7 @@ export function createCritter(
     toyReach: build.toyReach * PX_PER_UNIT,
     toySize: CRITTER_TOY * PX_PER_UNIT,
     toyLook,
+    carriesToys: build.species === 'raccoon',
     toyPoint: () => (toy ? { x: toy.x * PX_PER_UNIT * scale, y: toy.y * PX_PER_UNIT * scale } : null),
     setScale(next) {
       scale = next;

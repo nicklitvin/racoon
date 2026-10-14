@@ -48,8 +48,13 @@ export interface WanderConfig {
   zoomiesChance: number;
   /** How many dashes, each in a new direction, before he stops. */
   zoomiesDashes: Range;
-  /** Calm time after which he yawns and falls asleep. */
+  /**
+   * Calm time after which he takes a nap: he goes and curls up next to the pointer, or
+   * somewhere out of the way, yawns and falls asleep.
+   */
   sleepAfterMs: number;
+  /** He naps next to the pointer only if it has been still at least this long (you're reading, say). */
+  napByCursorAfterMs: number;
   /** Chance that the next activity is playing with one of the toy blocks, if there are any. */
   playChance: number;
 }
@@ -67,6 +72,12 @@ export interface PlayConfig {
   /** How fast a throw sends a block out, and up, px/s. */
   tossSpeed: Range;
   tossLift: Range;
+  /**
+   * For animals that can carry a block in their hands (raccoons): the chance that a throw
+   * is picking it up and walking off with it on his hind legs first, and how far he takes it.
+   */
+  carryChance: number;
+  carryDistance: Range;
   /** Running at least this fast (px/s), he kicks any block in his way. */
   kickSpeed: number;
   /** Waiting for you to throw a block you've picked up, he gives up after this long. */
@@ -111,6 +122,7 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     zoomiesChance: 0.06,
     zoomiesDashes: { min: 2, max: 4 },
     sleepAfterMs: 3 * 60_000,
+    napByCursorAfterMs: 4000,
     playChance: 0.14,
   },
   reactions: {
@@ -127,6 +139,8 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     batLift: { min: 140, max: 300 },
     tossSpeed: { min: 260, max: 430 },
     tossLift: { min: 480, max: 680 },
+    carryChance: 0.6,
+    carryDistance: { min: 110, max: 280 },
     kickSpeed: 260,
     waitMs: 9000,
   },

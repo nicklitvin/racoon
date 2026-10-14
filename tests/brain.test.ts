@@ -424,3 +424,44 @@ describe('Brain: dragging and the world changing', () => {
     expect(snap.mode).toBe('sleep');
   });
 });
+
+describe('Brain: naps', () => {
+  /** Nothing happening: never wanders off or sits about, so he gets sleepy soon. */
+  const SLEEPY: ConfigOverrides = { wander: { sleepAfterMs: 4000, sitChance: 0, lookAroundChance: 0, zoomiesChance: 0, pauseMs: { min: 400, max: 800 } } };
+
+  it('goes and curls up next to the pointer when it has been resting there, facing it', () => {
+    const brain = makeBrain(2, SLEEPY);
+    place(brain, { x: 300, y: 500 });
+    const cursor = { x: 1100, y: 420 };
+    const input = world({ cursor, cursorStillMs: 60_000 });
+    const naps = runUntil(brain, (s) => s.reaction === 'nap', input, 30_000);
+    expect(naps.snap.reaction).toBe('nap');
+    const { snap } = runUntil(brain, (s) => s.mode === 'sleep', input, 60_000);
+    // Right beside it, on the side he came from, nose towards it.
+    expect(snap.position.x).toBeLessThan(cursor.x);
+    expect(cursor.x - snap.position.x).toBeLessThan(size.width * 0.6);
+    expect(Math.abs(snap.position.y - cursor.y)).toBeLessThan(size.height * 0.5);
+    expect(snap.facing).toBe(1);
+    expect(run(brain, 5000, input).every((s) => s.mode === 'sleep')).toBe(true);
+  });
+
+  it('follows the pointer if it settles somewhere else while he is on his way', () => {
+    const brain = makeBrain(2, SLEEPY);
+    place(brain, { x: 300, y: 500 });
+    runUntil(brain, (s) => s.reaction === 'nap', world({ cursor: { x: 1100, y: 420 }, cursorStillMs: 60_000 }), 30_000);
+    const moved = { x: 600, y: 800 };
+    const { snap } = runUntil(brain, (s) => s.mode === 'sleep', world({ cursor: moved, cursorStillMs: 5000 }), 60_000);
+    expect(Math.abs(snap.position.x - moved.x)).toBeLessThan(size.width * 0.6);
+  });
+
+  it('with the pointer busy or away, naps somewhere out of the way: the bottom of the screen, by the nearer corner', () => {
+    const brain = makeBrain(2, SLEEPY);
+    place(brain, { x: 1300, y: 400 });
+    const { snap } = runUntil(brain, (s) => s.mode === 'sleep', world({ cursor: { x: 800, y: 300 }, cursorStillMs: 200 }), 60_000);
+    expect(bottom - snap.position.y).toBeLessThan(6);
+    expect(bounds.x + bounds.width - snap.position.x).toBeLessThan(size.width);
+    // Facing into the screen, not the wall.
+    expect(snap.facing).toBe(-1);
+  });
+});
+

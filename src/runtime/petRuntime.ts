@@ -356,6 +356,7 @@ export class PetRuntime {
       cursorStillMs: this.cursorTracker.stillFor(now),
       typingActive: keyboard && this.typingTracker.isActive,
       toyReach: this.renderer.toyReach === undefined ? undefined : this.renderer.toyReach * this.scale,
+      carries: this.renderer.carriesToys === true,
     };
   }
 
@@ -396,10 +397,12 @@ export class PetRuntime {
       sprite.classList.toggle('facing-left', facing < 0);
       this.lastFacing = facing;
     }
-    if (snap.emote !== this.lastEmote) {
-      emote.textContent = snap.emote === 'z' ? 'z Z' : snap.emote;
-      emote.dataset.emote = snap.emote;
-      this.lastEmote = snap.emote;
+    // Drawings that float their own z's over their heads don't need the page's as well.
+    const shown = this.renderer.drawsMarks ? '' : snap.emote;
+    if (shown !== this.lastEmote) {
+      emote.textContent = shown === 'z' ? 'z Z' : shown;
+      emote.dataset.emote = shown;
+      this.lastEmote = shown;
     }
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Brain, type PetSnapshot, type WorldInput } from '../src/core/behavior/brain';
-import { withConfig, type ConfigOverrides } from '../src/core/behavior/config';
+import { DEFAULT_CONFIG, withConfig, type ConfigOverrides } from '../src/core/behavior/config';
 import { seededRandom } from '../src/core/behavior/motion';
 import { targetHeading } from '../src/core/heading';
 import { Toybox, type Toy } from '../src/core/toys/toybox';
@@ -265,4 +265,56 @@ describe('Brain: playing with toys', () => {
     expect(toy.thrownBy).toBe('pet');
     expect(Math.abs(toy.x - 1000)).toBeGreaterThan(40);
   });
+
+  it('a raccoon picks a block up, walks off with it on his hind legs, and throws it from there', () => {
+    const box = toybox({ x: 1100, y: 700 });
+    const toy = box.toys[0]!;
+    const brain = makeBrain(box, { play: { tossChance: 1, carryChance: 1, pounceChance: 0 } });
+    const carrier = world({ carries: true });
+    runUntil(brain, (s) => s.animation === 'lift', 30_000, carrier);
+    let ms = STEP;
+    run(brain, PLAY.liftMs - STEP, carrier, () => {
+      ms += STEP;
+      if (ms < PLAY.liftGrabMs - STEP) expect(toy.holder).toBe(null);
+      if (ms > PLAY.liftGrabMs + STEP) expect(toy.holder).toBe('pet');
+    });
+    const start = runUntil(brain, (s) => s.animation === 'carry', 1000, carrier).position;
+    // Off he goes with it, on two legs, never letting go, at a careful walking pace.
+    const carrying = [] as PetSnapshot[];
+    const end = runUntil(brain, (s) => (carrying.push(s), s.animation !== 'carry'), 10_000, carrier);
+    expect(end.animation).toBe('throw');
+    expect(Math.abs(end.position.x - start.x)).toBeGreaterThan(100);
+    expect(Math.max(...carrying.map((s) => Math.hypot(s.velocity.x, s.velocity.y)))).toBeLessThan(DEFAULT_CONFIG.motion.walkSpeed * 1.2);
+    expect(toy.holder).toBe('pet');
+    // Then throws it the way he's facing.
+    const facing = end.facing;
+    const at = toy.x;
+    run(brain, PLAY.throwMs + 800, carrier);
+    expect(toy.holder).toBe(null);
+    expect(toy.thrownBy).toBe('pet');
+    expect((toy.x - at) * facing).toBeGreaterThan(60);
+  });
+
+  it('only animals that can carry a block go off with one: the rest just throw it', () => {
+    const box = toybox({ x: 1100, y: 700 });
+    const brain = makeBrain(box, { play: { tossChance: 1, carryChance: 1, pounceChance: 0 } });
+    const snaps = run(brain, 40_000);
+    expect(snaps.some((s) => s.animation === 'toss')).toBe(true);
+    expect(snaps.some((s) => s.animation === 'lift' || s.animation === 'carry' || s.animation === 'throw')).toBe(false);
+  });
+
+  it('lets go of a block he is carrying when you take it off him, and waits for you to throw it', () => {
+    const box = toybox({ x: 1100, y: 700 });
+    const toy = box.toys[0]!;
+    const brain = makeBrain(box, { play: { tossChance: 1, carryChance: 1, pounceChance: 0 } });
+    const carrier = world({ carries: true });
+    runUntil(brain, (s) => s.animation === 'carry', 30_000, carrier);
+    run(brain, 300, carrier);
+    expect(box.hold(toy.id, 'user')).toBe(true);
+    const snap = run(brain, 200, carrier).at(-1)!;
+    expect(snap.phase).toBe('wait');
+    expect(snap.animation).not.toBe('carry');
+    expect(toy.holder).toBe('user');
+  });
 });
+

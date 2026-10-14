@@ -1,9 +1,9 @@
-import { DEG, clamp01, lerp } from '../critter/kit';
+import { DEG, clamp01 } from '../critter/kit';
 import { bodyFrame, headCentre, legRoot, WATER_Y, type ChibiPose, type LegName } from '../chibi/pose';
-import type { ChibiBuild } from '../chibi/species';
 import { GLYPHS } from './glyphs';
 import { C } from './palette';
 import { capsule, ellipse, intersect, joinBoxes, polygon, Raster, tube, union, type Box, type Pt, type Sd } from './raster';
+import type { PixelBuild, PixelSpecies } from './species';
 
 /**
  * Draws a pixel-art pet from the same poses as the chibis: the same big head, bean body,
@@ -15,13 +15,12 @@ import { capsule, ellipse, intersect, joinBoxes, polygon, Raster, tube, union, t
 export const PIXEL = { width: 64, height: 54, feetX: 32, feetY: 46, k: 0.5 };
 
 /** Bands across the tail (from 0 at the root to 1 at the tip). */
-const TAIL_BANDS: Record<ChibiBuild['species'], [number, number][]> = {
+const TAIL_BANDS: Record<PixelSpecies, [number, number][]> = {
   raccoon: [
     [0.3, 0.42],
     [0.55, 0.67],
     [0.8, 1.01],
   ],
-  fox: [[0.75, 1.01]],
   cat: [
     [0.42, 0.5],
     [0.67, 0.75],
@@ -30,22 +29,17 @@ const TAIL_BANDS: Record<ChibiBuild['species'], [number, number][]> = {
 };
 
 /** Ears: half width and height at the base, and where on the head they sit (degrees, 90 = top). */
-const EARS: Record<ChibiBuild['species'], { w: number; h: number; near: number; far: number }> = {
-  cat: { w: 5.8, h: 9.5, near: 58, far: 122 },
-  fox: { w: 6, h: 13, near: 62, far: 120 },
-  raccoon: { w: 6, h: 8.5, near: 56, far: 124 },
+const EARS: Record<PixelSpecies, { w: number; h: number; near: number; far: number }> = {
+  cat: { w: 6.4, h: 10.5, near: 58, far: 122 },
+  raccoon: { w: 6.6, h: 9.5, near: 56, far: 124 },
   otter: { w: 3.6, h: 3.4, near: 42, far: 138 },
 };
 
 /** Cheek tufts: [angle round the head, how far out]. */
-const TUFTS: Record<ChibiBuild['species'], [number, number][]> = {
+const TUFTS: Record<PixelSpecies, [number, number][]> = {
   raccoon: [
     [205, 0.2],
     [335, 0.16],
-  ],
-  fox: [
-    [212, 0.22],
-    [322, 0.2],
   ],
   cat: [
     [205, 0.08],
@@ -72,16 +66,11 @@ function curvy(points: [number, number][], rx: number, ry: number): Pt[] {
   return out;
 }
 
-export interface PixelPetOptions {
-  /** Eyes drawn with a coloured iris round the pupil. */
-  iris: boolean;
-}
-
 /**
  * Draws the pet into `r` (cleared first) and returns the box round the figure itself, for
  * grabbing it. `facing` -1 mirrors it to face left; the marks over its head stay readable.
  */
-export function drawPixelPet(r: Raster, b: ChibiBuild, p: ChibiPose, clock: number, facing: number, moving: number, scruff: Pt, options: PixelPetOptions): Box | null {
+export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: number, facing: number, moving: number, scruff: Pt): Box | null {
   const { feetX: FX, feetY: FY, k: K } = PIXEL;
   const species = b.species;
   r.clear();
@@ -158,11 +147,6 @@ export function drawPixelPet(r: Raster, b: ChibiBuild, p: ChibiPose, clock: numb
     const far = leg.endsWith('Far');
     const c = capsule(root, paw, w);
     r.shape(c.sd, c.box, far ? C.far : C.fur, C.outline);
-    // A fox's black stockings.
-    if (species === 'fox') {
-      const sock = capsule({ x: lerp(root.x, paw.x, 0.55), y: lerp(root.y, paw.y, 0.55) }, paw, w);
-      r.shape(intersect(sock.sd, c.sd), sock.box, C.dark, null);
-    }
   };
   for (const leg of ['backFar', 'frontFar'] as const) if (!raised(leg)) drawLeg(leg);
   for (const leg of ['backNear', 'frontNear'] as const) if (!raised(leg)) drawLeg(leg);
@@ -181,7 +165,7 @@ export function drawPixelPet(r: Raster, b: ChibiBuild, p: ChibiPose, clock: numb
   };
   const B = b.body;
   bodyMark(B.rx * 0.2, B.ry * 0.62, B.rx * 0.78, B.ry * 0.55, C.belly);
-  if (species === 'fox' || species === 'raccoon') bodyMark(B.rx * 0.82, B.ry * 0.25, B.rx * 0.38, B.ry * 0.8, C.light);
+  if (species === 'raccoon') bodyMark(B.rx * 0.82, B.ry * 0.25, B.rx * 0.38, B.ry * 0.8, C.light);
   if (species === 'cat') {
     for (const x of [-0.45, -0.1, 0.25]) {
       const a = T(frame.at({ x: B.rx * x - 2, y: -B.ry - 1 }));
@@ -228,10 +212,6 @@ export function drawPixelPet(r: Raster, b: ChibiBuild, p: ChibiPose, clock: numb
     r.shape(outer.sd, outer.box, near ? C.fur : C.far, C.outline);
     const inner = tri(0.55);
     r.shape(intersect(inner.sd, outer.sd), inner.box, C.inner, null);
-    if (species === 'fox') {
-      const tip = tri(0.42, -0.46, -7.54);
-      r.shape(intersect(tip.sd, outer.sd), tip.box, C.dark, null);
-    }
   };
   drawEar(ear.far, false);
   drawEar(ear.near, true);
@@ -260,7 +240,9 @@ export function drawPixelPet(r: Raster, b: ChibiBuild, p: ChibiPose, clock: numb
   };
   switch (species) {
     case 'raccoon':
-      faceEllipse(rx * 0.15, -ry * 0.42, rx * 0.75, ry * 0.22, C.light);
+      // White brows over the mask, one over each eye.
+      faceEllipse(-rx * 0.26, -ry * 0.46, rx * 0.24, ry * 0.15, C.light);
+      faceEllipse(rx * 0.5, -ry * 0.5, rx * 0.24, ry * 0.15, C.light);
       facePoly(
         [
           [-0.62, 0.12],
@@ -279,22 +261,6 @@ export function drawPixelPet(r: Raster, b: ChibiBuild, p: ChibiPose, clock: numb
       );
       faceEllipse(rx * 0.62, ry * 0.58, rx * 0.45, ry * 0.32, C.light);
       break;
-    case 'fox':
-      facePoly(
-        [
-          [-1.1, 0.35],
-          [-0.4, 0.18],
-          [0.12, 0.36],
-          [0.6, 0.1],
-          [1.2, 0.18],
-          [1.2, 0.7],
-          [1.2, 1.2],
-          [0, 1.2],
-          [-1.1, 1.2],
-        ],
-        C.light,
-      );
-      break;
     case 'cat':
       for (const x of [-0.18, 0.04, 0.26]) {
         const stripe = capsule(onHead({ x: rx * x, y: -ry * 1.05 }), onHead({ x: rx * x + 0.6, y: -ry * 0.62 }), 0.5);
@@ -306,13 +272,7 @@ export function drawPixelPet(r: Raster, b: ChibiBuild, p: ChibiPose, clock: numb
       faceEllipse(rx * 0.42, ry * 0.5, rx * 0.72, ry * 0.42, C.light);
       break;
   }
-  const nose = species === 'fox' ? { x: rx * 0.98, y: ry * 0.3 } : species === 'otter' ? { x: rx * 0.78, y: ry * 0.22 } : { x: rx * 0.8, y: ry * 0.3 };
-  if (species === 'fox') {
-    // A short pointed snout poking out of the cheek: outlined where it stands out from the head.
-    const snout = polygon(curvy([[0.55, 0.06], [0.95, 0.04], [1.12, 0.28], [0.95, 0.56], [0.55, 0.55]], rx, ry).map(onHead));
-    r.shape(snout.sd, snout.box, C.light, null);
-    r.shape(snout.sd, snout.box, 0, C.outline, undefined, (x, y) => head(x, y) > 0);
-  }
+  const nose = species === 'otter' ? { x: rx * 0.78, y: ry * 0.22 } : { x: rx * 0.8, y: ry * 0.3 };
   if (species === 'otter') {
     for (const dx of [-1.9, 1.9]) {
       const at = onHead({ x: nose.x + dx * 0.8 - 0.5, y: nose.y + 2.7 });
@@ -345,10 +305,7 @@ export function drawPixelPet(r: Raster, b: ChibiBuild, p: ChibiPose, clock: numb
         const ey = y + look.y;
         const cols = wide ? [ex - 1, ex, ex + 1] : [ex, ex + 1];
         const rows = wide ? [ey - 1, ey, ey + 1] : [ey - 1, ey, ey + 1];
-        for (const cx of cols) for (const cy of rows) r.set(cx, cy, options.iris ? C.iris : C.eye);
-        // A cat's slit of a pupil; wide with fright, a round one in the middle.
-        if (options.iris && wide) r.set(ex, ey, C.eye);
-        else if (options.iris) for (const cy of rows) r.set(ex + 1, cy, C.eye);
+        for (const cx of cols) for (const cy of rows) r.set(cx, cy, C.eye);
         r.set(cols[cols.length - 1]!, rows[0]!, C.glint);
       }
     }

@@ -2,7 +2,8 @@ import type { AnimationName, AnimationSpec } from './types';
 
 /**
  * Moments in the toy animations that the behaviour and the drawings must agree on, ms
- * from the start: when a swat's paw meets the toy, and when a toss picks it up and lets go.
+ * from the start: when a swat's paw meets the toy, when a toss picks it up and lets go,
+ * when a lift picks it up (to carry it off), and when a throw from carrying lets go.
  */
 export const PLAY = {
   batMs: 650,
@@ -10,6 +11,10 @@ export const PLAY = {
   tossMs: 1250,
   tossGrabMs: 380,
   tossReleaseMs: 840,
+  liftMs: 1000,
+  liftGrabMs: 380,
+  throwMs: 950,
+  throwReleaseMs: 450,
 };
 
 /**
@@ -34,4 +39,7 @@ export const ANIMATIONS: Record<AnimationName, AnimationSpec> = {
   happy: { fps: 30, durationMs: 1200, loop: true, eyes: 'closed' },
   bat: { fps: 60, durationMs: PLAY.batMs, loop: false, eyes: 'wide' },
   toss: { fps: 60, durationMs: PLAY.tossMs, loop: false, eyes: 'open' },
+  lift: { fps: 60, durationMs: PLAY.liftMs, loop: false, eyes: 'open' },
+  carry: { fps: 60, durationMs: 700, loop: true, eyes: 'open' },
+  throw: { fps: 60, durationMs: PLAY.throwMs, loop: false, eyes: 'open' },
 };

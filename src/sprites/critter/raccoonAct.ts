@@ -1,8 +1,9 @@
 import { PLAY } from '../animations';
 import { CRITTER_TOY, RACCOON_BUILD as B } from './build';
 import { gaitFor, leap, leapKind, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
+import { step, strideAt, type Gait } from './gait';
 import { bump, clamp01, easeOut, keyed, lerp, noise1, smoother, span, wave } from './kit';
-import { blankPose, setPaw, type Pose } from './pose';
+import { blankPose, POSE_KEYS, setPaw, type Pose } from './pose';
 import { DEPTH } from './view';
 
 /**
@@ -281,7 +282,212 @@ export function raccoonAct(input: ActInput): Act {
 
     case 'toss':
       return toss(input);
+
+    case 'lift':
+      return lift(input);
+
+    case 'carry':
+      return carry(input);
+
+    case 'throw':
+      return throwIt(input);
   }
+}
+
+/** One pose eased `k` of the way into another. */
+function blend(a: Pose, b: Pose, k: number): Pose {
+  const out = { ...a };
+  for (const key of POSE_KEYS) out[key] = lerp(a[key], b[key], k);
+  return out;
+}
+
+/** Eases from each pose to the next at the times given (ms), holding the last. */
+function through(t: number, keys: readonly (readonly [number, Pose])[]): Pose {
+  for (let i = 1; i < keys.length; i++) {
+    const [t0, from] = keys[i - 1]!;
+    const [t1, to] = keys[i]!;
+    if (t <= t1) return blend(from, to, smoother((t - t0) / (t1 - t0)));
+  }
+  return { ...keys[keys.length - 1]![1] };
+}
+
+/** Bent down over a toy in front of him, both hands round it. */
+function reachDown(): Pose {
+  const p = stand();
+  p.py = -21;
+  p.sx = 13.5;
+  p.sy = -15;
+  p.hx = 27;
+  p.hy = -18;
+  p.hpitch = 30;
+  const block = { x: B.toyReach, y: -CRITTER_TOY / 2 };
+  setPaw(p, 'frontNear', block.x, block.y, -20);
+  setPaw(p, 'frontFar', block.x - 1, block.y, -20);
+  p.earN = 0.4;
+  p.earF = 0.4;
+  p.lookY = 0.8;
+  return p;
+}
+
+/** Up on his hind legs, hugging a toy to his chest in both hands. */
+function upright(): Pose {
+  const p = stand();
+  p.px = -4;
+  p.py = -21;
+  p.sx = 0;
+  p.sy = -43;
+  p.arch = 2.5;
+  p.hx = 5;
+  p.hy = -54;
+  p.hpitch = 6;
+  p.hyaw = 45;
+  setPaw(p, 'frontNear', 10, -33, -100);
+  setPaw(p, 'frontFar', 9, -33.5, -100);
+  setPaw(p, 'backNear', -2, 0, 72);
+  setPaw(p, 'backFar', -2 + B.farOffset, 0, 72);
+  // The tail down behind, to balance him.
+  p.tailA = 225;
+  p.tailBend = 0.8;
+  p.tailStiff = 0.5;
+  p.earN = 0.35;
+  p.earF = 0.35;
+  p.lookX = 0.3;
+  p.lookY = 0.1;
+  return p;
+}
+
+/** Winding up to throw: up on his toes, leaning back, the toy held high over his head. */
+function overhead(): Pose {
+  const p = upright();
+  p.px = -4;
+  p.py = -20;
+  p.sx = -1.5;
+  p.sy = -44;
+  p.arch = 2;
+  p.hx = 2;
+  p.hy = -55;
+  p.hpitch = -25;
+  p.hyaw = 52;
+  setPaw(p, 'frontNear', 5, -58, -150);
+  setPaw(p, 'frontFar', 4, -58, -150);
+  setPaw(p, 'backNear', -1, 0, 72);
+  setPaw(p, 'backFar', -1 + B.farOffset, 0, 72);
+  p.tailA = 230;
+  p.earN = -0.3;
+  p.earF = -0.3;
+  p.lookY = -0.6;
+  return p;
+}
+
+/** Just let go: arms flung out forward and up after it. */
+function flung(): Pose {
+  const p = overhead();
+  p.py = -20.5;
+  p.sx = 2;
+  p.sy = -41;
+  p.hx = 6;
+  p.hy = -52;
+  p.hpitch = 0;
+  setPaw(p, 'frontNear', 17, -40, -60);
+  setPaw(p, 'frontFar', 16, -40, -60);
+  p.earN = 0.6;
+  p.earF = 0.6;
+  p.lookY = -0.5;
+  return p;
+}
+
+/**
+ * Picking a toy up to carry it off: down to it, both hands round it, and up onto his hind
+ * legs with it hugged to his chest.
+ */
+function lift(input: ActInput): Act {
+  const { t, clock } = input;
+  const { liftGrabMs: grab, liftMs: end } = PLAY;
+  const flags = noFlags();
+  flags.pawUp = t > grab - 150;
+  const up = upright();
+  breathe(up, clock, 2400, 0.6);
+  const p = through(t, [
+    [0, stand()],
+    [grab - 40, reachDown()],
+    [grab + 60, reachDown()],
+    [end - 120, up],
+  ]);
+  // Pleased with himself.
+  p.mouth = keyed(t, [[end - 260, 0], [end - 120, 0.18], [end, 0.1]]);
+  return { pose: p, flags };
+}
+
+/**
+ * Walking on two legs he takes short, quick steps, twice as many as on four for the same
+ * ground, the near and far feet half a step apart.
+ */
+const BIPED: Gait = {
+  ...B.walk,
+  duty: 0.6,
+  offsets: { backNear: 0, backFar: 0.5, frontNear: 0, frontFar: 0.5 },
+  lift: [0, 3.2],
+  curl: [0, 36],
+  peak: [0.5, 0.42],
+};
+
+/**
+ * Toddling along on his hind legs with the toy hugged to his chest: short quick steps, a
+ * side-to-side waddle, the body bobbing up over each foot, the tail swinging to balance.
+ */
+function carry(input: ActInput): Act {
+  const { clock, phase, speed } = input;
+  const flags = noFlags();
+  flags.pawUp = true;
+  const p = upright();
+  breathe(p, clock, 2000, 0.5);
+  const amp = clamp01(speed / 14);
+  // The phase goes once round per four-legged stride: on two legs, that's two steps each.
+  const u = phase * 2;
+  const stride = strideAt(B.walk, speed) / 2;
+  for (const leg of ['backNear', 'backFar'] as const) {
+    const home = leg === 'backNear' ? -2 : -2 + B.farOffset;
+    const s = step(BIPED, leg, u, stride, home, 72, amp);
+    setPaw(p, leg, s.x, s.y, s.a);
+  }
+  const bob = Math.cos(u * Math.PI * 4) * amp;
+  const sway = Math.sin(u * Math.PI * 2) * amp;
+  // Up over each foot, leaning a little into the walk, rolling from side to side.
+  const rise = 0.8 * bob;
+  const lean = 1.5 * amp;
+  p.py -= rise * 0.6;
+  p.sy -= rise;
+  p.hy -= rise;
+  p.sx += lean;
+  p.hx += lean;
+  p.fnx += lean;
+  p.ffx += lean;
+  p.fny -= rise;
+  p.ffy -= rise;
+  p.hroll = 6 * sway;
+  p.hturn = 4 * sway;
+  p.tailSide = 0.4 * sway;
+  p.tailA += 6 * sway;
+  p.mouth = 0.1;
+  return { pose: p, flags };
+}
+
+/** Throwing what he's carrying: up over his head, a two-handed throw, and back down on all fours. */
+function throwIt(input: ActInput): Act {
+  const { t } = input;
+  const { throwReleaseMs: release, throwMs: end } = PLAY;
+  const wind = release - 230;
+  const down = release + 300;
+  const flags = noFlags();
+  flags.pawUp = t < release + 220;
+  const p = through(t, [
+    [0, upright()],
+    [wind, overhead()],
+    [release, flung()],
+    [down, stand()],
+  ]);
+  p.mouth = keyed(t, [[release, 0], [release + 80, 0.25], [end, 0]]);
+  return { pose: p, flags };
 }
 
 /** Shoving a toy along the floor with one hand: a crouch, a quick reach, a push. */

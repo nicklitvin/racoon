@@ -369,8 +369,14 @@ export function otterAct(input: ActInput): Act {
     case 'bat':
       return nudge(input);
 
+    // Only raccoons carry a toy about in their hands: an otter just flicks it away.
     case 'toss':
+    case 'lift':
+    case 'throw':
       return toss(input);
+
+    case 'carry':
+      return otterAct({ ...input, animation: 'walk' });
   }
 }
 

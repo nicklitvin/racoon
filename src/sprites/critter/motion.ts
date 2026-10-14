@@ -83,7 +83,7 @@ const MIRRORED: [PoseKey, PoseKey][] = [
   ['scapN', 'scapF'],
 ];
 /** While moving, which side is which doesn't matter, so it never swaps mid-stride. */
-const LOCOMOTION = new Set<AnimationName>(['walk', 'run', 'chase', 'jump', 'leap']);
+const LOCOMOTION = new Set<AnimationName>(['walk', 'run', 'chase', 'jump', 'leap', 'carry']);
 const RESTING = new Set<AnimationName>(['idle', 'sit', 'groom', 'yawn', 'sleep', 'happy', 'confused']);
 
 /** How much the tail wanders on its own in each animation: 0 still (posed), 1 a relaxed animal's. */
@@ -93,6 +93,7 @@ const TAIL_LIFE: Partial<Record<AnimationName, number>> = {
   confused: 1.3,
   peek: 0.6,
   walk: 0.6,
+  carry: 0.5,
   groom: 0.4,
   yawn: 0.4,
   run: 0.3,
@@ -120,7 +121,7 @@ const TAIL_TEMPER: Record<Build['species'], { amount: number; pace: number }> = 
 };
 
 /** Nominal ground speeds, used when the frame doesn't say how fast he's going (previews). */
-const NOMINAL_SPEED: Partial<Record<AnimationName, number>> = { walk: 76, run: 300, chase: 560, leap: 560 };
+const NOMINAL_SPEED: Partial<Record<AnimationName, number>> = { walk: 76, carry: 50, run: 300, chase: 560, leap: 560 };
 
 /**
  * How briskly the shoulders swing round to a new heading, and the hips after them: spring

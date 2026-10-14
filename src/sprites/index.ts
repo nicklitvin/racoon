@@ -8,7 +8,8 @@ import { foxAct } from './critter/foxAct';
 import { otterAct } from './critter/otterAct';
 import { raccoonAct } from './critter/raccoonAct';
 import { createPixel } from './pixel';
-import { handheld, PIXEL_COATS, type Palette } from './pixel/palette';
+import { PIXEL_COATS, type Palette } from './pixel/palette';
+import { PIXEL_CAT, PIXEL_OTTER, PIXEL_RACCOON, type PixelBuild } from './pixel/species';
 import type { RaccoonRenderer, ToyLook } from './types';
 
 export { ANIMATIONS } from './animations';
@@ -37,8 +38,8 @@ const lifelikeFox = (look: string, label: string) => (doc: Document = document) 
 const lifelikeOtter = (look: string, label: string) => (doc: Document = document) =>
   createCritter(doc, OTTER_BUILD, otterAct, look, label, toysFor(look));
 const chibi = (build: ChibiBuild, coat: string, label: string) => (doc: Document = document) => createChibi(doc, build, coat, label);
-const pixel = (build: ChibiBuild, palette: Palette, coat: string, label: string, toys: ToyLook = 'pixel') => (doc: Document = document) =>
-  createPixel(doc, build, palette, coat, label, toys);
+const pixel = (build: PixelBuild, palette: Palette, coat: string, label: string) => (doc: Document = document) =>
+  createPixel(doc, build, palette, coat, label);
 
 /** Every pet the settings offer, with its label and renderer. Retired ones are in ./archive. */
 export const RACCOON_STYLES: Record<RaccoonType, PetStyle> = {
@@ -142,41 +143,20 @@ export const RACCOON_STYLES: Record<RaccoonType, PetStyle> = {
     group: 'pixel',
     label: 'Pixel raccoon',
     description: 'A little bandit straight out of an old video game, every pixel placed.',
-    create: pixel(CHIBI_RACCOON, PIXEL_COATS.raccoon, 'pixel-coat-raccoon', 'raccoon'),
+    create: pixel(PIXEL_RACCOON, PIXEL_COATS.raccoon, 'pixel-coat-raccoon', 'raccoon'),
   },
   'cat-pixel': {
     species: 'cat',
     group: 'pixel',
     label: 'Pixel tabby',
     description: 'A ginger kitten in chunky pixels, ready to swat things off your desk.',
-    create: pixel(CHIBI_CAT, PIXEL_COATS.ginger, 'pixel-coat-ginger', 'ginger cat'),
-  },
-  'cat-pixel-black': {
-    species: 'cat',
-    group: 'pixel',
-    label: 'Pixel black cat',
-    description: 'A black cat with bright green-gold eyes, eight bits of mischief.',
-    create: pixel(CHIBI_CAT, PIXEL_COATS.black, 'pixel-coat-black', 'black cat'),
-  },
-  'fox-pixel': {
-    species: 'fox',
-    group: 'pixel',
-    label: 'Pixel fox',
-    description: 'A red fox sprite with black socks and a white-tipped brush.',
-    create: pixel(CHIBI_FOX, PIXEL_COATS.fox, 'pixel-coat-fox', 'fox'),
+    create: pixel(PIXEL_CAT, PIXEL_COATS.ginger, 'pixel-coat-ginger', 'ginger cat'),
   },
   'otter-pixel': {
     species: 'otter',
     group: 'pixel',
     label: 'Pixel otter',
     description: 'Paddles about in a pixel pond and floats on its back with its shell.',
-    create: pixel(CHIBI_OTTER, PIXEL_COATS.otter, 'pixel-coat-otter', 'otter'),
-  },
-  'raccoon-pixel-handheld': {
-    species: 'raccoon',
-    group: 'pixel',
-    label: 'Handheld raccoon',
-    description: 'The pixel raccoon in four shades of green, as on a pocket console’s screen.',
-    create: pixel(CHIBI_RACCOON, handheld(PIXEL_COATS.raccoon), 'pixel-coat-handheld', 'raccoon', 'handheld'),
+    create: pixel(PIXEL_OTTER, PIXEL_COATS.otter, 'pixel-coat-otter', 'otter'),
   },
 };

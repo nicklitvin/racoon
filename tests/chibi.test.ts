@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ChibiMotion } from '../src/sprites/chibi';
 import { CHIBI_VIEW } from '../src/sprites/chibi/draw';
-import { headCentre, LEGS, legRoot, scruffPoint, WATER_Y, type ChibiPose } from '../src/sprites/chibi/pose';
+import { headCentre, LEGS, legRoot, scruffPoint, toyHoldPoint, WATER_Y, type ChibiPose } from '../src/sprites/chibi/pose';
 import { CHIBI_CAT, CHIBI_FOX, CHIBI_OTTER, CHIBI_RACCOON, type ChibiBuild } from '../src/sprites/chibi/species';
 import { PX_PER_UNIT } from '../src/sprites/svg';
 import { ANIMATION_NAMES, type AnimationName, type RaccoonFrame } from '../src/sprites/types';
@@ -164,6 +164,46 @@ describe.each(WALKERS)('chibi %s on its feet', (_name, build) => {
           expect(Math.hypot(paw.x - root.x, paw.y - root.y), `${animation} ${leg}`).toBeLessThan(22);
         }
       }
+    }
+  });
+});
+
+describe('chibi raccoon carrying a block', () => {
+  it('walks along on his hind legs with the block held in his front paws', () => {
+    const poses = settled(CHIBI_RACCOON, 'carry', 60, { velocity: { x: 40, y: 0 } });
+    for (const p of poses) {
+      // Body upright, front paws up off the floor, hind paws taking it in turns to step.
+      expect(p.rot).toBeGreaterThan(55);
+      expect(p.paws.frontNear.y).toBeLessThan(-10);
+      expect(p.hold).toBe(1);
+      const block = toyHoldPoint(CHIBI_RACCOON, p);
+      expect(Math.abs(block.x - p.paws.frontNear.x)).toBeLessThan(6);
+      expect(Math.abs(block.y - p.paws.frontNear.y)).toBeLessThan(6);
+    }
+    const lifted = (leg: 'backNear' | 'backFar') => poses.filter((p) => p.paws[leg].y < -0.5).length;
+    expect(lifted('backNear')).toBeGreaterThan(5);
+    expect(lifted('backFar')).toBeGreaterThan(5);
+    expect(poses.some((p) => p.paws.backNear.y < -0.5 && p.paws.backFar.y < -0.5)).toBe(false);
+  });
+
+  it('holds it overhead winding up to throw, and has let go by the time it flies', () => {
+    const d = driver(CHIBI_RACCOON);
+    const at = (ms: number) => {
+      let pose!: ChibiPose;
+      for (let t = 0; t <= ms; t += 16) pose = d.step({ animation: 'throw' });
+      return pose;
+    };
+    const wind = at(220);
+    expect(toyHoldPoint(CHIBI_RACCOON, wind).y).toBeLessThan(headCentre(CHIBI_RACCOON, wind).y);
+    expect(wind.hold).toBe(1);
+    const after = at(300);
+    expect(after.hold).toBe(0);
+  });
+
+  it('is only a raccoon thing: a cat carrying just walks, holding nothing in its paws', () => {
+    for (const p of settled(CHIBI_CAT, 'carry', 20, { velocity: { x: 40, y: 0 } })) {
+      expect(p.hold).toBe(0);
+      expect(p.rot).toBeLessThan(20);
     }
   });
 });

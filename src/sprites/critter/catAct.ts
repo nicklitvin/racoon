@@ -283,8 +283,14 @@ export function catAct(input: ActInput): Act {
     case 'bat':
       return bat(input);
 
+    // Only raccoons carry a toy about in their hands: a cat just throws it.
     case 'toss':
+    case 'lift':
+    case 'throw':
       return toss(input);
+
+    case 'carry':
+      return catAct({ ...input, animation: 'walk' });
   }
 }
 

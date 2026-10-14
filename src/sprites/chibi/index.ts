@@ -58,8 +58,8 @@ export class ChibiMotion {
     const v = frame.velocity ?? { x: 0, y: 0 };
     const speed = Math.hypot(v.x, v.y) * unitsPerPx;
     const { stride } = this.build;
-    const cycle = frame.animation === 'walk' ? stride.walkCycle : stride.runCycle;
-    const locomotion = frame.animation === 'walk' || frame.animation === 'run' || frame.animation === 'chase' || frame.animation === 'leap';
+    const cycle = frame.animation === 'walk' || frame.animation === 'carry' ? stride.walkCycle : stride.runCycle;
+    const locomotion = frame.animation === 'walk' || frame.animation === 'carry' || frame.animation === 'run' || frame.animation === 'chase' || frame.animation === 'leap';
     if (locomotion) this.phase = (this.phase + (Math.max(speed, cycle * 1.2) * dt) / cycle) % 1;
     this.moving += ((locomotion ? Math.min(1.5, speed / 60) : 0) - this.moving) * Math.min(1, dt * 6);
 
@@ -108,6 +108,8 @@ export function createChibi(doc: Document, build: ChibiBuild, className: string,
     toyReach: build.toyReach * PX_PER_UNIT,
     toySize: CHIBI_TOY * PX_PER_UNIT,
     toyLook: 'chibi',
+    carriesToys: build.species === 'raccoon',
+    drawsMarks: true,
     toyPoint: () => (toy ? { x: toy.x * motion.facing * PX_PER_UNIT * scale, y: toy.y * PX_PER_UNIT * scale } : null),
     setScale(next) {
       scale = next;

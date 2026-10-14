@@ -25,12 +25,18 @@ export const ANIMATION_NAMES = [
   'bat',
   /** Picking a toy up and flinging it. */
   'toss',
+  /** Picking a toy up in both hands and standing up with it, to carry it off (raccoons). */
+  'lift',
+  /** Walking along on the hind legs, the toy held in both hands. */
+  'carry',
+  /** Throwing the toy he's carrying, from up on his hind legs, and dropping back onto all fours. */
+  'throw',
 ] as const;
 
 export type AnimationName = (typeof ANIMATION_NAMES)[number];
 
-/** How toy blocks are drawn: painted, outlined like a cartoon, inked, or in pixels (in colour or handheld greens). */
-export type ToyLook = 'paint' | 'chibi' | 'ink' | 'pixel' | 'handheld';
+/** How toy blocks are drawn: painted, outlined like a cartoon, inked, or in pixels. */
+export type ToyLook = 'paint' | 'chibi' | 'ink' | 'pixel';
 
 /** How the eyes are drawn. "open" eyes blink now and then. */
 export type EyeStyle = 'open' | 'closed' | 'wide';
@@ -119,6 +125,13 @@ export interface RaccoonRenderer {
   toyPoint?(): { x: number; y: number } | null;
   /** Drawn in pixels: placed on whole screen pixels, so they stay crisp. */
   readonly pixelated?: boolean;
+  /**
+   * Can pick a toy up in its hands and walk off with it on its hind legs (a raccoon), with
+   * the lift, carry and throw animations.
+   */
+  readonly carriesToys?: boolean;
+  /** Draws its own marks over its head (z's asleep), so the page shouldn't add its own. */
+  readonly drawsMarks?: boolean;
   setScale(scale: number): void;
   /** Cheap to call every tick: only touches what changed. */
   draw(frame: RaccoonFrame): void;

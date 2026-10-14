@@ -50,6 +50,8 @@ export interface ChibiPose {
   pawUp: number;
   /** An otter's shell, held on its chest. */
   shell: number;
+  /** 1 holds a toy block in both front paws (a raccoon), rather than in the mouth. */
+  hold: number;
   /** How much of a pond there is round him (swimmers only). */
   wet: number;
   /** Rocking on the end of your grip, in degrees round the scruff. */
@@ -100,6 +102,7 @@ const NUMBERS = [
   'haunch',
   'pawUp',
   'shell',
+  'hold',
   'wet',
   'swing',
   'splash',
@@ -142,10 +145,15 @@ export function scruffPoint(b: ChibiBuild, p: ChibiPose): Pt {
 }
 
 /**
- * Where a toy block he has in his mouth is (its middle): hanging from his jaws, just under
- * the corner of his mouth.
+ * Where a toy block he has hold of is (its middle): between his front paws if he's holding
+ * it in them, or else hanging from his jaws, just under the corner of his mouth.
  */
 export function toyHoldPoint(b: ChibiBuild, p: ChibiPose): Pt {
+  if (p.hold > 0.5) {
+    const a = p.paws.frontNear;
+    const z = p.paws.frontFar;
+    return { x: (a.x + z.x) / 2 + 2.5, y: (a.y + z.y) / 2 + p.lift - 1 };
+  }
   const h = headCentre(b, p);
   const th = -p.hrot * DEG;
   const l = { x: b.head.rx * 0.78, y: b.head.ry * 0.55 };
@@ -179,6 +187,7 @@ function stand(b: ChibiBuild): ChibiPose {
     haunch: 0,
     pawUp: 0,
     shell: 0,
+    hold: 0,
     wet: 0,
     swing: 0,
     eyes: 'open',
@@ -447,6 +456,143 @@ function toss(b: ChibiBuild, input: ChibiInput): ChibiPose {
   return p;
 }
 
+/** Up on his hind legs, hugging a toy block to his tummy in both front paws. */
+function upright(b: ChibiBuild): ChibiPose {
+  const p = stand(b);
+  p.rot = 70;
+  p.bx = 1;
+  p.by = -2.2;
+  // Turned upright, the head would end up behind; it goes on top.
+  p.hx = 15;
+  p.hy = -3;
+  p.hrot = -4;
+  for (const leg of ['backNear', 'backFar'] as const) p.paws[leg] = { x: legRoot(b, p, leg).x + 0.5, y: 0 };
+  const shoulder = legRoot(b, p, 'frontNear');
+  p.paws.frontNear = { x: shoulder.x + 6.5, y: shoulder.y + 3 };
+  p.paws.frontFar = { x: shoulder.x + 4.5, y: shoulder.y + 1.5 };
+  p.pawUp = 2;
+  p.hold = 1;
+  // The tail out behind him along the floor, to balance (its angle is from the body, which is upright).
+  p.tailA = 118;
+  p.tailCurl = 30;
+  p.ears = 0.3;
+  p.lookX = 0.6;
+  p.lookY = 0.3;
+  return p;
+}
+
+/** Bent down over a block in front of him, front paws round it. */
+function reachDown(b: ChibiBuild): ChibiPose {
+  const p = stand(b);
+  p.rot = -9;
+  p.by = 2;
+  p.hx = 2.5;
+  p.hy = 4;
+  p.hrot = -20;
+  plant(b, p);
+  const contact = b.toyReach - CHIBI_TOY / 2;
+  p.paws.frontNear = { x: contact + 0.5, y: -4 };
+  p.paws.frontFar = { x: contact - 1, y: -5 };
+  p.pawUp = 2;
+  p.ears = 0.4;
+  p.lookX = 0.8;
+  p.lookY = 0.9;
+  return p;
+}
+
+/** Eases from each pose to the next at the times given (ms), holding the last. */
+function through(t: number, keys: readonly (readonly [number, ChibiPose])[]): ChibiPose {
+  for (let i = 1; i < keys.length; i++) {
+    const [t0, from] = keys[i - 1]!;
+    const [t1, to] = keys[i]!;
+    if (t <= t1) return mix(from, to, smooth(clamp01((t - t0) / (t1 - t0))));
+  }
+  return keys[keys.length - 1]![1];
+}
+
+/** A raccoon picking a block up in his front paws and standing up with it. */
+function lift(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t } = input;
+  const { liftGrabMs: grab, liftMs: end } = PLAY;
+  const reach = reachDown(b);
+  const p = through(t, [
+    [0, stand(b)],
+    [grab - 40, reach],
+    [grab + 60, reach],
+    [end - 120, upright(b)],
+  ]);
+  // He only has it from the moment he grabs it.
+  p.hold = t >= grab ? 1 : 0;
+  p.eyes = t > end - 250 ? 'happy' : eyesFrom(input);
+  p.mouth = 0.25 * span(t, end - 300, end - 120);
+  return p;
+}
+
+/**
+ * Toddling along on his hind legs with the block: quick little steps, bobbing up over each
+ * foot, rocking from side to side, the tail swinging to balance him.
+ */
+function carry(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const p = upright(b);
+  const u = input.phase * Math.PI * 4;
+  const rock = Math.sin(u / 2);
+  p.by += 0.6 * Math.cos(2 * u);
+  p.rot += 4 * rock;
+  p.hrot += 5 * rock;
+  p.tailA += 12 * rock;
+  for (const [leg, offset] of [['backNear', 0], ['backFar', Math.PI]] as const) {
+    const v = u + offset;
+    const root = legRoot(b, p, leg);
+    p.paws[leg] = { x: root.x + 0.5 + b.stride.walk * 0.8 * Math.sin(v), y: -2.6 * Math.max(0, Math.cos(v)) };
+  }
+  // The block bobs along with him.
+  const bob = 0.6 * Math.cos(2 * u);
+  p.paws.frontNear.y += bob;
+  p.paws.frontFar.y += bob;
+  p.mouth = 0.15;
+  p.eyes = eyesFrom(input);
+  return p;
+}
+
+/** Throwing the block he's carrying: up over his head, a two-pawed throw, and back down on all fours. */
+function throwIt(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t } = input;
+  const { throwReleaseMs: release, throwMs: end } = PLAY;
+  const wind = release - 230;
+  const down = release + 300;
+  const held = upright(b);
+  const over = upright(b);
+  over.rot = 62;
+  over.hrot = 14;
+  over.ears = -0.3;
+  over.lookY = -0.8;
+  // Arms up behind his big head, the block held high over it.
+  over.pawUp = 0;
+  const h = headCentre(b, over);
+  over.paws.frontNear = { x: h.x + 1, y: h.y - b.head.ry - 2 };
+  over.paws.frontFar = { x: h.x - 2, y: h.y - b.head.ry - 1 };
+  const flung = upright(b);
+  flung.rot = 76;
+  flung.hrot = 6;
+  flung.ears = 0.8;
+  flung.lookY = -0.6;
+  // Paws out in front after it, below his chin.
+  const chin = headCentre(b, flung);
+  flung.paws.frontNear = { x: chin.x + b.head.rx * 1.05, y: chin.y + b.head.ry * 0.75 };
+  flung.paws.frontFar = { x: chin.x + b.head.rx * 0.85, y: chin.y + b.head.ry * 0.85 };
+  flung.hold = 0;
+  const p = through(t, [
+    [0, held],
+    [wind, over],
+    [release, flung],
+    [down, stand(b)],
+  ]);
+  p.hold = t < release ? 1 : 0;
+  p.mouth = 0.35 * keyed(t, [[release, 0], [release + 60, 1], [end, 0]]);
+  p.eyes = t > release + 40 && t < end - 120 ? 'happy' : eyesFrom(input);
+  return p;
+}
+
 /** The pose for a land animal at this moment. */
 function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
   const { t, clock, phase } = input;
@@ -571,6 +717,13 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return bat(b, input);
     case 'toss':
       return toss(b, input);
+    // Only a raccoon carries a block about in his paws; anyone else just throws it.
+    case 'lift':
+      return b.species === 'raccoon' ? lift(b, input) : toss(b, input);
+    case 'carry':
+      return b.species === 'raccoon' ? carry(b, input) : walkerPose(b, { ...input, animation: 'walk' });
+    case 'throw':
+      return b.species === 'raccoon' ? throwIt(b, input) : toss(b, input);
     case 'happy': {
       const p = stand(b);
       const hop = Math.abs(Math.sin((t / 600) * Math.PI * 2));
@@ -832,7 +985,11 @@ function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
     case 'bat':
       return nudge(b, input);
     case 'toss':
+    case 'lift':
+    case 'throw':
       return otterToss(b, input);
+    case 'carry':
+      return otterPose(b, { ...input, animation: 'walk' });
   }
 }
 

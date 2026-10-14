@@ -23,10 +23,7 @@ export const RACCOON_TYPES = [
   'otter-chibi',
   'raccoon-pixel',
   'cat-pixel',
-  'cat-pixel-black',
-  'fox-pixel',
   'otter-pixel',
-  'raccoon-pixel-handheld',
 ] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
@@ -52,11 +49,22 @@ function isRaccoonType(value: unknown): value is RaccoonType {
   return (RACCOON_TYPES as readonly unknown[]).includes(value);
 }
 
+/** Pets that have since been retired, and the nearest one still here. */
+const RETIRED: Record<string, RaccoonType> = {
+  'cat-pixel-black': 'cat-pixel',
+  'fox-pixel': 'fox-chibi',
+  'raccoon-pixel-handheld': 'raccoon-pixel',
+};
+
 /** Turns anything (a parsed file, an IPC message) into valid settings, falling back to defaults. */
 export function normalizeSettings(raw: unknown): Settings {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   return {
-    raccoonType: isRaccoonType(r.raccoonType) ? r.raccoonType : DEFAULT_SETTINGS.raccoonType,
+    raccoonType: isRaccoonType(r.raccoonType)
+      ? r.raccoonType
+      : typeof r.raccoonType === 'string' && Object.hasOwn(RETIRED, r.raccoonType)
+        ? RETIRED[r.raccoonType]!
+        : DEFAULT_SETTINGS.raccoonType,
     keyboardReactions: r.keyboardReactions === true,
     launchAtLogin: r.launchAtLogin === true,
     toys: r.toys !== false,

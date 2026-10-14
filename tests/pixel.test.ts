@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { ChibiMotion } from '../src/sprites/chibi';
-import { scruffPoint, WATER_Y, type ChibiPose } from '../src/sprites/chibi/pose';
-import { CHIBI_CAT, CHIBI_FOX, CHIBI_OTTER, CHIBI_RACCOON, type ChibiBuild } from '../src/sprites/chibi/species';
+import { headCentre, scruffPoint, WATER_Y, type ChibiPose } from '../src/sprites/chibi/pose';
+import { CHIBI_CAT, CHIBI_RACCOON } from '../src/sprites/chibi/species';
 import { drawPixelPet, PIXEL } from '../src/sprites/pixel/draw';
-import { C, HANDHELD, handheld, PIXEL_COATS, rgbaTable, SLOTS } from '../src/sprites/pixel/palette';
+import { C, PIXEL_COATS, rgbaTable, SLOTS } from '../src/sprites/pixel/palette';
 import { ellipse, Raster } from '../src/sprites/pixel/raster';
+import { PIXEL_CAT, PIXEL_OTTER, PIXEL_RACCOON, type PixelBuild } from '../src/sprites/pixel/species';
 import { ANIMATION_NAMES, type AnimationName } from '../src/sprites/types';
 
 const BUILDS = [
-  ['raccoon', CHIBI_RACCOON],
-  ['cat', CHIBI_CAT],
-  ['fox', CHIBI_FOX],
-  ['otter', CHIBI_OTTER],
+  ['raccoon', PIXEL_RACCOON],
+  ['cat', PIXEL_CAT],
+  ['otter', PIXEL_OTTER],
 ] as const;
 
 /** A settled pose for an animation, `ms` in. */
-function poseAt(build: ChibiBuild, animation: AnimationName, ms = 600, facing = 1): { pose: ChibiPose; motion: ChibiMotion; clock: number } {
+function poseAt(build: PixelBuild, animation: AnimationName, ms = 600, facing = 1): { pose: ChibiPose; motion: ChibiMotion; clock: number } {
   const motion = new ChibiMotion(build);
   let clock = 10_000;
   let pose!: ChibiPose;
@@ -26,10 +26,10 @@ function poseAt(build: ChibiBuild, animation: AnimationName, ms = 600, facing = 
   return { pose, motion, clock };
 }
 
-function draw(build: ChibiBuild, animation: AnimationName, ms = 600, facing = 1) {
+function draw(build: PixelBuild, animation: AnimationName, ms = 600, facing = 1) {
   const r = new Raster(PIXEL.width, PIXEL.height);
   const { pose, motion, clock } = poseAt(build, animation, ms, facing);
-  const box = drawPixelPet(r, build, pose, clock, motion.facing, motion.moving, scruffPoint(build, pose), { iris: false });
+  const box = drawPixelPet(r, build, pose, clock, motion.facing, motion.moving, scruffPoint(build, pose));
   return { r, box, pose };
 }
 
@@ -85,13 +85,8 @@ describe('pixel palettes', () => {
     expect(table[C.shadow]! >>> 24).toBeLessThan(255);
   });
 
-  it('draws the handheld coat in nothing but four greens', () => {
-    const coat = handheld(PIXEL_COATS.raccoon);
-    for (const slot of SLOTS) {
-      if (slot === 'shadow') continue;
-      expect(HANDHELD, slot).toContain(coat[slot]);
-    }
-    expect(coat.outline).toBe(HANDHELD[0]);
+  it('gives every coat a colour for every slot', () => {
+    for (const coat of Object.values(PIXEL_COATS)) for (const slot of SLOTS) expect(coat[slot], slot).toMatch(/^(#|rgba)/);
   });
 });
 
@@ -130,9 +125,27 @@ describe.each(BUILDS)('pixel %s', (_name, build) => {
   });
 });
 
+describe('pixel proportions', () => {
+  it('gives the raccoon and the cat a bigger head for their bodies than the chibis, as a sprite wants', () => {
+    for (const [pixel, chibi] of [[PIXEL_RACCOON, CHIBI_RACCOON], [PIXEL_CAT, CHIBI_CAT]] as const) {
+      const ratio = (b: PixelBuild | typeof chibi) => b.head.rx / b.body.rx;
+      expect(ratio(pixel)).toBeGreaterThan(ratio(chibi) * 1.15);
+    }
+  });
+
+  it('draws the head at least as wide as the body standing', () => {
+    for (const build of [PIXEL_RACCOON, PIXEL_CAT]) {
+      const { pose } = draw(build, 'idle');
+      const head = headCentre(build, pose);
+      expect(head.y, build.species).toBeLessThan(build.body.at.y);
+      expect(build.head.rx * 2, build.species).toBeGreaterThanOrEqual(build.body.rx * 2.6);
+    }
+  });
+});
+
 describe('pixel otter', () => {
   it('swims in a pixel pond, nothing of it showing below the surface but water', () => {
-    const { r, pose } = draw(CHIBI_OTTER, 'walk');
+    const { r, pose } = draw(PIXEL_OTTER, 'walk');
     expect(pose.wet).toBe(1);
     expect(count(r, C.water)).toBeGreaterThan(40);
     const surface = Math.ceil(PIXEL.feetY + (WATER_Y + 2) * PIXEL.k);

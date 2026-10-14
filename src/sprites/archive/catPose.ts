@@ -394,6 +394,9 @@ export function catPoseFor(animation: AnimationName, t: number, keystrokes = 0):
     // Retired drawings never learnt to play: they stand and look pleased instead.
     case 'bat':
     case 'toss':
+    case 'lift':
+    case 'carry':
+    case 'throw':
     case 'happy': {
       // Being petted: eyes shut, leans up into the hand, kneads with the front paws, tail up.
       const pose = sitting(t);

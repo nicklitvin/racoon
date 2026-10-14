@@ -1,6 +1,5 @@
 import { PIXEL_TOY } from './pixel';
 import { BLOCK_LETTERS, GLYPHS } from './pixel/glyphs';
-import { HANDHELD } from './pixel/palette';
 import { n, svgWriter } from './svg';
 import type { ToyLook } from './types';
 
@@ -29,7 +28,7 @@ export interface ToyDrawing {
 export const TOY_BOX = 1.5;
 
 export function createToyDrawing(doc: Document, look: ToyLook, face: number, size: number): ToyDrawing {
-  return look === 'pixel' || look === 'handheld' ? pixelBlock(doc, look, face, size) : vectorBlock(doc, look, face, size);
+  return look === 'pixel' ? pixelBlock(doc, look, face, size) : vectorBlock(doc, look, face, size);
 }
 
 function vectorBlock(doc: Document, look: ToyLook, face: number, size: number): ToyDrawing {
@@ -85,9 +84,8 @@ function pixelBlock(doc: Document, look: ToyLook, face: number, size: number): T
   canvas.style.width = `${size * (S / N)}px`;
   canvas.style.height = `${size * (S / N)}px`;
   const paint = BLOCKS[face % BLOCKS.length]!;
-  const green = look === 'handheld';
   // 1 outline, 2 panel, 3 lit edge, 4 shaded edge, 5 letter.
-  const colours = green ? ['', HANDHELD[0]!, HANDHELD[1]!, HANDHELD[2]!, HANDHELD[0]!, HANDHELD[3]!] : ['', '#2a1f2d', paint.face, lighten(paint.face), paint.deep, paint.letter];
+  const colours = ['', '#2a1f2d', paint.face, lighten(paint.face), paint.deep, paint.letter];
   const glyph = GLYPHS[BLOCK_LETTERS[face % BLOCK_LETTERS.length]!];
   const art: number[][] = [];
   for (let y = 0; y < N; y++) {
