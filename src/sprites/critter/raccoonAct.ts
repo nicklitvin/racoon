@@ -4,6 +4,7 @@ import { gaitFor, leap, leapKind, lookAt, noFlags, walkBob, walkLegs, type Act, 
 import { step, strideAt, type Gait } from './gait';
 import { bump, clamp01, easeOut, keyed, lerp, noise1, smoother, span, wave } from './kit';
 import { blankPose, POSE_KEYS, setPaw, type Pose } from './pose';
+import { typing } from '../typing';
 import { DEPTH } from './view';
 
 /**
@@ -291,7 +292,67 @@ export function raccoonAct(input: ActInput): Act {
 
     case 'throw':
       return throwIt(input);
+
+    case 'work':
+      return work(input);
+
+    case 'attention':
+      return attention(input);
   }
+}
+
+/**
+ * Sat up at his desk, leaning in, both hands on the keyboard: typing in bursts, then
+ * stopping to think with a hand to his chin, eyes on the screen.
+ */
+function work(input: ActInput): Act {
+  const { clock } = input;
+  const flags = noFlags();
+  flags.pawUp = true;
+  const p = sitUp();
+  breathe(p, clock, 3200, 0.6);
+  const k = typing(clock);
+  // Leaning in to the screen.
+  p.sx += 3;
+  p.hx += 5;
+  p.hy += 2;
+  p.hpitch = lerp(-4, -12, k.pause);
+  p.hyaw = 24;
+  p.hroll = 4 * k.pause;
+  p.lookX = 0.6;
+  p.lookY = lerp(-0.2, -0.5, k.pause);
+  const D = B.desk;
+  setPaw(p, 'frontNear', D.x + 1.5, D.y - k.near * 2.4, -95);
+  // Thinking, the far hand comes up to his chin.
+  setPaw(p, 'frontFar', lerp(D.x - 1.5, p.hx - 1, k.pause), lerp(D.y - k.far * 2.4, p.hy + 9, k.pause), lerp(-95, -150, k.pause));
+  p.earN = 0.3 + 0.2 * k.pause;
+  p.earF = p.earN;
+  p.tailA = 238;
+  return { pose: p, flags };
+}
+
+/** Wants to play: up on his hind legs, bouncing on his toes and waving, chattering at you. */
+function attention(input: ActInput): Act {
+  const { t, clock } = input;
+  const flags = noFlags();
+  flags.pawUp = true;
+  const p = upright();
+  breathe(p, clock, 1400, 0.8);
+  const hop = Math.abs(Math.sin((t / 600) * Math.PI));
+  p.py -= hop * 1.5;
+  p.sy -= hop * 2;
+  p.hy -= hop * 2;
+  p.hyaw = 75;
+  p.hpitch = -6;
+  const wave = Math.sin((t / 300) * Math.PI * 2);
+  setPaw(p, 'frontNear', 9 + wave * 3, -52, -160 + wave * 25);
+  setPaw(p, 'frontFar', 7, -33, -100);
+  p.mouth = 0.18 + 0.12 * (0.5 + 0.5 * Math.sin(t / 90));
+  p.earN = 0.7;
+  p.earF = 0.7;
+  p.lids = -0.2;
+  p.tailSide = 0.4 * Math.sin((t / 400) * Math.PI * 2);
+  return { pose: p, flags };
 }
 
 /** One pose eased `k` of the way into another. */

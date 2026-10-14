@@ -4,6 +4,7 @@ import { LEAP_MS, lookAt, noFlags, type Act, type ActInput } from './act';
 import { bump, clamp01, easeOut, keyed, lerp, noise1, smooth, span, wave } from './kit';
 import { blankPose, LEGS, POSE_KEYS, setPaw, type Pose } from './pose';
 import { DEPTH } from './view';
+import { typing } from '../typing';
 
 /**
  * How a real otter carries itself in the water. The floor is the surface of the pond:
@@ -377,6 +378,43 @@ export function otterAct(input: ActInput): Act {
 
     case 'carry':
       return otterAct({ ...input, animation: 'walk' });
+
+    case 'work': {
+      // Treading water at its desk, paws up on the keyboard, typing.
+      const p = tread();
+      const k = typing(clock);
+      breathe(p, clock, 3000, 0.6);
+      bob(p, clock, 0.4);
+      p.sy -= 2;
+      p.hy -= 2;
+      p.hx += 1;
+      p.hpitch = lerp(0, -10, k.pause);
+      p.hyaw = 24;
+      p.lookX = 0.6;
+      const D = B.desk;
+      setPaw(p, 'frontNear', D.x + 1, D.y - k.near * 1.8, -60);
+      setPaw(p, 'frontFar', D.x - 1, D.y - k.far * 1.8, -60);
+      p.earN = 0.3;
+      p.earF = 0.3;
+      return { pose: p, flags: { ...flags, pawUp: true } };
+    }
+
+    case 'attention': {
+      // Bobbing up out of the water, waving both paws over its head.
+      const p = tread();
+      const hop = Math.abs(Math.sin((t / 600) * Math.PI));
+      p.sy -= 3 + hop * 2;
+      p.hy -= 3 + hop * 2;
+      p.py -= hop;
+      p.hyaw = 75;
+      const wave = Math.sin((t / 300) * Math.PI * 2);
+      setPaw(p, 'frontNear', p.sx + 4 + wave * 2, p.sy - 7, -150);
+      setPaw(p, 'frontFar', p.sx + 2 - wave * 2, p.sy - 6.5, -150);
+      p.mouth = 0.3;
+      p.earN = 0.6;
+      p.earF = 0.6;
+      return { pose: p, flags: { ...flags, pawUp: true } };
+    }
   }
 }
 

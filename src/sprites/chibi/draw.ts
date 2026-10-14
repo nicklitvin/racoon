@@ -1,4 +1,5 @@
 import { clamp01, curve, DEG, fmt, lerp, tubePoints } from '../critter/kit';
+import { drawWearable, hatItem, NECK_WIDTH, outfitItem, type Dress } from '../outfits';
 import { n, svgWriter } from '../svg';
 import { bodyFrame, headCentre, LEGS, legRoot, WATER_Y, type ChibiPose, type LegName } from './pose';
 import type { ChibiBuild, Pt } from './species';
@@ -81,6 +82,9 @@ export function createChibiSkin(doc: Document, build: ChibiBuild, className: str
   const legsNear = make('g', {}, figure);
   const bodyGroup = make('g', {}, figure);
   const tailInFront = make('g', {}, figure);
+  // What he wears round his neck: over his chest, under his chin.
+  const neckGroup = make('g', { class: 'c-outfit' }, figure);
+  const neckwear = make('g', {}, neckGroup);
   const headGroup = make('g', {}, figure);
   const front = make('g', {}, figure);
 
@@ -224,6 +228,9 @@ export function createChibiSkin(doc: Document, build: ChibiBuild, className: str
     const wy = nose.y + 1.6;
     make('path', { class: 'c-whisker', d: `M${n(wx)},${n(wy - 0.6)} l7,-2.2 M${n(wx + 0.3)},${n(wy + 0.8)} l7.4,0.2 M${n(wx)},${n(wy + 2.1)} l6.6,2.2` }, headGroup);
   }
+
+  // A hat, on top of everything else on his head.
+  const hat = make('g', { class: 'c-outfit', transform: `translate(${n(-rx * 0.06)} ${n(-ry * 0.9)}) scale(${n(rx)})` }, headGroup);
 
   // --- A paw raised to the face or over the screen edge, and an otter's shell ---
   const raisedFarEdge = make('path', { class: 'c-limb-edge', 'stroke-width': n(build.legWidth + 2.6) }, front);
@@ -376,6 +383,16 @@ export function createChibiSkin(doc: Document, build: ChibiBuild, className: str
     set(blushFar, 'opacity', n(p.blush * 0.8));
   }
 
+  /** The collar sits under his chin, turned with his head. */
+  function drawNeck(p: ChibiPose): void {
+    if (!neckwear.firstChild) return;
+    const h = headCentre(build, p);
+    const th = -p.hrot * DEG;
+    const l = { x: -rx * 0.05, y: ry * 1.06 };
+    const at = { x: h.x + l.x * Math.cos(th) - l.y * Math.sin(th), y: h.y + l.x * Math.sin(th) + l.y * Math.cos(th) };
+    set(neckGroup, 'transform', `translate(${n(at.x)} ${n(at.y)}) rotate(${n(-p.hrot)}) scale(${n(NECK_WIDTH * rx)})`);
+  }
+
   function drawExtras(p: ChibiPose): void {
     const frame = bodyFrame(build, p);
     const chest = frame.at({ x: build.shoulder.x - 3, y: -B.ry * Math.sign(p.sy) * 1.05 });
@@ -468,6 +485,11 @@ export function createChibiSkin(doc: Document, build: ChibiBuild, className: str
   return {
     svg,
     figure,
+    dress(d: Dress): void {
+      const style = { line: '#2b2630', width: 1.1 };
+      drawWearable(doc, hat, hatItem(d.hat), rx, style);
+      drawWearable(doc, neckwear, outfitItem(d.outfit), NECK_WIDTH * rx, style);
+    },
     draw(p: ChibiPose, clock: number, facing: number, moving: number, scruff: Pt): void {
       set(flip, 'transform', `scale(${n(facing)} 1)`);
       set(figure, 'transform', p.swing ? `rotate(${n(p.swing)} ${n(scruff.x)} ${n(scruff.y)})` : '');
@@ -475,6 +497,7 @@ export function createChibiSkin(doc: Document, build: ChibiBuild, className: str
       drawLegs(p);
       drawBody(p);
       drawHead(p);
+      drawNeck(p);
       drawExtras(p);
       drawPond(p, clock, moving);
       drawMarks(p, clock, Math.sign(facing) || 1);

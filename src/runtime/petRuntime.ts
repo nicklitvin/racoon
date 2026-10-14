@@ -3,14 +3,16 @@ import type { RaccoonType, Settings } from '../../shared/settings';
 import { CursorActivityTracker } from '../core/activity/cursor';
 import { TypingActivityTracker } from '../core/activity/typing';
 import { Animator } from '../core/animator';
-import { Brain, type PetSnapshot, type WorldInput } from '../core/behavior/brain';
+import { Brain, type Desk, type PetSnapshot, type WorldInput } from '../core/behavior/brain';
 import { DEFAULT_CONFIG } from '../core/behavior/config';
 import { ClickThroughController } from '../core/clickThrough';
 import { isTurning, targetHeading, turnTowards } from '../core/heading';
 import { Toybox } from '../core/toys/toybox';
 import type { Host } from '../host';
 import { ANIMATIONS, RACCOON_STYLES, type AnimationName, type RaccoonRenderer } from '../sprites';
+import { PIXEL_PX } from '../sprites/pixel';
 import type { AnimationSpec } from '../sprites/types';
+import { DeskLayer } from './deskLayer';
 import { ToyLayer } from './toyLayer';
 
 export interface PetElements {
@@ -21,6 +23,8 @@ export interface PetElements {
   /** Holds the drawing; mirrored to face left. */
   sprite: HTMLElement;
   emote: HTMLElement;
+  /** His speech bubble. */
+  speech?: HTMLElement;
 }
 
 /** Longest gap between ticks while nothing moves. Brain timers have this granularity. */
@@ -75,11 +79,17 @@ export class PetRuntime {
   private readonly animator = new Animator(ANIMATIONS);
   private renderer!: RaccoonRenderer;
   private rendererType: RaccoonType | null = null;
+  /** What he was last dressed in, as `hat|outfit`. */
+  private dressed = '';
   private readonly cursorTracker = new CursorActivityTracker();
   private readonly typingTracker = new TypingActivityTracker();
   private readonly clickThrough: ClickThroughController;
   private readonly toybox = new Toybox();
   private readonly toyLayer: ToyLayer;
+  private readonly deskLayer: DeskLayer;
+  /** His desk, in work mode. */
+  private desk: Desk | null = null;
+  private lastSaid: string | null = null;
 
   private cursor: Point | null = null;
   /** Where the pointer last was over the page, to tell when it strokes him. */
@@ -118,6 +128,10 @@ export class PetRuntime {
       wake: () => this.wake(),
       dragStarted: () => this.clickThrough.dragStarted(),
       dragEnded: (p) => this.clickThrough.dragEnded(p, this.grabRects()),
+    });
+    this.deskLayer = new DeskLayer(document, els.stage, () => {
+      this.brain.deskTapped();
+      this.wake();
     });
     this.applySettings();
     this.applyLayout();
@@ -164,6 +178,7 @@ export class PetRuntime {
     this.keyboardOff = null;
     this.cleanups.splice(0).forEach((off) => off());
     this.toyLayer.destroy();
+    this.deskLayer.destroy();
     this.host.setInteractive(false);
   }
 
@@ -177,6 +192,7 @@ export class PetRuntime {
     this.settings = settings;
     this.applySettings();
     this.syncToys();
+    this.syncDesk();
     this.syncKeyboardSubscription();
     this.wake();
   }
@@ -268,15 +284,16 @@ export class PetRuntime {
     this.clickThrough.dragEnded({ x: e.clientX, y: e.clientY }, this.grabRects());
   }
 
-  /** Everything on the page you can pick up: him, and his toys. */
+  /** Everything on the page you can pick up or tap: him, his toys and his desk. */
   private grabRects(): Rect[] {
     const rect = this.hitRect();
-    return rect ? [rect, ...this.toyLayer.rects()] : this.toyLayer.rects();
+    const desk = this.deskLayer.rect();
+    return [...(rect ? [rect] : []), ...this.toyLayer.rects(), ...(desk ? [desk] : [])];
   }
 
   private updateHover(p: Point): void {
     const rect = this.hitRect();
-    const targets = rect ? [rect, ...this.toyLayer.rects()] : this.toyLayer.rects();
+    const targets = this.grabRects();
     // Nothing to grab (he's fully hidden behind an edge, and no toys): never hold the mouse.
     if (targets.length) this.clickThrough.pointerMoved(p, targets);
     else this.clickThrough.pointerLeft();
@@ -357,6 +374,7 @@ export class PetRuntime {
       typingActive: keyboard && this.typingTracker.isActive,
       toyReach: this.renderer.toyReach === undefined ? undefined : this.renderer.toyReach * this.scale,
       carries: this.renderer.carriesToys === true,
+      desk: this.desk,
     };
   }
 
@@ -396,6 +414,15 @@ export class PetRuntime {
     if (facing !== this.lastFacing) {
       sprite.classList.toggle('facing-left', facing < 0);
       this.lastFacing = facing;
+    }
+    this.deskLayer.setWorking(snap.reaction === 'work' && snap.phase === 'type');
+    const speech = this.els.speech;
+    if (speech && snap.say !== this.lastSaid) {
+      // Keeps the last words while the bubble fades away.
+      if (snap.say) speech.textContent = snap.say;
+      speech.classList.toggle('show', snap.say !== null);
+      speech.classList.toggle('speech-pixel', this.renderer.pixelated === true);
+      this.lastSaid = snap.say;
     }
     // Drawings that float their own z's over their heads don't need the page's as well.
     const shown = this.renderer.drawsMarks ? '' : snap.emote;
@@ -461,6 +488,25 @@ export class PetRuntime {
     this.toybox.setBounds({ x: wa.x, y: wa.y + top, width: wa.width, height: wa.height - top });
     this.toyLayer.setOrigin({ x: wa.x, y: wa.y });
     this.syncToys();
+    this.syncDesk();
+  }
+
+  /** Puts his desk out in work mode, built to fit him, or puts it away. */
+  private syncDesk(): void {
+    if (!this.settings.workMode) {
+      this.desk = this.deskLayer.fit(null);
+      return;
+    }
+    const wa = this.display.workArea;
+    const reach = this.renderer.deskReach ?? { x: this.size.width * 0.3, y: -this.size.height * 0.35 };
+    this.desk = this.deskLayer.fit({
+      bounds: wa,
+      floor: wa.y + wa.height - this.belowFeet,
+      unit: this.size.height,
+      reach: { x: reach.x * this.scale, y: reach.y * this.scale },
+      look: this.renderer.toyLook ?? 'paint',
+      pixel: this.renderer.pixelated ? PIXEL_PX * this.scale : 0,
+    });
   }
 
   private applyScale(): void {
@@ -475,11 +521,21 @@ export class PetRuntime {
     this.toyLayer.setLook(this.renderer.toyLook ?? 'paint', this.toybox.size);
   }
 
-  /** Swaps in the drawing for the chosen raccoon type. Behaviour carries on untouched. */
+  /** Swaps in the drawing for the chosen raccoon type, in what he's wearing. Behaviour carries on untouched. */
   private applySettings(): void {
     const type = this.settings.raccoonType;
-    if (type === this.rendererType) return;
+    const { hat, outfit } = this.settings;
+    if (type === this.rendererType) {
+      if (`${hat}|${outfit}` !== this.dressed) {
+        this.dressed = `${hat}|${outfit}`;
+        this.renderer.dress?.({ hat, outfit });
+        this.lastDrawn = '';
+      }
+      return;
+    }
     this.renderer = RACCOON_STYLES[type].create();
+    this.dressed = `${hat}|${outfit}`;
+    this.renderer.dress?.({ hat, outfit });
     this.rendererType = type;
     this.animator.setSpecs(specsFor(this.renderer));
     this.els.sprite.replaceChildren(this.renderer.element);
@@ -487,6 +543,8 @@ export class PetRuntime {
     this.lastFacing = 0;
     this.lastTransform = '';
     this.applyScale();
+    // A new pet needs a desk its size (not before the first layout, which builds it).
+    if (this.deskLayer) this.syncDesk();
   }
 
   /** The visible part of the raccoon: the drawn figure clipped to the stage. */

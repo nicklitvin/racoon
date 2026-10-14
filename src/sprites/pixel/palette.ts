@@ -33,6 +33,13 @@ export const SLOTS = [
   'mark',
   'heart',
   'alarm',
+  /** Whatever he's wearing: a hat's colours, then the neckwear's. Set from the item. */
+  'hatMain',
+  'hatTrim',
+  'hatAccent',
+  'wearMain',
+  'wearTrim',
+  'wearAccent',
 ] as const;
 
 export type Slot = (typeof SLOTS)[number];
@@ -55,6 +62,12 @@ const SHARED = {
   mark: '#dfe8ff',
   heart: '#ff6f91',
   alarm: '#ffd23f',
+  hatMain: '#000000',
+  hatTrim: '#000000',
+  hatAccent: '#000000',
+  wearMain: '#000000',
+  wearTrim: '#000000',
+  wearAccent: '#000000',
 };
 
 export const PIXEL_COATS = {

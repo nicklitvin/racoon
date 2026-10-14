@@ -1,5 +1,6 @@
 import { DEG, clamp01 } from '../critter/kit';
 import { bodyFrame, headCentre, legRoot, WATER_Y, type ChibiPose, type LegName } from '../chibi/pose';
+import { hatItem, NECK_WIDTH, outfitItem, UNDRESSED, type Dress, type Paint, type Wearable } from '../outfits';
 import { GLYPHS } from './glyphs';
 import { C } from './palette';
 import { capsule, ellipse, intersect, joinBoxes, polygon, Raster, tube, union, type Box, type Pt, type Sd } from './raster';
@@ -70,7 +71,7 @@ function curvy(points: [number, number][], rx: number, ry: number): Pt[] {
  * Draws the pet into `r` (cleared first) and returns the box round the figure itself, for
  * grabbing it. `facing` -1 mirrors it to face left; the marks over its head stay readable.
  */
-export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: number, facing: number, moving: number, scruff: Pt): Box | null {
+export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: number, facing: number, moving: number, scruff: Pt, dress: Dress = UNDRESSED): Box | null {
   const { feetX: FX, feetY: FY, k: K } = PIXEL;
   const species = b.species;
   r.clear();
@@ -192,6 +193,21 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   const onHead = (l: Pt): Pt => T({ x: hc.x + l.x * hcos - l.y * hsin, y: hc.y + l.x * hsin + l.y * hcos });
   const headAngle = th + sw;
   const centre = T(hc);
+
+  /** Something he's wearing, its units `size` head units across, placed at `origin` on the head. */
+  const wear = (item: Wearable | null, origin: Pt, size: number, slots: Record<Paint, number>) => {
+    if (!item) return;
+    const at = (x: number, y: number) => onHead({ x: origin.x + x * size, y: origin.y + y * size });
+    for (const s of item.shapes) {
+      const shape = s.kind === 'poly' ? polygon(s.points.map(([x, y]) => at(x, y))) : (() => {
+        const c = at(s.cx, s.cy);
+        return ellipse(c.x, c.y, Math.max(0.6, s.rx * size * K), Math.max(0.6, s.ry * size * K), headAngle);
+      })();
+      r.shape(shape.sd, shape.box, slots[s.paint], C.outline);
+    }
+  };
+  // Round his neck, under his chin: drawn before the head, so the chin comes over its top.
+  wear(outfitItem(dress.outfit), { x: -H.rx * 0.05, y: H.ry * 1.06 }, H.rx * NECK_WIDTH, { main: C.wearMain, trim: C.wearTrim, accent: C.wearAccent });
 
   // Ears, behind the head.
   const ear = EARS[species];
@@ -325,6 +341,9 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     const far = pix({ x: -rx * 0.32, y: ry * 0.4 });
     r.dots([near, { x: near.x + 1, y: near.y }, far], C.blush);
   }
+
+  // A hat, over the ears and the top of the head.
+  wear(hatItem(dress.hat), { x: -H.rx * 0.06, y: -H.ry * 0.9 }, H.rx, { main: C.hatMain, trim: C.hatTrim, accent: C.hatAccent });
 
   // --- Paws raised in front, and an otter's shell ---
   for (const leg of ['frontFar', 'frontNear'] as const) if (raised(leg)) drawLeg(leg);

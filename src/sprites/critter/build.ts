@@ -65,6 +65,8 @@ export interface Build {
   peekEdge: number;
   /** How far in front of his feet a toy block sits (its middle) for him to swat or pick up. */
   toyReach: number;
+  /** Where his front paws rest on a keyboard, typing at his desk (the middle of the keys). */
+  desk: { x: number; y: number };
 }
 
 /** Edge of a toy block, in drawing units. */
@@ -127,6 +129,7 @@ export const CAT_BUILD: Build = {
   peekSink: 30,
   peekEdge: -30,
   toyReach: 30,
+  desk: { x: 13, y: -12 },
 };
 
 export const RACCOON_BUILD: Build = {
@@ -185,6 +188,7 @@ export const RACCOON_BUILD: Build = {
   peekSink: 26,
   peekEdge: -26,
   toyReach: 29,
+  desk: { x: 11, y: -21 },
 };
 
 /**
@@ -219,6 +223,7 @@ export const FOX_BUILD: Build = {
   peekSink: CAT_BUILD.peekSink * FOX_SCALE.y,
   peekEdge: CAT_BUILD.peekEdge * FOX_SCALE.y,
   toyReach: 30 * FOX_SCALE.x,
+  desk: { x: 13 * FOX_SCALE.x, y: -12 * FOX_SCALE.y },
 };
 
 /**
@@ -285,4 +290,5 @@ export const OTTER_BUILD: Build = {
   peekSink: 24,
   peekEdge: -24,
   toyReach: 36,
+  desk: { x: 17, y: -12 },
 };

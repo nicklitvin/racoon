@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, normalizeSettings, RACCOON_TYPES } from '../shared/settings';
+import { DEFAULT_SETTINGS, HATS, normalizeSettings, OUTFITS, RACCOON_TYPES } from '../shared/settings';
 
 describe('normalizeSettings', () => {
   it('falls back to defaults for missing or broken input', () => {
@@ -38,6 +38,20 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ raccoonType: 'fox-pixel' }).raccoonType).toBe('fox-chibi');
     // Not fooled by names that only look like one.
     expect(normalizeSettings({ raccoonType: 'constructor' }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
+  });
+
+  it('dresses the pet in nothing to start with, and keeps only hats and outfits there are', () => {
+    expect(DEFAULT_SETTINGS.hat).toBe('none');
+    expect(DEFAULT_SETTINGS.outfit).toBe('none');
+    for (const hat of HATS) expect(normalizeSettings({ hat }).hat).toBe(hat);
+    for (const outfit of OUTFITS) expect(normalizeSettings({ outfit }).outfit).toBe(outfit);
+    expect(normalizeSettings({ hat: 'sombrero', outfit: 42 })).toMatchObject({ hat: 'none', outfit: 'none' });
+  });
+
+  it('keeps work mode off unless switched on', () => {
+    expect(DEFAULT_SETTINGS.workMode).toBe(false);
+    expect(normalizeSettings({ workMode: 'yes' }).workMode).toBe(false);
+    expect(normalizeSettings({ workMode: true }).workMode).toBe(true);
   });
 
   it('drops unknown and retired keys', () => {

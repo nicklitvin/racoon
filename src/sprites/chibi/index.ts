@@ -109,8 +109,12 @@ export function createChibi(doc: Document, build: ChibiBuild, className: string,
     toySize: CHIBI_TOY * PX_PER_UNIT,
     toyLook: 'chibi',
     carriesToys: build.species === 'raccoon',
+    deskReach: { x: build.desk.x * PX_PER_UNIT, y: build.desk.y * PX_PER_UNIT },
     drawsMarks: true,
     toyPoint: () => (toy ? { x: toy.x * motion.facing * PX_PER_UNIT * scale, y: toy.y * PX_PER_UNIT * scale } : null),
+    dress(d) {
+      skin.dress(d);
+    },
     setScale(next) {
       scale = next;
       skin.svg.setAttribute('width', n(view.width * PX_PER_UNIT * scale));

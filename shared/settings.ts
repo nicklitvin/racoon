@@ -27,6 +27,14 @@ export const RACCOON_TYPES = [
 ] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
+/** Hats to dress your pet up in. */
+export const HATS = ['none', 'party', 'beanie', 'tophat', 'crown', 'cap', 'bow'] as const;
+export type Hat = (typeof HATS)[number];
+
+/** Things to wear round the neck. */
+export const OUTFITS = ['none', 'scarf', 'bowtie', 'bandana', 'collar'] as const;
+export type Outfit = (typeof OUTFITS)[number];
+
 export interface Settings {
   /** Which drawing of the raccoon to use. */
   raccoonType: RaccoonType;
@@ -36,6 +44,14 @@ export interface Settings {
   launchAtLogin: boolean;
   /** A few toy blocks lying about for the pet to play with (and for you to throw for it). */
   toys: boolean;
+  /** What the pet wears on its head, and round its neck. */
+  hat: Hat;
+  outfit: Outfit;
+  /**
+   * A little desk in the corner. Tap it a few times and the pet sits down at it to work for
+   * a while, then wants to play.
+   */
+  workMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -43,6 +59,9 @@ export const DEFAULT_SETTINGS: Settings = {
   keyboardReactions: false,
   launchAtLogin: false,
   toys: true,
+  hat: 'none',
+  outfit: 'none',
+  workMode: false,
 };
 
 function isRaccoonType(value: unknown): value is RaccoonType {
@@ -68,6 +87,9 @@ export function normalizeSettings(raw: unknown): Settings {
     keyboardReactions: r.keyboardReactions === true,
     launchAtLogin: r.launchAtLogin === true,
     toys: r.toys !== false,
+    hat: (HATS as readonly unknown[]).includes(r.hat) ? (r.hat as Hat) : DEFAULT_SETTINGS.hat,
+    outfit: (OUTFITS as readonly unknown[]).includes(r.outfit) ? (r.outfit as Outfit) : DEFAULT_SETTINGS.outfit,
+    workMode: r.workMode === true,
   };
 }
 

@@ -3,6 +3,7 @@ import { CAT_BUILD as B, CRITTER_TOY } from './build';
 import { gaitFor, leap, leapKind, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
 import { bump, clamp01, easeOut, frac, keyed, lerp, noise1, smoother, span, wave } from './kit';
 import { blankPose, setPaw, type Pose } from './pose';
+import { typing } from '../typing';
 import { DEPTH } from './view';
 
 /**
@@ -291,7 +292,68 @@ export function catAct(input: ActInput): Act {
 
     case 'carry':
       return catAct({ ...input, animation: 'walk' });
+
+    case 'work':
+      return work(input);
+
+    case 'attention':
+      return attention(input);
   }
+}
+
+/**
+ * Sat at the desk, both front paws up on the keyboard, batting at the keys, now and then
+ * stopping to stare at the screen with the tail tip flicking.
+ */
+function work(input: ActInput): Act {
+  const { clock } = input;
+  const flags = noFlags();
+  flags.pawUp = true;
+  const p = sit();
+  breathe(p, clock, 3000, 0.6);
+  const k = typing(clock);
+  p.sx += 2.5;
+  p.sy += 1;
+  p.hx += 3.5;
+  p.hy += 2;
+  p.hpitch = lerp(2, -8, k.pause);
+  p.hyaw = 26;
+  p.lookX = 0.6;
+  p.lookY = -0.2;
+  const D = B.desk;
+  setPaw(p, 'frontNear', D.x + 1.5, D.y - k.near * 2.2, -55);
+  setPaw(p, 'frontFar', D.x - 1.5, D.y - k.far * 2.2, -55);
+  p.earN = 0.35;
+  p.earF = 0.35;
+  p.tailCurl += Math.sin(clock / 260) * 12 * k.pause;
+  return { pose: p, flags };
+}
+
+/** Wants to play: sat up tall, one paw batting the air at you, meowing. */
+function attention(input: ActInput): Act {
+  const { t, clock } = input;
+  const flags = noFlags();
+  flags.pawUp = true;
+  const p = sit();
+  breathe(p, clock, 1600, 0.7);
+  const bob = Math.abs(Math.sin((t / 600) * Math.PI));
+  p.sy -= 2 + bob * 1.5;
+  p.hy -= 2 + bob * 1.5;
+  p.hyaw = 70;
+  p.hpitch = -8;
+  const wave = Math.sin((t / 300) * Math.PI * 2);
+  setPaw(p, 'frontNear', 11 + wave * 2.5, -24 + wave * 2, -120 + wave * 30);
+  // A meow every so often.
+  const meow = Math.max(0, Math.sin((t / 1200) * Math.PI * 2)) ** 2;
+  p.mouth = 0.45 * meow;
+  p.earN = 0.8;
+  p.earF = 0.8;
+  p.lids = -0.2;
+  p.pupil = 0.9;
+  p.tailA = 100;
+  p.tailCurl = 40 + Math.sin(t / 200) * 10;
+  p.tailSide = 0;
+  return { pose: p, flags };
 }
 
 /**

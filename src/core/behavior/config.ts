@@ -84,6 +84,20 @@ export interface PlayConfig {
   waitMs: number;
 }
 
+export interface WorkConfig {
+  /** Taps on the desk, each within `tapWindowMs` of the first, that send him to work. */
+  taps: number;
+  tapWindowMs: number;
+  /** How long he types away before he's had enough. */
+  focusMs: number;
+  /** Then how long he sits there looking about, restless, before he comes to find you. */
+  restlessMs: number;
+  /** How long he keeps on at you to play before he gives up. */
+  begMs: number;
+  /** How often he asks. */
+  askEveryMs: number;
+}
+
 export interface ReactionConfig {
   fleeRadius: number;
   fleeChance: number;
@@ -96,6 +110,7 @@ export interface BehaviorConfig {
   wander: WanderConfig;
   reactions: ReactionConfig;
   play: PlayConfig;
+  work: WorkConfig;
 }
 
 export const DEFAULT_CONFIG: BehaviorConfig = {
@@ -144,6 +159,14 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     kickSpeed: 260,
     waitMs: 9000,
   },
+  work: {
+    taps: 3,
+    tapWindowMs: 1500,
+    focusMs: 20 * 60_000,
+    restlessMs: 9000,
+    begMs: 3 * 60_000,
+    askEveryMs: 6500,
+  },
 };
 
 export type ConfigOverrides = { [K in keyof BehaviorConfig]?: Partial<BehaviorConfig[K]> };
@@ -155,6 +178,7 @@ export function withConfig(overrides: ConfigOverrides, base: BehaviorConfig = DE
     wander: { ...base.wander, ...overrides.wander },
     reactions: { ...base.reactions, ...overrides.reactions },
     play: { ...base.play, ...overrides.play },
+    work: { ...base.work, ...overrides.work },
   };
 }
 

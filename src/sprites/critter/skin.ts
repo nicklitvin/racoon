@@ -1,5 +1,6 @@
 import type { Point } from '../../core/geometry';
 import type { LegName } from './pose';
+import { drawWearable, hatItem, outfitItem, type Dress } from '../outfits';
 import { n, svgWriter } from '../svg';
 import type { Build, Species } from './build';
 import { HeadView, onDisc, onSphere, v3, type Disc, type V3 } from './head';
@@ -68,6 +69,7 @@ export interface Skin {
   svg: SVGSVGElement;
   figure: SVGElement;
   draw(shown: Shown): void;
+  dress(dress: Dress): void;
 }
 
 export function createSkin(doc: Document, build: Build, className: string, label: string): Skin {
@@ -258,6 +260,14 @@ export function createSkin(doc: Document, build: Build, className: string, label
   const mouthOpen = make('path', { class: 'k-mouth' }, face);
   const tongue = make('path', { class: 'k-tongue' }, face);
   const whiskers = [0, 1, 2, 3, 4, 5].map(() => make('path', { class: 'k-whisker' }, face));
+  // A hat goes on over everything on the head; a collar round the neck, under the head.
+  const hatGroup = make('g', { class: 'k-outfit' }, face);
+  const hat = make('g', {}, hatGroup);
+  const neckGroup = make('g', { class: 'k-outfit' });
+  headUnit.insertBefore(neckGroup, headParts);
+  const neckwear = make('g', {}, neckGroup);
+  /** Which way his face points on screen, held steady while he looks straight at you. */
+  let faceSide = 1;
 
   const R = build.head.r;
   let muzzleBehind = false;
@@ -283,6 +293,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
     const head = new HeadView(view.at(pose.hx, pose.hy, shown.head.z), pose.hpitch, shown.head.yaw, pose.hroll, HEAD_TILT);
     drawNeck(frame, pose, view, head, shown);
     drawHead(head, pose);
+    placeOutfit(frame, pose, view, head);
 
     // Who's in front of whom, from how far towards you each part stands on the floor.
     const bodyDepth = view.towards((pose.px + pose.sx) / 2);
@@ -671,6 +682,37 @@ export function createSkin(doc: Document, build: Build, className: string, label
     } else {
       set(neckLine, 'd', '');
     }
+  }
+
+  /** The hat sits on the crown, upright on the head; the collar round the neck, across it. */
+  function placeOutfit(frame: Frame, pose: Pose, view: BodyView, head: HeadView): void {
+    const forward = head.vec(v3(1, 0, 0)).x;
+    if (Math.abs(forward) > 0.15) faceSide = forward < 0 ? -1 : 1;
+    if (hat.firstChild) {
+      const crown = head.at(v3(-R * 0.12, R * SKULL[species] * 0.95, 0));
+      const up = head.vec(v3(0, 1, 0));
+      const angle = (Math.atan2(up.x, -up.y) * 180) / Math.PI;
+      set(hatGroup, 'transform', `translate(${n(crown.x)} ${n(crown.y)}) rotate(${n(angle)}) scale(${n(faceSide * R)} ${n(R)})`);
+    }
+    if (neckwear.firstChild) {
+      const base = view.pt(bodyAt(frame, pose, frame.length - 0.5, -0.5));
+      const join = head.at(v3(-R * 0.25, -R * 0.35, 0));
+      const at = mixPt(base, join, 0.62);
+      const d = unit(sub(join, base));
+      const angle = (Math.atan2(d.x, -d.y) * 180) / Math.PI;
+      const w = collarWidth();
+      set(neckGroup, 'transform', `translate(${n(at.x)} ${n(at.y)}) rotate(${n(angle)}) scale(${n(faceSide * w)} ${n(w)})`);
+    }
+  }
+
+  function collarWidth(): number {
+    return lerp(NECK[species], R * 0.6, 0.6) * 1.05;
+  }
+
+  function dress(d: Dress): void {
+    const style = { line: '#2c2a2e', width: 0.55 };
+    drawWearable(doc, hat, hatItem(d.hat), R, style);
+    drawWearable(doc, neckwear, outfitItem(d.outfit), collarWidth(), style);
   }
 
   function drawContours(pose: Pose, view: BodyView, frame: Frame, placed: { el: SVGElement; layer: Layer; depth: number }[]): void {
@@ -1284,7 +1326,7 @@ export function createSkin(doc: Document, build: Build, className: string, label
     set(waterline, 'd', line);
   }
 
-  return { svg, figure, draw };
+  return { svg, figure, draw, dress };
 }
 
 /** A body slice's ring, where it's out of the water, on screen, and its waterline on the side nearer you. */

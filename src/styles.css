@@ -148,6 +148,173 @@ html[data-host='web'][data-theme='dark'] {
   line-height: 0;
 }
 
+/* ---- Work mode: the desk, and his speech bubble ---------------------------------------- */
+
+.desk {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.desk.tapped {
+  animation: desk-tap 0.2s ease-out;
+}
+
+@keyframes desk-tap {
+  40% {
+    translate: 0 2px;
+  }
+}
+
+.desk-art {
+  display: block;
+  pointer-events: auto;
+  cursor: pointer;
+  filter: drop-shadow(0 0 1.2px var(--halo));
+}
+
+canvas.desk-art {
+  image-rendering: pixelated;
+}
+
+.desk-screen {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.desk-line {
+  display: block;
+  flex: none;
+  border-radius: 1px;
+  background: #7fe0a8;
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
+.desk-ink .desk-line {
+  background: #1f1d22;
+}
+
+.desk-pixel .desk-line {
+  border-radius: 0;
+}
+
+/* Typing: each line of work spells itself out, a few characters at a time. */
+.desk.working .desk-line {
+  animation: desk-type 2.7s steps(7, end) infinite;
+}
+
+@keyframes desk-type {
+  0% {
+    transform: scaleX(0);
+  }
+  65%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+/* Not working: a screen saver, a slow glowing dot. */
+.desk:not(.working) .desk-screen::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  background: radial-gradient(circle, rgba(127, 224, 168, 0.55), transparent 70%);
+  animation: desk-saver 4s ease-in-out infinite;
+}
+
+.desk-pixel:not(.working) .desk-screen::before {
+  border-radius: 0;
+  background: rgba(127, 224, 168, 0.5);
+  width: 12%;
+}
+
+@keyframes desk-saver {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.speech {
+  position: absolute;
+  bottom: 88%;
+  left: 50%;
+  z-index: 5;
+  padding: 3px 9px 4px;
+  border: 2px solid #2b2630;
+  border-radius: 12px;
+  background: #fffdf8;
+  color: #2b2630;
+  font: 700 13px/1.2 system-ui, 'Segoe UI', sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px) scale(0.7);
+  transform-origin: 50% 100%;
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s ease-out;
+}
+
+.speech::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 8px;
+  height: 8px;
+  border: solid #2b2630;
+  border-width: 0 2px 2px 0;
+  background: #fffdf8;
+  transform: translate(-50%, -4px) rotate(45deg);
+}
+
+.speech.show {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+.speech.speech-pixel {
+  border-radius: 0;
+  font: 700 12px/1.2 'Cascadia Mono', Consolas, Menlo, monospace;
+  box-shadow:
+    2px 0 0 #2b2630,
+    -2px 0 0 #2b2630,
+    0 2px 0 #2b2630,
+    0 -2px 0 #2b2630;
+  border-color: transparent;
+}
+
+.speech.speech-pixel::after {
+  transform: translate(-50%, -2px);
+  border-width: 0 2px 2px 2px;
+  width: 4px;
+  height: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speech {
+    transition: none;
+  }
+
+  .desk.working .desk-line {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
 /* ---- Toy blocks ---------------------------------------------------------------------- */
 
 /* Each block stands on the floor at its wrapper's origin: shadow there, block lifted above it. */
@@ -1301,6 +1468,118 @@ html[data-view='settings'] .settings {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* --- Dress up: hats and neckwear --- */
+.dress-up {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+
+.dress-up legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.dress-up-body {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.dress-preview {
+  flex: none;
+  width: 164px;
+  height: 112px;
+}
+
+.dress-up-rows {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.wear-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wear-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 58px;
+  padding: 4px 2px 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.wear-option.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.wear-option:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.wear-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wear-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 30px;
+  border-radius: 6px;
+  /* Light behind every item, whatever the theme, so a black top hat shows on a dark page. */
+  background: #f3efe6;
+}
+
+/* "Nothing": an empty circle with a line through it. */
+.wear-none::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid #8a8490;
+  border-radius: 50%;
+  background: linear-gradient(45deg, transparent 45%, #8a8490 45%, #8a8490 55%, transparent 55%);
+}
+
+.wear-name {
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--muted);
+}
+
+.wear-option.selected .wear-name {
+  color: inherit;
+  font-weight: 600;
+}
+
+@media (max-width: 380px) {
+  .dress-up-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dress-preview {
+    width: 100%;
+  }
 }
 
 /* --- Chibi pets: flat 2D, bold outlines, big heads. --- */

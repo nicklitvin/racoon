@@ -51,6 +51,7 @@ export function createCritter(
   let scale = 1;
   let scruff: { x: number; y: number } | null = null;
   let toy: Point | null = null;
+  let lastShown: Shown | null = null;
   return {
     element: skin.svg,
     figure: skin.figure,
@@ -65,7 +66,13 @@ export function createCritter(
     toySize: CRITTER_TOY * PX_PER_UNIT,
     toyLook,
     carriesToys: build.species === 'raccoon',
+    deskReach: { x: build.desk.x * PX_PER_UNIT, y: build.desk.y * PX_PER_UNIT },
     toyPoint: () => (toy ? { x: toy.x * PX_PER_UNIT * scale, y: toy.y * PX_PER_UNIT * scale } : null),
+    dress(d) {
+      skin.dress(d);
+      // Redrawn now, so the new hat is in place even while he rests.
+      if (lastShown) skin.draw(lastShown);
+    },
     setScale(next) {
       scale = next;
       skin.svg.setAttribute('width', n(view.width * PX_PER_UNIT * scale));
@@ -73,6 +80,7 @@ export function createCritter(
     },
     draw(frame) {
       const shown = motion.update(frame, 1 / (PX_PER_UNIT * scale));
+      lastShown = shown;
       scruff = shown.scruff;
       toy = heldToy(build, shown);
       skin.draw(shown);

@@ -397,6 +397,8 @@ export function catPoseFor(animation: AnimationName, t: number, keystrokes = 0):
     case 'lift':
     case 'carry':
     case 'throw':
+    case 'work':
+    case 'attention':
     case 'happy': {
       // Being petted: eyes shut, leans up into the hand, kneads with the front paws, tail up.
       const pose = sitting(t);

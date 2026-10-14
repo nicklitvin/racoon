@@ -21,6 +21,7 @@ export function PetApp({ host }: PetAppProps) {
   const petRef = useRef<HTMLDivElement>(null);
   const spriteRef = useRef<HTMLDivElement>(null);
   const emoteRef = useRef<HTMLDivElement>(null);
+  const speechRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<PetRuntime | null>(null);
 
   useEffect(() => {
@@ -45,8 +46,9 @@ export function PetApp({ host }: PetAppProps) {
     const pet = petRef.current;
     const sprite = spriteRef.current;
     const emote = emoteRef.current;
+    const speech = speechRef.current ?? undefined;
     if (!stage || !pet || !sprite || !emote) return;
-    const runtime = new PetRuntime(host, { stage, pet, sprite, emote }, display, settings);
+    const runtime = new PetRuntime(host, { stage, pet, sprite, emote, speech }, display, settings);
     runtime.start();
     runtimeRef.current = runtime;
     return () => {
@@ -80,6 +82,7 @@ export function PetApp({ host }: PetAppProps) {
         {ready && (
           <div className="pet" ref={petRef}>
             <div className="emote" ref={emoteRef} aria-hidden="true" />
+            <div className="speech" ref={speechRef} role="status" aria-live="polite" />
             <div className="sprite" ref={spriteRef} />
           </div>
         )}

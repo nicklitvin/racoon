@@ -42,4 +42,6 @@ export const ANIMATIONS: Record<AnimationName, AnimationSpec> = {
   lift: { fps: 60, durationMs: PLAY.liftMs, loop: false, eyes: 'open' },
   carry: { fps: 60, durationMs: 700, loop: true, eyes: 'open' },
   throw: { fps: 60, durationMs: PLAY.throwMs, loop: false, eyes: 'open' },
+  work: { fps: 20, durationMs: 6000, loop: true, eyes: 'open' },
+  attention: { fps: 30, durationMs: 1200, loop: true, eyes: 'open' },
 };

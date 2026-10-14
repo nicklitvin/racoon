@@ -1,6 +1,7 @@
 import { ChibiMotion, TIMING } from '../chibi';
 import { scruffPoint, toyHoldPoint } from '../chibi/pose';
 import type { Pt } from '../chibi/species';
+import { hatItem, outfitItem, UNDRESSED, type Dress } from '../outfits';
 import type { RaccoonRenderer } from '../types';
 import { drawPixelPet, PIXEL } from './draw';
 import { rgbaTable, type Palette } from './palette';
@@ -37,7 +38,8 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
   const ctx = canvas.getContext?.('2d') ?? null;
   const image = ctx?.createImageData(W, H) ?? null;
   const words = image ? new Uint32Array(image.data.buffer) : null;
-  const colours = rgbaTable(palette);
+  let colours = rgbaTable(palette);
+  let dressed: Dress = UNDRESSED;
   const raster = new Raster(W, H);
   const motion = new ChibiMotion(build);
 
@@ -82,8 +84,20 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
     toySize: PIXEL_TOY * PIXEL_PX,
     toyLook: 'pixel',
     carriesToys: build.species === 'raccoon',
+    deskReach: { x: build.desk.x * K * PIXEL_PX, y: build.desk.y * K * PIXEL_PX },
     drawsMarks: true,
     toyPoint: () => (toy ? { x: toy.x * motion.facing * K * cell, y: toy.y * K * cell } : null),
+    dress(d) {
+      dressed = d;
+      const hat = hatItem(d.hat)?.colours;
+      const wear = outfitItem(d.outfit)?.colours;
+      colours = rgbaTable({
+        ...palette,
+        ...(hat && { hatMain: hat.main, hatTrim: hat.trim, hatAccent: hat.accent }),
+        ...(wear && { wearMain: wear.main, wearTrim: wear.trim, wearAccent: wear.accent }),
+      });
+      shownTick = NaN;
+    },
     setScale(next) {
       scale = next;
       sizeTo();
@@ -99,7 +113,7 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
       shownFacing = facing;
       scruff = scruffPoint(build, pose);
       toy = toyHoldPoint(build, pose);
-      const box = drawPixelPet(raster, build, pose, clock, facing, motion.moving, scruff);
+      const box = drawPixelPet(raster, build, pose, clock, facing, motion.moving, scruff, dressed);
       paint();
       if (box) {
         figure.style.left = `${box.x0 * cell}px`;

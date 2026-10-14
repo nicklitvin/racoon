@@ -2,6 +2,7 @@ import { PLAY } from '../animations';
 import { bump, clamp, clamp01, DEG, easeOut, keyed, lerp, noise1, smooth, span, wave } from '../critter/kit';
 import type { AnimationName, EyeStyle } from '../types';
 import { CHIBI_TOY, type ChibiBuild, type Pt } from './species';
+import { typing } from '../typing';
 
 export const LEGS = ['frontNear', 'frontFar', 'backNear', 'backFar'] as const;
 export type LegName = (typeof LEGS)[number];
@@ -593,6 +594,55 @@ function throwIt(b: ChibiBuild, input: ChibiInput): ChibiPose {
   return p;
 }
 
+/**
+ * Sat at the desk, front paws up on the keyboard: typing in bursts, then stopping to
+ * think, head tilted, eyes on the screen.
+ */
+function work(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const k = typing(input.clock);
+  const p = upright(b);
+  p.hold = 0;
+  // Sat down on his bottom, hind feet out in front.
+  p.rot = 64;
+  p.by += 3;
+  p.haunch = 1;
+  for (const leg of ['backNear', 'backFar'] as const) p.paws[leg] = { x: legRoot(b, p, leg).x + (leg === 'backNear' ? 6 : 4), y: 0 };
+  p.hrot = lerp(-5, 8, k.pause);
+  p.paws.frontNear = { x: b.desk.x + 1.5, y: b.desk.y - k.near * 2.2 };
+  p.paws.frontFar = { x: b.desk.x - 1.5, y: b.desk.y - k.far * 2.2 };
+  p.pawUp = 2;
+  p.lookX = 0.9;
+  p.lookY = lerp(0.1, -0.6, k.pause);
+  p.ears = 0.3;
+  p.tailA = 125;
+  p.tailCurl = 20 + 20 * Math.sin(input.clock / 500) * k.pause;
+  p.mouth = 0;
+  p.eyes = eyesFrom(input);
+  return p;
+}
+
+/** Wants to play: up on his toes, bouncing and waving a paw over his head at you. */
+function attention(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t } = input;
+  const p = upright(b);
+  p.hold = 0;
+  const hop = Math.abs(Math.sin((t / 600) * Math.PI));
+  p.lift = -3 * hop;
+  const wave = Math.sin((t / 300) * Math.PI * 2);
+  // One paw held out in front of him (clear of his face), waving.
+  const shoulder = legRoot(b, p, 'frontNear');
+  p.paws.frontNear = { x: shoulder.x + 17, y: shoulder.y - p.lift - 9 + wave * 3.5 };
+  p.hrot = 6 * wave;
+  p.ears = 0.8;
+  p.mouth = 0.4;
+  p.blush = 1;
+  p.lookX = 0.4;
+  p.lookY = -0.2;
+  p.tailA += 12 * wave;
+  p.eyes = eyesFrom(input);
+  return p;
+}
+
 /** The pose for a land animal at this moment. */
 function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
   const { t, clock, phase } = input;
@@ -724,6 +774,10 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return b.species === 'raccoon' ? carry(b, input) : walkerPose(b, { ...input, animation: 'walk' });
     case 'throw':
       return b.species === 'raccoon' ? throwIt(b, input) : toss(b, input);
+    case 'work':
+      return work(b, input);
+    case 'attention':
+      return attention(b, input);
     case 'happy': {
       const p = stand(b);
       const hop = Math.abs(Math.sin((t / 600) * Math.PI * 2));
@@ -990,6 +1044,36 @@ function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return otterToss(b, input);
     case 'carry':
       return otterPose(b, { ...input, animation: 'walk' });
+    case 'work': {
+      // Treading water at its desk, paws up on the keyboard.
+      const k = typing(clock);
+      const p = tread(b, clock);
+      p.paws.frontNear = { x: b.desk.x + 1.2, y: b.desk.y - k.near * 1.8 };
+      p.paws.frontFar = { x: b.desk.x - 1.2, y: b.desk.y - k.far * 1.8 };
+      p.pawUp = 2;
+      p.hrot = lerp(-3, 8, k.pause);
+      p.lookX = 0.8;
+      p.lookY = lerp(0, -0.6, k.pause);
+      p.eyes = eyesFrom(input);
+      return p;
+    }
+    case 'attention': {
+      // Bobbing up out of the water, waving both paws over its head.
+      const p = tread(b, clock);
+      const hop = Math.abs(Math.sin((t / 600) * Math.PI));
+      p.by -= 2 * hop;
+      const wave = Math.sin((t / 300) * Math.PI * 2);
+      // Both paws held out in front, clear of its face, waving.
+      const shoulder = legRoot(b, p, 'frontNear');
+      p.paws.frontNear = { x: shoulder.x + 15, y: shoulder.y - 6 + wave * 3 };
+      p.paws.frontFar = { x: shoulder.x + 12, y: shoulder.y - 3 - wave * 3 };
+      p.pawUp = 2;
+      p.mouth = 0.4;
+      p.blush = 1;
+      p.splash = 1;
+      p.eyes = eyesFrom(input);
+      return p;
+    }
   }
 }
 

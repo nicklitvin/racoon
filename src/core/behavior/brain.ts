@@ -9,7 +9,7 @@ import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d, steerArc } 
 export type Mode = 'idle' | 'walk' | 'sit' | 'sleep' | 'react';
 
 /** What the raccoon is reacting to, while in the "react" mode. */
-export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged' | 'petted' | 'zoomies' | 'play' | 'nap';
+export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged' | 'petted' | 'zoomies' | 'play' | 'nap' | 'work';
 
 /** Little symbol drawn above the raccoon's head. Only sleep shows one. */
 export type Emote = '' | 'z';
@@ -42,6 +42,14 @@ export interface WorldInput {
   toyReach?: number;
   /** He can pick a toy up in his hands and walk off with it on his hind legs (a raccoon). */
   carries?: boolean;
+  /** His desk, in work mode: where he sits at it (his feet), which way he faces, and its screen. */
+  desk?: Desk | null;
+}
+
+export interface Desk {
+  seat: Point;
+  facing: 1 | -1;
+  screen: Point;
 }
 
 export interface PetSnapshot {
@@ -64,6 +72,8 @@ export interface PetSnapshot {
   aim: number | null;
   /** Something he's keeping his eyes on (a toy), screen px; null to look at the pointer. */
   lookAt: Point | null;
+  /** What he's saying, in a speech bubble, if anything. */
+  say: string | null;
 }
 
 /**
@@ -94,6 +104,28 @@ interface PlayState {
   dest: Point | null;
 }
 
+/**
+ * At his desk: announcing it's work time, going to it, typing away, then getting restless,
+ * and finally coming to find you because it's play time.
+ */
+interface WorkState {
+  mode: 'react';
+  reaction: 'work';
+  phase: 'announce' | 'go' | 'type' | 'restless' | 'beg';
+  until: number;
+  /** When he'll have worked long enough, set when he first sits down. */
+  focusUntil: number | null;
+  /** Where he's going, begging: next to the pointer, and where it was when he picked it. */
+  spot: Point | null;
+  cursorAt: Point | null;
+  /** Looking about, restless: at what, and when he looks somewhere else. */
+  look: Point | null;
+  nextLook: number;
+  /** When he next asks you to play. */
+  nextAsk: number;
+  asked: number;
+}
+
 /** Off for a nap: going to curl up next to the pointer, or somewhere out of the way. */
 interface NapState {
   mode: 'react';
@@ -120,10 +152,11 @@ type State =
   | { mode: 'react'; reaction: 'hide'; edge: -1 | 1; phase: 'in' | 'wait' | 'out'; targetX: number; until: number; giveUpAt: number }
   | { mode: 'react'; reaction: 'peek'; phase: 'approach' | 'sink' | 'watch' | 'rise'; sink: number }
   | { mode: 'react'; reaction: 'dragged' }
-  | { mode: 'react'; reaction: 'petted'; until: number }
+  | { mode: 'react'; reaction: 'petted'; until: number; resume: WorkState | null; then: 'play' | null }
   | { mode: 'react'; reaction: 'zoomies'; target: Point; dashes: number }
   | PlayState
-  | NapState;
+  | NapState
+  | WorkState;
 
 const SUBSTEP_S = 1 / 60;
 const MAX_FRAME_MS = 1000;
@@ -147,6 +180,12 @@ const CARRY_MS = 7000;
 const NAP_GO_MS = 20_000;
 /** The pointer has to move this far from where it was for him to pick a new spot next to it. */
 const NAP_CURSOR_MOVED = 60;
+/** Off to his desk, he gives up if he can't get there in this long. */
+const DESK_GO_MS = 20_000;
+/** How long he says something for. */
+const SAY_MS = 2200;
+/** What he says to get you to play, in turn. */
+const ASKS = ['Play time!', 'Let’s play!', 'Pleeease?', 'Play with me!'];
 
 /** Play phases he has hold of the block through. */
 const HOLDING = new Set<PlayState['phase']>(['toss', 'lift', 'carry', 'throw']);
@@ -185,6 +224,9 @@ export class Brain {
   private leapUntil = 0;
   private nextLeapAt = 0;
   private input: WorldInput;
+  /** When the desk was last tapped, for counting taps. */
+  private taps: number[] = [];
+  private speech: { text: string; until: number } | null = null;
 
   constructor(
     initial: WorldInput,
@@ -237,11 +279,19 @@ export class Brain {
     this.idle(1000, 2500);
   }
 
-  /** A click or tap on the raccoon: a pat. He sits and enjoys it. */
+  /**
+   * A click or tap on the raccoon: a pat. He sits and enjoys it. Busy at his desk, he
+   * enjoys it and gets back to work; asking to play, it's what he wanted, and he plays.
+   */
   poke(): void {
+    const s = this.state;
     if (this.reaction === 'dragged') return;
     this.calmMs = 0;
-    this.state = { mode: 'react', reaction: 'petted', until: this.now + PETTED_MS };
+    const work = s.mode === 'react' && s.reaction === 'work' ? s : null;
+    const resume = work && work.phase !== 'beg' ? work : s.mode === 'react' && s.reaction === 'petted' ? s.resume : null;
+    const then = work?.phase === 'beg' || (s.mode === 'react' && s.reaction === 'petted' && s.then === 'play') ? 'play' : null;
+    if (work?.phase === 'beg') this.speak('Yay!');
+    this.state = { mode: 'react', reaction: 'petted', until: this.now + PETTED_MS, resume, then };
   }
 
   /** The pointer moving over him while he's being petted: he enjoys it for longer. */
@@ -251,13 +301,31 @@ export class Brain {
   }
 
   /**
+   * A tap on his desk. A few quick ones and it's work time: he says so and goes and sits
+   * down at it. Tapping it while he's working just gets you shushed.
+   */
+  deskTapped(): void {
+    if (!this.input.desk || this.reaction === 'dragged') return;
+    const w = this.config.work;
+    if (this.busyWorking) {
+      this.speak('Shh! Working.');
+      return;
+    }
+    this.taps = this.taps.filter((t) => this.now - t <= w.tapWindowMs);
+    this.taps.push(this.now);
+    if (this.taps.length < w.taps) return;
+    this.taps = [];
+    this.startWork();
+  }
+
+  /**
    * You threw one of his toys (or dropped it): he's off after it, unless he's asleep, in
    * your hand or busy watching you type.
    */
   toyThrown(id: number): void {
     const s = this.state;
     const r = this.reaction;
-    if (s.mode === 'sleep' || r === 'dragged' || r === 'peek' || r === 'hide' || !this.toys.get(id)) return;
+    if (s.mode === 'sleep' || r === 'dragged' || r === 'peek' || r === 'hide' || this.busyWorking || !this.toys.get(id)) return;
     if (s.mode === 'react' && s.reaction === 'play' && s.toy === id) {
       this.playPhase(s, 'go', GO_MS);
       s.excited = true;
@@ -311,6 +379,12 @@ export class Brain {
     const { cursor, cursorExcited, typingActive } = this.input;
     const s = this.state;
     const r = this.reaction;
+    // Hard at work: nothing distracts him (except being picked up, or a pat).
+    if (this.busyWorking) {
+      this.calmMs = 0;
+      this.cursorWasNear = cursor !== null && dist(cursor, this.center) < this.config.reactions.fleeRadius;
+      return;
+    }
     const alreadyChasing =
       r === 'chase' || r === 'pounce' || r === 'dragged' || (s.mode === 'react' && s.reaction === 'surprised' && s.next === 'chase');
 
@@ -416,7 +490,19 @@ export class Brain {
 
       case 'petted':
         this.brake(dt);
-        if (this.now >= s.until) this.idle(1500, 3000);
+        if (this.now < s.until) return;
+        if (s.resume && this.input.desk) {
+          // Back to work.
+          this.state = { ...s.resume, phase: 'go', until: this.now + DESK_GO_MS };
+        } else if (s.then === 'play' && this.favouriteToy()) {
+          this.startPlay(this.favouriteToy()!.id, true);
+        } else {
+          this.idle(1500, 3000);
+        }
+        return;
+
+      case 'work':
+        this.work(s, dt);
         return;
 
       case 'zoomies': {
@@ -742,6 +828,140 @@ export class Brain {
       return;
     }
     this.state = { mode: 'react', reaction: 'flee', target };
+  }
+
+  // ---- Work ---------------------------------------------------------------------------
+
+  /** Sat at his desk, or on his way to it: not to be distracted. Asking you to play, he's all yours. */
+  private get busyWorking(): boolean {
+    const s = this.state;
+    return s.mode === 'react' && s.reaction === 'work' && s.phase !== 'beg';
+  }
+
+  private speak(text: string | null, ms = SAY_MS): void {
+    this.speech = text ? { text, until: this.now + ms } : null;
+  }
+
+  private startWork(): void {
+    this.calmMs = 0;
+    this.vel = { x: 0, y: 0 };
+    this.speak('Work time!');
+    this.state = {
+      mode: 'react',
+      reaction: 'work',
+      phase: 'announce',
+      until: this.now + 1200,
+      focusUntil: null,
+      spot: null,
+      cursorAt: null,
+      look: null,
+      nextLook: 0,
+      nextAsk: 0,
+      asked: 0,
+    };
+  }
+
+  private work(s: WorkState, dt: number): void {
+    const desk = this.input.desk;
+    const m = this.config.motion;
+    const w = this.config.work;
+    const k = this.speedScale;
+    // The desk's been put away: work's over.
+    if (!desk) {
+      if (s.phase !== 'beg') this.speak(null);
+      this.pause();
+      return;
+    }
+    switch (s.phase) {
+      case 'announce':
+        this.brake(dt);
+        if (this.now >= s.until) {
+          s.phase = 'go';
+          s.until = this.now + DESK_GO_MS;
+        }
+        return;
+
+      case 'go': {
+        this.vel = this.steer(desk.seat, m.runSpeed * 0.75 * k, m.runAccel * k, dt, 50);
+        if (dist(this.pos, desk.seat) < 4 && length(this.vel) < 15) {
+          this.vel = { x: 0, y: 0 };
+          this.facing = desk.facing;
+          s.focusUntil ??= this.now + w.focusMs;
+          s.phase = 'type';
+          s.until = s.focusUntil;
+        } else if (this.now >= s.until) {
+          // Can't get there.
+          this.pause();
+        }
+        return;
+      }
+
+      case 'type':
+        // Sat still at the keyboard.
+        this.vel = { x: 0, y: 0 };
+        this.facing = desk.facing;
+        if (dist(this.pos, desk.seat) > 6) {
+          // The desk moved (the screen changed): over to it again.
+          s.phase = 'go';
+          s.until = this.now + DESK_GO_MS;
+          return;
+        }
+        if (this.now >= s.until) {
+          s.phase = 'restless';
+          s.until = this.now + w.restlessMs;
+          s.nextLook = this.now;
+        }
+        return;
+
+      case 'restless': {
+        this.vel = { x: 0, y: 0 };
+        // Looking about: at the screen edges, up, at you, anywhere but the screen.
+        if (this.now >= s.nextLook) {
+          const { bounds } = this.input;
+          const spots = [
+            { x: bounds.x + this.random() * bounds.width * 0.3, y: this.pos.y - this.input.size.height * (0.5 + this.random()) },
+            { x: this.pos.x + (this.random() * 2 - 1) * 200, y: bounds.y + this.random() * bounds.height * 0.3 },
+            this.input.cursor ?? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 },
+          ];
+          s.look = spots[Math.floor(this.random() * spots.length)]!;
+          s.nextLook = this.now + 900 + this.random() * 900;
+        }
+        if (this.now >= s.until) {
+          s.phase = 'beg';
+          s.until = this.now + w.begMs;
+          s.nextAsk = this.now;
+          s.look = null;
+        }
+        return;
+      }
+
+      case 'beg': {
+        if (this.now >= s.until) {
+          // You're not playing. Oh well.
+          this.speak(null);
+          this.confused();
+          return;
+        }
+        if (this.now >= s.nextAsk) {
+          this.speak(ASKS[s.asked % ASKS.length]!);
+          s.asked++;
+          s.nextAsk = this.now + w.askEveryMs;
+        }
+        // Over to you: next to the pointer, or out into the middle where you'll see him.
+        const { cursor, bounds } = this.input;
+        if (cursor && (!s.cursorAt || dist(cursor, s.cursorAt) > 120)) {
+          const side: 1 | -1 = this.pos.x < cursor.x ? -1 : 1;
+          s.spot = this.clampToArea({ x: cursor.x + side * this.input.size.width * 0.55, y: cursor.y + this.input.size.height * 0.35 });
+          s.cursorAt = { ...cursor };
+        } else if (!s.spot) {
+          s.spot = this.clampToArea({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height * 0.75 });
+        }
+        const far = dist(this.pos, s.spot);
+        this.vel = this.steer(s.spot, (far > 220 ? m.runSpeed : m.walkSpeed * 1.8) * k, m.runAccel * k, dt, 50);
+        if (far < 6 && cursor) this.facing = cursor.x < this.pos.x ? -1 : 1;
+        return;
+      }
+    }
   }
 
   // ---- Naps --------------------------------------------------------------------------
@@ -1134,6 +1354,23 @@ export class Brain {
           case 'nap':
             animation = speed > this.config.motion.walkSpeed * 1.5 ? 'run' : speed > 25 ? 'walk' : 'idle';
             break;
+          case 'work':
+            phase = s.phase;
+            animation =
+              s.phase === 'announce'
+                ? 'attention'
+                : s.phase === 'type'
+                  ? 'work'
+                  : s.phase === 'restless'
+                    ? 'sit'
+                    : speed > this.config.motion.walkSpeed * 1.5
+                      ? 'run'
+                      : speed > 25
+                        ? 'walk'
+                        : s.phase === 'beg' && s.spot && dist(this.pos, s.spot) < 15
+                          ? 'attention'
+                          : 'idle';
+            break;
         }
         break;
     }
@@ -1143,7 +1380,10 @@ export class Brain {
       s.mode === 'sit' ||
       s.mode === 'sleep' ||
       (s.mode === 'react' &&
-        (s.reaction === 'confused' || (s.reaction === 'peek' && s.phase === 'watch') || (s.reaction === 'hide' && s.phase === 'wait')));
+        (s.reaction === 'confused' ||
+          (s.reaction === 'peek' && s.phase === 'watch') ||
+          (s.reaction === 'hide' && s.phase === 'wait') ||
+          (s.reaction === 'work' && (s.phase === 'type' || s.phase === 'restless'))));
 
     let aim: number | null = null;
     let lookAt: Point | null = null;
@@ -1154,6 +1394,17 @@ export class Brain {
       // Eyes on the block, except while it's in his mouth.
       if (toy && toy.holder !== 'pet') lookAt = { x: toy.x, y: toy.y - toy.z - this.toys.size / 2 };
     }
+    const desk = this.input.desk;
+    if (s.mode === 'react' && s.reaction === 'work' && desk && (s.phase === 'type' || s.phase === 'restless')) {
+      // Square on to the desk, eyes on the screen (or wandering, restless).
+      aim = desk.facing > 0 ? 0 : Math.PI;
+      lookAt = s.phase === 'type' ? desk.screen : s.look;
+    }
+    if (s.mode === 'react' && s.reaction === 'work' && (s.phase === 'announce' || s.phase === 'beg') && speed < 25) {
+      // Saying it to you: turned three-quarters towards you, never with his back to you.
+      aim = this.facing > 0 ? 0.6 : Math.PI - 0.6;
+    }
+    const say = this.speech && this.now < this.speech.until ? this.speech.text : null;
 
     return {
       position: { ...this.pos },
@@ -1167,6 +1418,7 @@ export class Brain {
       resting: settled && speed <= 1,
       aim,
       lookAt,
+      say,
     };
   }
 

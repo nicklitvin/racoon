@@ -143,6 +143,31 @@ describe('pixel proportions', () => {
   });
 });
 
+describe('pixel outfits', () => {
+  it('draws a hat on top of the head and neckwear under the chin, in their own colours', () => {
+    for (const build of [PIXEL_RACCOON, PIXEL_CAT, PIXEL_OTTER]) {
+      const r = new Raster(PIXEL.width, PIXEL.height);
+      const { pose, motion, clock } = poseAt(build, 'idle');
+      drawPixelPet(r, build, pose, clock, motion.facing, motion.moving, scruffPoint(build, pose), { hat: 'tophat', outfit: 'collar' });
+      const rows = (c: number) => Array.from(r.data).flatMap((v, i) => (v === c ? [Math.floor(i / PIXEL.width)] : []));
+      const hat = rows(C.hatMain);
+      const collar = rows(C.wearMain);
+      expect(hat.length, build.species).toBeGreaterThan(10);
+      // The hat is above the eyes, the collar below them (in the water, on a swimming otter).
+      const eyes = rows(C.eye);
+      expect(Math.min(...hat)).toBeLessThan(Math.min(...eyes));
+      if (build.swims) continue;
+      expect(collar.length, build.species).toBeGreaterThan(2);
+      expect(Math.max(...collar)).toBeGreaterThan(Math.max(...eyes));
+    }
+  });
+
+  it('draws nothing extra undressed', () => {
+    const { r } = draw(PIXEL_RACCOON, 'idle');
+    for (const slot of [C.hatMain, C.hatTrim, C.hatAccent, C.wearMain, C.wearTrim, C.wearAccent]) expect(count(r, slot)).toBe(0);
+  });
+});
+
 describe('pixel otter', () => {
   it('swims in a pixel pond, nothing of it showing below the surface but water', () => {
     const { r, pose } = draw(PIXEL_OTTER, 'walk');

@@ -8,6 +8,10 @@ There are also 2D chibi versions of each (raccoon, ginger and tuxedo cats, fox, 
 
 A few wooden alphabet blocks lie about for your pet to play with. Now and then it goes over to one and swats it along the floor, or picks it up and flings it, then watches where it lands and goes after it. Running about, it kicks any block in its way. You can pick a block up and throw it yourself: your pet waits with its eyes on it while you hold it, and chases after it when you let go. (Click a block to flick it over.) You can put the blocks away in the settings.
 
+You can dress your pet up: in the settings, pick a hat (a party hat, beanie, top hat, crown, cap or bow) and something round its neck (a scarf, bow tie, bandana, or a collar and bell). Every pet wears them, in its own art style.
+
+Switch on **work mode** and a little desk appears in the bottom right corner of the screen, with a computer on it. Tap the desk three times and your pet says "Work time!", goes and sits down at it and types away, eyes on the screen, while you work. It isn't distracted by anything while it works (tap the desk and it shushes you). After 20 minutes it's had enough: it gets restless and looks about, then comes and finds your mouse pointer and asks you to play. Give it a pat and it's delighted, and off it goes to play with its blocks.
+
 It runs two ways from one codebase:
 
 - **Desktop** (Electron + React + TypeScript): a transparent, click-through overlay above all your windows. Built for Windows first; everything OS-specific is behind one adapter, and the macOS adapter is already written.
@@ -84,9 +88,13 @@ src/                      The page (React). Runs in Electron and in a browser
     chibi/                The flat 2D chibi pets: builds, poses and drawing
     pixel/                The pixel-art pets: a little rasteriser, palettes and drawing
     toys.ts               The toy blocks' drawings, one for each art style
+    outfits.ts            Hats and neckwear, as shapes every art style draws its own way
+    desk.ts               The work-mode desk, built to fit the pet, in each art style
+    typing.ts             The rhythm of a pet typing (bursts of taps, pauses to think)
     archive/              Retired pets (3D arena, cartoon, plush, classic, cartoon cat)
   runtime/petRuntime.ts   Connects core logic to the DOM; runs the animation loop
   runtime/toyLayer.ts     Puts the toy blocks on the page; picking them up and throwing them
+  runtime/deskLayer.ts    Puts the work-mode desk in the corner; taps on it
   host/                   "Where am I running?": Electron bridge or browser fallback
   components/             React: the pet page, the settings panel and its "What's new" notes
   lib/                    The version (the build date) and the patch notes
@@ -108,7 +116,7 @@ Two rules keep this portable and testable: **`src/core` never imports React, the
 
 ### Behaviour
 
-`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek, dragged, petted, zoomies, play** and **nap**. While chasing or dashing about at full tilt, it leaps now and then (`motion.leapMs`, `motion.leapEvery`), flying straight on through each leap. At speed it steers like an animal, not a hovercraft: the direction it's running can only swing round so fast (the faster it goes, the wider the turn) and it slows down to turn sharply, so it runs round in curves to a cursor behind it instead of stopping and reversing.
+`Brain` (`src/core/behavior/brain.ts`) is a state machine with the modes **idle, walk, sit, sleep** and **react**. Reactions are **surprised, chase, pounce, confused, flee, hide, peek, dragged, petted, zoomies, play, nap** and **work**. While chasing or dashing about at full tilt, it leaps now and then (`motion.leapMs`, `motion.leapEvery`), flying straight on through each leap. At speed it steers like an animal, not a hovercraft: the direction it's running can only swing round so fast (the faster it goes, the wider the turn) and it slows down to turn sharply, so it runs round in curves to a cursor behind it instead of stopping and reversing.
 
 - **Wandering:** the whole work area is the raccoon's world; there is no floor and no gravity. After each pause it picks something to do: walk to a random point anywhere on screen, sit and groom or yawn, or just turn round and look about. After about 3 calm minutes it goes for a nap (the **nap** reaction). If the pointer has been resting in one place for a few seconds (`wander.napByCursorAfterMs`: you're reading, say), it goes and lies down right next to it, on the side it's coming from, facing it; if the pointer then settles somewhere else before it gets there, it follows. Otherwise it picks somewhere sensible: curled up beside a toy block if one is nearby, or down at the bottom of the screen in the nearer corner, out of the way, facing into the room. There it yawns and falls asleep. Dropping it after a drag leaves it exactly where you let go.
 - **Organic movement:** walks follow a gently curved path with ease-in-out speed, and each walk varies a little in distance, curve and top speed. Everything else (chasing, fleeing, pouncing) goes through velocity with limited acceleration ("arrive" steering). Nothing ever teleports; the tests check this on every simulated frame.
@@ -124,6 +132,28 @@ The brain plays with them (the **play** reaction): after a pause it sometimes pi
 A raccoon can also take it for a walk. Drawings that can hold a block in their hands say so (`carriesToys` on the renderer), and then a throw is sometimes (`play.carryChance`) a carry instead: he picks the block up in both hands and stands up with it hugged to his chest (`lift`), toddles off a little way on his hind legs (`carry`, `play.carryDistance`), and throws it from there, up over his head and away (`throw`). The pick-up and the let-go are in `PLAY` too. Take the block off him while he's carrying it and he waits for you to throw it.
 
 You can play too: `ToyLayer` (`src/runtime/toyLayer.ts`) puts a block in your hand when you press on it, and throws it with the pointer's speed when you let go (flung up the screen it goes up into the air). The brain hears about it (`toyThrown`) and chases after it, to where it will land. Holding a block, you have the pet's attention: it waits, watching it, until you throw it. Tuning is in `DEFAULT_CONFIG.play`.
+
+### Dressing up
+
+`src/sprites/outfits.ts` describes each hat and each thing to wear round the neck as a few plain shapes (polygons and ellipses) with three colours. Hats are drawn in head units (the head's half-width is 1, the origin the crown of the head) and neckwear in neck units, so one description fits every animal and every size. Each renderer draws them its own way through `dress()`:
+
+- The lifelike pets put the hat on the crown of their 3D head and turn it with the head (`placeOutfit` in `critter/skin.ts`), and wrap the collar across the neck between body and head, so the head comes over its top.
+- The chibis draw the hat inside the head group and the neckwear just under the chin.
+- The pixel pets rasterise the same shapes, with the item's colours in palette slots of their own.
+
+The settings panel draws its buttons from the same shapes (`wearableIcon`), and shows your pet in what you've picked.
+
+### Work mode
+
+With `workMode` on, `DeskLayer` (`src/runtime/deskLayer.ts`) puts a desk in the bottom right corner, built to fit the pet: each drawing says where its paws come down when it types (`deskReach` on the renderer), and the keyboard goes just there. The brain is told where the desk is (`WorldInput.desk`: the seat, which way he faces, the screen) and counts taps on it (`deskTapped`). Three quick ones start the **work** reaction:
+
+1. **announce**: "Work time!" in a speech bubble (`PetSnapshot.say`), waving.
+2. **go**: over to the desk.
+3. **type**: sat at it, the `work` animation, eyes on the screen, for `work.focusMs` (20 minutes). Nothing distracts him: no chasing, peeking, fleeing or toys, and taps on the desk get "Shh! Working." A pat, and he enjoys it and goes back to work. He counts as resting, so the page ticks slowly all the while.
+4. **restless**: still sat there, looking about everywhere but the screen.
+5. **beg**: off to find you, next to the pointer (or out in the middle of the screen), turned towards you, waving (the `attention` animation) and asking to play every few seconds. Pat him and he's delighted and goes off to play with a block; throw him a block and he chases it. After `work.begMs` he gives up.
+
+Picking him up, or switching work mode off, ends it. While he types, the desk's screen fills with lines of work (CSS, on a layer over the drawing).
 
 ### Reactions to the cursor
 
@@ -269,5 +299,6 @@ In the browser, the page is the raccoon's whole world. Wandering, chasing, pounc
 5. Drag it and let go: it dangles while held and stays where you drop it. Click it: it startles.
 6. Settings (double-click it): change size and speed and watch them apply live. Turn on "React to typing" and type steadily for a few seconds: it peeks over the bottom edge and its eyes follow your typing. Stop typing: it comes back out after about 5 seconds.
 7. Change display scaling or resolution: it stays on screen.
-8. Toy blocks: wait a while and it goes over to a block, swats it or throws it, and goes after it. A raccoon sometimes picks it up and walks off with it on his hind legs, then throws it. Pick a block up: it watches it. Throw it: it chases after it. Click a block: it flips over. Clicks next to a block still go through to the window behind.
-9. Quit from the tray icon.
+8. Settings: pick a hat and something for its neck: your pet wears them straight away, in the panel's preview and on screen. Switch on work mode: a desk appears in the bottom right corner. Tap it three times: "Work time!", and it goes and types at it. Tap it again: "Shh! Working." (To see the end of the session without waiting 20 minutes, shorten `work.focusMs` in `config.ts`.)
+9. Toy blocks: wait a while and it goes over to a block, swats it or throws it, and goes after it. A raccoon sometimes picks it up and walks off with it on his hind legs, then throws it. Pick a block up: it watches it. Throw it: it chases after it. Click a block: it flips over. Clicks next to a block still go through to the window behind.
+10. Quit from the tray icon.

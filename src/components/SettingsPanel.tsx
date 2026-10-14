@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { RACCOON_TYPES, type KeyboardStatus, type RaccoonType, type Settings } from '../../shared/settings';
+import { HATS, OUTFITS, RACCOON_TYPES, type Hat, type KeyboardStatus, type Outfit, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
 import { RACCOON_STYLES, type Species } from '../sprites';
+import { HAT_ITEMS, OUTFIT_ITEMS, wearableIcon, type Dress } from '../sprites/outfits';
 import { PatchNotes, VersionChip } from './PatchNotes';
 
 interface SettingsPanelProps {
@@ -43,25 +44,26 @@ const GROUPS: { group: Species | 'chibi' | 'pixel'; title: string }[] = [
   { group: 'pixel', title: 'Pixel art' },
 ];
 
-/** A small still of the pet, drawn once. */
-function PetPreview({ type }: { type: RaccoonType }) {
+/** A small still of the pet in what it's wearing, drawn once. */
+function PetPreview({ type, dress, scale = 0.5, className = 'type-preview' }: { type: RaccoonType; dress: Dress; scale?: number; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const host = ref.current;
     if (!host) return;
     const renderer = RACCOON_STYLES[type].create();
-    renderer.setScale(0.5);
+    renderer.setScale(scale);
+    renderer.dress?.(dress);
     renderer.draw({ animation: 'idle', timeMs: 1000, keystrokes: 0, eyes: 'open', heading: 0.5 });
     // Stand every pet on the same floor, whatever empty space its drawing has below the feet.
-    const below = renderer.baseSize.height * 0.5 * (1 - (renderer.anchor?.y ?? 1));
+    const below = renderer.baseSize.height * scale * (1 - (renderer.anchor?.y ?? 1));
     (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${6 - below}px`;
     host.replaceChildren(renderer.element);
     return () => host.replaceChildren();
-  }, [type]);
-  return <span className="type-preview" ref={ref} aria-hidden="true" />;
+  }, [type, dress.hat, dress.outfit, scale]);
+  return <span className={className} ref={ref} aria-hidden="true" />;
 }
 
-function TypePicker({ value, onChange }: TypePickerProps) {
+function TypePicker({ value, onChange, dress }: TypePickerProps & { dress: Dress }) {
   return (
     <fieldset className="field type-picker">
       <legend>Pet</legend>
@@ -74,7 +76,7 @@ function TypePicker({ value, onChange }: TypePickerProps) {
               return (
                 <label key={type} className={type === value ? 'type-option selected' : 'type-option'} title={style.description}>
                   <input type="radio" name="raccoonType" checked={type === value} onChange={() => onChange(type)} />
-                  <PetPreview type={type} />
+                  <PetPreview type={type} dress={dress} />
                   <span className="type-name">{style.label}</span>
                   <span className="type-description">{style.description}</span>
                 </label>
@@ -83,6 +85,75 @@ function TypePicker({ value, onChange }: TypePickerProps) {
           </div>
         </div>
       ))}
+    </fieldset>
+  );
+}
+
+/** A picture of a hat or a scarf on its own, for its button. */
+function WearIcon({ kind, id }: { kind: 'hat' | 'outfit'; id: Hat | Outfit }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const host = ref.current;
+    if (!host) return;
+    const item = id === 'none' ? null : kind === 'hat' ? HAT_ITEMS[id as Exclude<Hat, 'none'>] : OUTFIT_ITEMS[id as Exclude<Outfit, 'none'>];
+    host.replaceChildren(...(item ? [wearableIcon(document, item)] : []));
+  }, [kind, id]);
+  return <span className={id === 'none' ? 'wear-glyph wear-none' : 'wear-glyph'} ref={ref} aria-hidden="true" />;
+}
+
+interface WearRowProps<T extends string> {
+  kind: 'hat' | 'outfit';
+  title: string;
+  options: readonly T[];
+  value: T;
+  label: (id: T) => string;
+  onChange: (id: T) => void;
+}
+
+function WearRow<T extends Hat | Outfit>({ kind, title, options, value, label, onChange }: WearRowProps<T>) {
+  return (
+    <div className="wear-row" role="radiogroup" aria-label={title}>
+      <h2 className="type-group-title">{title}</h2>
+      <div className="wear-options">
+        {options.map((id) => (
+          <label key={id} className={id === value ? 'wear-option selected' : 'wear-option'} title={label(id)}>
+            <input type="radio" name={kind} checked={id === value} onChange={() => onChange(id)} />
+            <WearIcon kind={kind} id={id} />
+            <span className="wear-name">{label(id)}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Hats and things round the neck, with your pet modelling them. */
+function DressUp({ settings, update }: { settings: Settings; update: (patch: Partial<Settings>) => void }) {
+  const dress = { hat: settings.hat, outfit: settings.outfit };
+  return (
+    <fieldset className="field dress-up">
+      <legend>Dress up</legend>
+      <div className="dress-up-body">
+        <PetPreview type={settings.raccoonType} dress={dress} scale={0.85} className="type-preview dress-preview" />
+        <div className="dress-up-rows">
+          <WearRow
+            kind="hat"
+            title="Hat"
+            options={HATS}
+            value={settings.hat}
+            label={(id) => (id === 'none' ? 'No hat' : HAT_ITEMS[id].label)}
+            onChange={(hat) => update({ hat })}
+          />
+          <WearRow
+            kind="outfit"
+            title="Round the neck"
+            options={OUTFITS}
+            value={settings.outfit}
+            label={(id) => (id === 'none' ? 'Nothing' : OUTFIT_ITEMS[id].label)}
+            onChange={(outfit) => update({ outfit })}
+          />
+        </div>
+      </div>
     </fieldset>
   );
 }
@@ -120,7 +191,9 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
     <section className="settings" aria-label="Racoon settings">
       {header}
 
-      <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
+      <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} dress={{ hat: settings.hat, outfit: settings.outfit }} />
+
+      <DressUp settings={settings} update={update} />
 
       <div className="field">
         <label className="toggle">
@@ -130,6 +203,17 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
         <p className="hint">
           A few wooden blocks to play with: your pet swats them about and throws them. Pick one up and throw it, and
           it’ll chase after it.
+        </p>
+      </div>
+
+      <div className="field">
+        <label className="toggle">
+          <input type="checkbox" checked={settings.workMode} onChange={(e) => update({ workMode: e.target.checked })} />
+          <span>Work mode</span>
+        </label>
+        <p className="hint">
+          Puts a little desk in the corner of the screen. Tap the desk three times and your pet sits down at it and
+          types away while you work. After 20 minutes it decides it’s play time and comes to find you.
         </p>
       </div>
 

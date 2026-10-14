@@ -10,6 +10,16 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-14',
+    title: 'Dress up, and work mode',
+    changes: [
+      'Dress up your pet: pick a hat (a party hat, beanie, top hat, crown, cap or bow) and something for its neck (a scarf, bow tie, bandana, or a collar and bell) in the settings. Every pet wears them in its own style, and the settings show yours trying them on.',
+      'Work mode: switch it on and a little desk with a computer appears in the corner of the screen. Tap the desk three times and your pet announces it’s work time, sits down at it and types away while you work. Nothing distracts it, and if you tap the desk it’ll shush you.',
+      'After 20 minutes of work it gets restless, looks about, then comes and finds your mouse pointer and keeps asking you to play. Give it a pat and it’s delighted, and off it goes to play with its blocks.',
+      'Pets now say things in a speech bubble.',
+    ],
+  },
+  {
     date: '2026-10-13',
     title: 'Naps, and a raccoon on two legs',
     changes: [
