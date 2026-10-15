@@ -4,7 +4,7 @@ import type { Pt } from '../chibi/species';
 import { hatItem, outfitItem, UNDRESSED, type Dress } from '../outfits';
 import type { RaccoonRenderer } from '../types';
 import { drawPixelPet, PIXEL } from './draw';
-import { rgbaTable, type Palette } from './palette';
+import { rgbaTable, shade, type Palette } from './palette';
 import { Raster } from './raster';
 import type { PixelBuild } from './species';
 
@@ -85,6 +85,7 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
     toyLook: 'pixel',
     carriesToys: build.species === 'raccoon',
     deskReach: { x: build.desk.x * K * PIXEL_PX, y: build.desk.y * K * PIXEL_PX },
+    mouseReach: { x: build.mouse.x * K * PIXEL_PX, y: build.mouse.y * K * PIXEL_PX },
     drawsMarks: true,
     toyPoint: () => (toy ? { x: toy.x * motion.facing * K * cell, y: toy.y * K * cell } : null),
     dress(d) {
@@ -94,7 +95,7 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
       colours = rgbaTable({
         ...palette,
         ...(hat && { hatMain: hat.main, hatTrim: hat.trim, hatAccent: hat.accent }),
-        ...(wear && { wearMain: wear.main, wearTrim: wear.trim, wearAccent: wear.accent }),
+        ...(wear && { wearMain: wear.main, wearTrim: wear.trim, wearAccent: wear.accent, wearLight: shade(wear.main, 0.25), wearDark: shade(wear.main, -0.25) }),
       });
       shownTick = NaN;
     },

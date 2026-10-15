@@ -2,15 +2,15 @@
 
 A raccoon that lives on your screen. It wanders all over your screen, sits down to groom and yawn, and when nothing is happening it goes for a nap: curled up right next to your mouse pointer if you've left it resting somewhere, or else somewhere out of the way. Now and then it gets the zoomies and dashes about, leaping as it goes. Shake your mouse and it jumps out and chases the cursor, leaping with excitement, pounces when the cursor stops, then sits looking confused. Click it to pet it, and stroke it to keep it happy. Get the cursor too close and it may run off or hide behind the edge of the screen. If you opt in, it also comes to watch you type, peeking up over the bottom edge with its eyes following your rhythm.
 
-You don't have to have a raccoon: the settings also offer cats, foxes and an otter, each in a few art styles. The otter swims about your screen instead of walking, in its own little patch of water: it paddles along with its head up, porpoises when it's excited, treads water to look about and floats on its back to rest.
+The pets are pixel art, drawn in chunky whole pixels like sprites from an old game: a raccoon, a ginger cat and an otter. You don't have to have the raccoon. The otter swims about your screen instead of walking, in its own little pixel pond: it paddles along with its head up, porpoises when it's excited, treads water to look about and floats on its back with its shell to rest.
 
-There are also 2D chibi versions of each (raccoon, ginger and tuxedo cats, fox, otter): flat cartoon pets with big heads, bean bodies and stubby legs, who bounce about with little floating hearts, z's and question marks. The chibi otter paddles about in its own little pond and floats on its back holding a shell. And there are pixel-art ones (raccoon, ginger cat, otter), drawn in chunky whole pixels like sprites from an old game.
+(The code also has lifelike and 2D chibi drawings of a raccoon, cats, a fox and an otter, in `src/sprites/critter` and `src/sprites/chibi`. They aren't offered in the settings for now; the pixel pets move with the chibis' poses.)
 
 A few wooden alphabet blocks lie about for your pet to play with. Now and then it goes over to one and swats it along the floor, or picks it up and flings it, then watches where it lands and goes after it. Running about, it kicks any block in its way. You can pick a block up and throw it yourself: your pet waits with its eyes on it while you hold it, and chases after it when you let go. (Click a block to flick it over.) You can put the blocks away in the settings.
 
-You can dress your pet up: in the settings, pick a hat (a party hat, beanie, top hat, crown, cap or bow) and something round its neck (a scarf, bow tie, bandana, or a collar and bell). Every pet wears them, in its own art style.
+You can dress your pet up: in the settings, pick a hat (a party hat, beanie, top hat, crown, cap, bow, nightcap or headphones) and an outfit (a suit and tie, pajamas, a sweater, a superhero cape, a scarf, a bow tie, a bandana, or a collar and bell).
 
-Switch on **work mode** and a little desk appears in the bottom right corner of the screen, with a computer on it. Tap the desk three times and your pet says "Work time!", goes and sits down at it and types away, eyes on the screen, while you work. It isn't distracted by anything while it works (tap the desk and it shushes you). After 20 minutes it's had enough: it gets restless and looks about, then comes and finds your mouse pointer and asks you to play. Give it a pat and it's delighted, and off it goes to play with its blocks.
+Switch on **work mode** and a little desk appears in the bottom right corner of the screen, with a computer on it. Tap the desk three times and your pet says "Work time!", goes and sits down at it and gets busy, eyes on the screen, while you work: typing away in a terminal, browsing the web, and every once in a while flicking through a few reels (and giggling at the funny ones). It isn't distracted by anything while it works (tap the desk and it shushes you). After 20 minutes it's had enough: it gets restless and looks about, then comes and finds your mouse pointer and asks you to play. Give it a pat and it's delighted, and off it goes to play with its blocks.
 
 It runs two ways from one codebase:
 
@@ -89,7 +89,7 @@ src/                      The page (React). Runs in Electron and in a browser
     pixel/                The pixel-art pets: a little rasteriser, palettes and drawing
     toys.ts               The toy blocks' drawings, one for each art style
     outfits.ts            Hats and neckwear, as shapes every art style draws its own way
-    desk.ts               The work-mode desk, built to fit the pet, in each art style
+    desk.ts               The work-mode desk in pixel art, built to fit the pet, and what's on its screen
     typing.ts             The rhythm of a pet typing (bursts of taps, pauses to think)
     archive/              Retired pets (3D arena, cartoon, plush, classic, cartoon cat)
   runtime/petRuntime.ts   Connects core logic to the DOM; runs the animation loop
@@ -135,13 +135,13 @@ You can play too: `ToyLayer` (`src/runtime/toyLayer.ts`) puts a block in your ha
 
 ### Dressing up
 
-`src/sprites/outfits.ts` describes each hat and each thing to wear round the neck as a few plain shapes (polygons and ellipses) with three colours. Hats are drawn in head units (the head's half-width is 1, the origin the crown of the head) and neckwear in neck units, so one description fits every animal and every size. Each renderer draws them its own way through `dress()`:
+`src/sprites/outfits.ts` describes each hat and outfit as a few plain shapes (polygons and ellipses) with three colours. Hats are drawn in head units (the head's half-width is 1, the origin the crown of the head) and what's worn at the neck (a tie, a collar) in neck units, so one description fits every animal and every size. Clothes also say how they cover the body (`body`): the body and how far down the legs, stripes round it, a shirt front, buttons, or a cape over the back that flies out behind as he runs. Each renderer draws them its own way through `dress()`:
 
 - The lifelike pets put the hat on the crown of their 3D head and turn it with the head (`placeOutfit` in `critter/skin.ts`), and wrap the collar across the neck between body and head, so the head comes over its top.
 - The chibis draw the hat inside the head group and the neckwear just under the chin.
-- The pixel pets rasterise the same shapes, with the item's colours in palette slots of their own.
+- The pixel pets rasterise the same shapes, with the item's colours in palette slots of their own, and dress the body too. (Only they dress the body for now: the others wear just the neck part of clothes.)
 
-The settings panel draws its buttons from the same shapes (`wearableIcon`), and shows your pet in what you've picked.
+The settings panel lists them with a little picture of each, drawn from the same shapes (`wearableIcon`).
 
 ### Work mode
 
@@ -149,11 +149,13 @@ With `workMode` on, `DeskLayer` (`src/runtime/deskLayer.ts`) puts a desk in the 
 
 1. **announce**: "Work time!" in a speech bubble (`PetSnapshot.say`), waving.
 2. **go**: over to the desk.
-3. **type**: sat at it, the `work` animation, eyes on the screen, for `work.focusMs` (20 minutes). Nothing distracts him: no chasing, peeking, fleeing or toys, and taps on the desk get "Shh! Working." A pat, and he enjoys it and goes back to work. He counts as resting, so the page ticks slowly all the while.
+3. **type**: sat at it, eyes on the screen, for `work.focusMs` (20 minutes). He switches between tasks (`work.tasks`): typing in the terminal (the `work` animation), browsing the web with a paw on the mouse (`browse`), and now and then a few reels, leant back flicking the mouse for the next one (`reels`). He always starts in the terminal and never does the same thing twice in a row; reels are the rarest and shortest. The snapshot says what's on the screen (`PetSnapshot.screen`). Nothing distracts him: no chasing, peeking, fleeing or toys, and taps on the desk get "Shh! Working." A pat, and he enjoys it and goes back to work. He counts as resting, so the page ticks slowly all the while.
 4. **restless**: still sat there, looking about everywhere but the screen.
 5. **beg**: off to find you, next to the pointer (or out in the middle of the screen), turned towards you, waving (the `attention` animation) and asking to play every few seconds. Pat him and he's delighted and goes off to play with a block; throw him a block and he chases it. After `work.begMs` he gives up.
 
-Picking him up, or switching work mode off, ends it. While he types, the desk's screen fills with lines of work (CSS, on a layer over the drawing).
+Picking him up, or switching work mode off, ends it.
+
+The desk (`src/sprites/desk.ts`) is pixel art on a small canvas. Its monitor is turned towards him, so you see the screen at an angle: each column of it a little shorter than the last, and its side showing past the far edge. What's on the screen is drawn into it a few times a second: a terminal with commands and output scrolling up and a blinking cursor, a web page with pictures and paragraphs scrolling by, reels flicked away upwards one after another in time with his paw (`REEL_MS`), or a screen saver when nobody's at it.
 
 ### Reactions to the cursor
 
@@ -299,6 +301,6 @@ In the browser, the page is the raccoon's whole world. Wandering, chasing, pounc
 5. Drag it and let go: it dangles while held and stays where you drop it. Click it: it startles.
 6. Settings (double-click it): change size and speed and watch them apply live. Turn on "React to typing" and type steadily for a few seconds: it peeks over the bottom edge and its eyes follow your typing. Stop typing: it comes back out after about 5 seconds.
 7. Change display scaling or resolution: it stays on screen.
-8. Settings: pick a hat and something for its neck: your pet wears them straight away, in the panel's preview and on screen. Switch on work mode: a desk appears in the bottom right corner. Tap it three times: "Work time!", and it goes and types at it. Tap it again: "Shh! Working." (To see the end of the session without waiting 20 minutes, shorten `work.focusMs` in `config.ts`.)
+8. Settings: pick a hat and an outfit: your pet wears them straight away. Switch on work mode: a desk appears in the bottom right corner, its monitor turned towards where the pet sits. Tap it three times: "Work time!", and it goes and works at it, switching between the terminal, the web and reels every minute or so. Tap it again: "Shh! Working." (To see the end of the session without waiting 20 minutes, shorten `work.focusMs` in `config.ts`.)
 9. Toy blocks: wait a while and it goes over to a block, swats it or throws it, and goes after it. A raccoon sometimes picks it up and walks off with it on his hind legs, then throws it. Pick a block up: it watches it. Throw it: it chases after it. Click a block: it flips over. Clicks next to a block still go through to the window behind.
 10. Quit from the tray icon.

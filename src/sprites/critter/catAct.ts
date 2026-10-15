@@ -294,6 +294,8 @@ export function catAct(input: ActInput): Act {
       return catAct({ ...input, animation: 'walk' });
 
     case 'work':
+    case 'browse':
+    case 'reels':
       return work(input);
 
     case 'attention':

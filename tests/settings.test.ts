@@ -21,8 +21,9 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ toys: false }).toys).toBe(false);
   });
 
-  it('accepts every pet type, defaulting to the storybook raccoon', () => {
-    expect(DEFAULT_SETTINGS.raccoonType).toBe('raccoon-storybook');
+  it('offers the three pixel pets, defaulting to the raccoon', () => {
+    expect(RACCOON_TYPES).toEqual(['raccoon-pixel', 'cat-pixel', 'otter-pixel']);
+    expect(DEFAULT_SETTINGS.raccoonType).toBe('raccoon-pixel');
     for (const type of RACCOON_TYPES) expect(normalizeSettings({ raccoonType: type }).raccoonType).toBe(type);
   });
 
@@ -32,10 +33,16 @@ describe('normalizeSettings', () => {
     }
   });
 
-  it('moves anyone on a retired pixel pet to the nearest one still here', () => {
-    expect(normalizeSettings({ raccoonType: 'cat-pixel-black' }).raccoonType).toBe('cat-pixel');
-    expect(normalizeSettings({ raccoonType: 'raccoon-pixel-handheld' }).raccoonType).toBe('raccoon-pixel');
-    expect(normalizeSettings({ raccoonType: 'fox-pixel' }).raccoonType).toBe('fox-chibi');
+  it('moves anyone on a pet no longer offered to the same animal in pixel art', () => {
+    for (const old of ['raccoon-storybook', 'raccoon-sketch', 'raccoon-chibi', 'raccoon-pixel-handheld']) {
+      expect(normalizeSettings({ raccoonType: old }).raccoonType, old).toBe('raccoon-pixel');
+    }
+    for (const old of ['cat-storybook', 'cat-shadow', 'cat-chibi-tuxedo', 'cat-pixel-black']) {
+      expect(normalizeSettings({ raccoonType: old }).raccoonType, old).toBe('cat-pixel');
+    }
+    for (const old of ['otter-storybook', 'otter-sketch', 'otter-chibi']) expect(normalizeSettings({ raccoonType: old }).raccoonType, old).toBe('otter-pixel');
+    // No pixel fox: the cat is the nearest thing.
+    for (const old of ['fox-storybook', 'fox-arctic', 'fox-chibi', 'fox-pixel']) expect(normalizeSettings({ raccoonType: old }).raccoonType, old).toBe('cat-pixel');
     // Not fooled by names that only look like one.
     expect(normalizeSettings({ raccoonType: 'constructor' }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
   });

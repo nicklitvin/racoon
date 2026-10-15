@@ -1,15 +1,18 @@
-import { n, svgWriter } from './svg';
-import type { ToyLook } from './types';
-
 /**
- * The desk for work mode: a little wooden desk with a computer on it (monitor, keyboard,
- * mouse) and a mug, drawn to match the pet. It's built to fit him: the keyboard sits just
- * where his paws come down when he types, and everything else is in proportion to him.
+ * The desk for work mode, in pixel art: a little wooden desk with a computer on it (a
+ * monitor, keyboard and mouse) and a mug. It's built to fit the pet: the keyboard and the
+ * mouse sit just where his paws come down, and everything else is in proportion to him.
  *
- * Drawn facing right, as he sits at it: keyboard nearest him, on the left, the monitor
- * beyond it. The screen is a separate layer of plain elements over the drawing, so the
- * lines of "work" on it can scroll by with CSS while he types.
+ * Drawn facing right, as he sits at it: keyboard nearest him, then the mouse, then the
+ * monitor, turned towards him: you see its screen at an angle, its far edge shorter and its
+ * side showing. What's on the screen is drawn too, a few times a second: a terminal, a web
+ * page, reels, or a screen saver while nobody's using it.
  */
+
+import { REEL_MS } from './typing';
+
+/** What's on the screen. */
+export type DeskApp = 'terminal' | 'web' | 'reels' | 'idle';
 
 export interface DeskDrawing {
   element: HTMLElement;
@@ -21,184 +24,299 @@ export interface DeskDrawing {
   keyboardX: number;
   /** The middle of the screen, px from the desk's left edge and up from the floor. */
   screen: { x: number; y: number };
-  setWorking(on: boolean): void;
-}
-
-interface Part {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  fill: string;
-  /** Corner radius, px (vector drawings only). */
-  r?: number;
-  /** Drawn without an outline (details on something already outlined). */
-  flat?: boolean;
+  /** Shows `app` on the screen as it is at `clock` (ms). Cheap to call every frame. */
+  show(app: DeskApp, clock: number): void;
 }
 
 const COLOURS = {
+  line: '#2a1f2d',
   wood: '#c99460',
   woodLight: '#ddb07c',
   woodDark: '#9b6a3e',
   metal: '#3b404c',
   metalLight: '#565c6b',
-  screen: '#1f2b3b',
+  metalSide: '#2c3039',
   keys: '#ece8e0',
-  key: '#c4beb2',
+  key: '#b9b2a6',
   mug: '#f2775f',
-  mugLight: '#ffffff',
 };
 
-const LOOKS: Record<ToyLook, { line: string; width: number; paper?: boolean }> = {
-  paint: { line: '#5a4232', width: 1 },
-  chibi: { line: '#2b2630', width: 1.8 },
-  ink: { line: '#1f1d22', width: 1.1, paper: true },
-  pixel: { line: '#2a1f2d', width: 1 },
-};
+/** The screen redraws this often while something's on it. */
+const SCREEN_FPS = 8;
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  fill: string;
+  /** Drawn without an outline (detail on something already outlined). */
+  flat?: boolean;
+}
 
 /**
  * @param unit his height, px: the desk is sized to it
  * @param keysTop how high the top of the keyboard is off the floor, px: where his paws rest
- * @param pixel for pixel art, how many px each art pixel is
+ * @param mouseDx how far right of the keyboard's middle the mouse goes, px
+ * @param pixel px per art pixel
  */
-export function createDeskDrawing(doc: Document, look: ToyLook, unit: number, keysTop: number, pixel = 0): DeskDrawing {
-  const U = unit;
-  const snap = (v: number) => (pixel ? Math.max(pixel, Math.round(v / pixel) * pixel) : v);
-  const keysH = snap(Math.max(3, U * 0.05));
-  const surface = Math.max(snap(U * 0.12), snap(keysTop - keysH));
-  const top = snap(Math.max(4, U * 0.065));
-  const legW = snap(Math.max(3, U * 0.055));
-  const width = snap(U * 1.5);
-  const keysX = snap(U * 0.05);
-  const keysW = snap(U * 0.4);
-  const mouseX = snap(U * 0.49);
-  const monX = snap(U * 0.72);
-  const monW = snap(U * 0.72);
-  const monH = snap(U * 0.48);
-  const bezel = snap(Math.max(2, U * 0.025));
-  const stand = snap(U * 0.09);
-  const height = snap(surface + stand + monH + U * 0.06);
-  // y from the top of the drawing, for a height off the floor.
+export function createDeskDrawing(doc: Document, unit: number, keysTop: number, mouseDx: number, pixel: number): DeskDrawing {
+  const P = Math.max(1, pixel);
+  // Everything in art pixels from here on.
+  const u = unit / P;
+  const r = (v: number) => Math.max(1, Math.round(v));
+  const keysH = 2;
+  const surface = Math.max(5, Math.round(keysTop / P) - keysH);
+  const top = 2;
+  const legW = 2;
+  const mouseW = 3;
+  const mouseX = Math.round(mouseDx / P);
+  // The keyboard fills what room there is between his near paw and the mouse.
+  const keysW = Math.max(6, Math.min(r(u * 0.26), 2 * (mouseX - Math.ceil(mouseW / 2) - 1)));
+  const keysX = 1;
+  const keysMid = keysX + keysW / 2;
+  const mouseLeft = Math.round(keysMid + mouseX - mouseW / 2);
+  const mugX = mouseLeft + mouseW + 2;
+  // The monitor: its face foreshortened, turned towards him, its far edge `fall` shorter top and bottom.
+  const faceW = r(u * 0.4);
+  const faceH = r(u * 0.34);
+  const fall = Math.max(2, Math.round(faceH * 0.2));
+  const side = 3;
+  const stand = r(u * 0.07) + 1;
+  const monX = mugX + 6;
+  const width = monX + faceW + side + 3;
+  const height = surface + stand + faceH + 2;
+  // y from the top of the canvas for a height off the floor.
   const Y = (up: number) => height - up;
-
   const C = COLOURS;
-  const L = LOOKS[look];
-  const paper = L.paper ? '#fffdf8' : null;
-  const fill = (c: string) => paper ?? c;
-  const drawerX = width - snap(U * 0.42);
-  const parts: Part[] = [
-    // Legs, a drawer unit under the far end, and the top.
-    { x: snap(U * 0.04), y: Y(surface - top), w: legW, h: surface - top, fill: fill(C.woodDark) },
-    { x: drawerX, y: Y(surface - top), w: width - drawerX - snap(U * 0.04), h: surface - top, fill: fill(C.wood) },
-    { x: drawerX + snap(U * 0.04), y: Y(surface - top - snap(U * 0.04)), w: width - drawerX - snap(U * 0.12), h: snap(U * 0.1), fill: fill(C.woodLight), r: 1.5 },
-    { x: drawerX + snap(U * 0.04), y: Y(surface - top - snap(U * 0.19)), w: width - drawerX - snap(U * 0.12), h: snap(U * 0.1), fill: fill(C.woodLight), r: 1.5 },
-    { x: 0, y: Y(surface), w: width, h: top, fill: fill(C.wood), r: 2 },
-    { x: snap(U * 0.02), y: Y(surface), w: width - snap(U * 0.04), h: snap(Math.max(1, top * 0.3)), fill: fill(C.woodLight), flat: true },
-    // The monitor on its stand.
-    { x: monX + monW / 2 - snap(U * 0.12), y: Y(surface + snap(U * 0.025)), w: snap(U * 0.24), h: snap(U * 0.025), fill: fill(C.metal), r: 1 },
-    { x: monX + monW / 2 - snap(U * 0.03), y: Y(surface + stand), w: snap(U * 0.06), h: stand, fill: fill(C.metalLight) },
-    { x: monX, y: Y(surface + stand + monH), w: monW, h: monH, fill: fill(C.metal), r: 3 },
-    { x: monX + bezel, y: Y(surface + stand + monH - bezel), w: monW - bezel * 2, h: monH - bezel * 2.6, fill: paper ? '#eef2f6' : C.screen, r: 1.5, flat: true },
-    // A mug of something warm.
-    { x: snap(U * 0.59), y: Y(surface + snap(U * 0.1)), w: snap(U * 0.075), h: snap(U * 0.1), fill: fill(C.mug), r: 1.5 },
-    // Keyboard and mouse.
-    { x: keysX, y: Y(surface + keysH), w: keysW, h: keysH, fill: fill(C.keys), r: 1.5 },
-    { x: mouseX, y: Y(surface + snap(U * 0.035)), w: snap(U * 0.07), h: snap(U * 0.035), fill: fill(C.keys), r: 3 },
-  ];
-  // A row of keys along the keyboard.
-  const keyW = snap(Math.max(1, keysW / 9));
-  for (let x = keysX + keyW; x + keyW <= keysX + keysW - keyW / 2; x += keyW * 1.6) {
-    parts.push({ x, y: Y(surface + keysH * 0.8), w: keyW, h: pixel ? pixel : Math.max(1, keysH * 0.3), fill: paper ? L.line : C.key, flat: true });
-  }
 
-  const element = doc.createElement('div');
-  element.className = `desk desk-${look}`;
-  element.style.width = `${width}px`;
-  element.style.height = `${height}px`;
-  let art: Element;
-  if (pixel) {
-    art = pixelArt(doc, parts, width, height, pixel, L.line);
-  } else {
-    const { make } = svgWriter(doc);
-    const svg = make('svg', { viewBox: `0 0 ${n(width)} ${n(height)}`, width: n(width), height: n(height), class: 'desk-art', 'aria-hidden': 'true' });
-    for (const p of parts) {
-      make(
-        'rect',
-        {
-          x: n(p.x),
-          y: n(p.y),
-          width: n(p.w),
-          height: n(p.h),
-          rx: n(p.r ?? 0),
-          fill: p.fill,
-          stroke: p.flat ? 'none' : L.line,
-          'stroke-width': n(L.width),
-          'stroke-linejoin': 'round',
-        },
-        svg,
-      );
+  const drawerX = monX + 1;
+  const rects: Rect[] = [
+    { x: 1, y: Y(surface - top), w: legW, h: surface - top, fill: C.woodDark },
+    { x: drawerX, y: Y(surface - top), w: width - drawerX - 2, h: surface - top, fill: C.wood },
+    { x: drawerX + 2, y: Y(surface - top - 1), w: width - drawerX - 6, h: Math.max(1, Math.floor((surface - top) / 2) - 1), fill: C.woodLight },
+    { x: 0, y: Y(surface), w: width, h: top, fill: C.wood },
+    { x: 1, y: Y(surface), w: width - 2, h: 1, fill: C.woodLight, flat: true },
+    // The monitor's stand: a base and a neck up to the middle of the screen.
+    { x: monX + Math.round(faceW / 2) - 3, y: Y(surface + 1), w: 6, h: 1, fill: C.metal },
+    { x: monX + Math.round(faceW / 2) - 1, y: Y(surface + stand), w: 2, h: stand - 1, fill: C.metalLight },
+    // A mug, keyboard and mouse.
+    { x: mugX, y: Y(surface + 3), w: 3, h: 3, fill: C.mug },
+    { x: keysX, y: Y(surface + keysH), w: keysW, h: keysH, fill: C.keys },
+    { x: mouseLeft, y: Y(surface + 1), w: mouseW, h: 1, fill: C.keys },
+  ];
+  for (let x = keysX + 1; x < keysX + keysW - 1; x += 2) rects.push({ x, y: Y(surface + keysH) , w: 1, h: 1, fill: C.key, flat: true });
+
+  const canvas = doc.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.className = 'desk-art';
+  canvas.style.width = `${width * P}px`;
+  canvas.style.height = `${height * P}px`;
+  const ctx = canvas.getContext?.('2d') ?? null;
+  const px = (x: number, y: number, fill: string) => {
+    if (!ctx) return;
+    ctx.fillStyle = fill;
+    ctx.fillRect(x, y, 1, 1);
+  };
+  if (ctx) {
+    for (const p of rects) {
+      if (!p.flat) {
+        ctx.fillStyle = C.line;
+        ctx.fillRect(p.x - 1, p.y - 1, p.w + 2, p.h + 2);
+      }
+      ctx.fillStyle = p.fill;
+      ctx.fillRect(p.x, p.y, p.w, p.h);
     }
     // The mug's handle.
-    const mx = snap(U * 0.59) + snap(U * 0.075);
-    make('path', { d: `M${n(mx)},${n(Y(surface + U * 0.08))} q${n(U * 0.04)},${n(U * 0.025)} 0,${n(U * 0.055)}`, fill: 'none', stroke: L.line, 'stroke-width': n(L.width * 1.4) }, svg);
-    art = svg;
+    px(mugX + 3, Y(surface + 2), C.line);
+    px(mugX + 4, Y(surface + 2), C.line);
+    px(mugX + 4, Y(surface + 1), C.line);
   }
-  element.appendChild(art);
 
-  // What's on the screen: lines of work appearing while he types, a screen saver otherwise.
-  const screen = doc.createElement('div');
-  screen.className = 'desk-screen';
-  const sx = monX + bezel * 2;
-  const sTop = Y(surface + stand + monH - bezel * 2);
-  Object.assign(screen.style, { left: `${sx}px`, top: `${sTop}px`, width: `${monW - bezel * 4}px`, height: `${monH - bezel * 4}px` });
-  const lineH = pixel ? pixel : Math.max(2, U * 0.022);
-  for (let i = 0; i < 6; i++) {
-    const line = doc.createElement('i');
-    line.className = 'desk-line';
-    line.style.height = `${lineH}px`;
-    line.style.width = `${[70, 45, 82, 30, 60, 52][i]}%`;
-    line.style.marginLeft = `${[0, 12, 12, 24, 12, 0][i]}%`;
-    line.style.animationDelay = `${i * 0.45}s`;
-    screen.appendChild(line);
+  // The monitor's face, column by column: each column a little shorter than the last.
+  const faceTop = Y(surface + stand + faceH);
+  const colTop = (i: number) => faceTop + Math.round((i * fall) / (faceW - 1));
+  const colBottom = (i: number) => faceTop + faceH - 1 - Math.round((i * fall) / (faceW - 1));
+  if (ctx) {
+    for (let i = -1; i <= faceW + side; i++) {
+      // Outline round the face and its side.
+      const c = Math.min(Math.max(i, 0), faceW - 1);
+      for (let y = colTop(c) - 1; y <= colBottom(c) + 1; y++) px(monX + i, y, C.line);
+    }
+    for (let i = 0; i < faceW; i++) for (let y = colTop(i); y <= colBottom(i); y++) px(monX + i, y, C.metal);
+    // Its side, seen past the far edge.
+    for (let i = 0; i < side; i++) {
+      for (let y = colTop(faceW - 1) + 1 + i; y <= colBottom(faceW - 1) - 1 - i; y++) px(monX + faceW + i, y, C.metalSide);
+    }
   }
-  element.appendChild(screen);
+  // The screen inside the bezel.
+  const scr = { x0: 1, x1: faceW - 2 };
+  const screenW = scr.x1 - scr.x0 + 1;
+  const screenRows = (i: number) => ({ top: colTop(i) + 1, bottom: colBottom(i) - 2 });
+  const screenH = screenRows(0).bottom - screenRows(0).top + 1;
 
+  const element = doc.createElement('div');
+  element.className = 'desk';
+  element.style.width = `${width * P}px`;
+  element.style.height = `${height * P}px`;
+  element.appendChild(canvas);
+
+  let shown = '';
+  const content: string[] = new Array(screenW * screenH);
   return {
     element,
-    art,
-    width,
-    height,
-    keyboardX: keysX + keysW / 2,
-    screen: { x: monX + monW / 2, y: surface + stand + monH / 2 },
-    setWorking(on) {
-      element.classList.toggle('working', on);
+    art: canvas,
+    width: width * P,
+    height: height * P,
+    keyboardX: (keysX + keysW / 2) * P,
+    screen: { x: (monX + faceW / 2) * P, y: (surface + stand + faceH / 2) * P },
+    show(app, clock) {
+      const frame = app === 'idle' ? Math.floor(clock / 250) : Math.floor(clock / (1000 / SCREEN_FPS));
+      const key = `${app}|${frame}`;
+      if (key === shown || !ctx) return;
+      shown = key;
+      paintScreen(app, clock, screenW, screenH, content);
+      // Each column of the screen is a little shorter: squeeze the picture into it.
+      for (let i = scr.x0; i <= scr.x1; i++) {
+        const { top, bottom } = screenRows(i);
+        const h = bottom - top + 1;
+        const cx = i - scr.x0;
+        for (let y = 0; y < h; y++) {
+          const cy = Math.min(screenH - 1, Math.floor(((y + 0.5) * screenH) / h));
+          px(monX + i, top + y, content[cy * screenW + cx]!);
+        }
+      }
     },
   };
 }
 
-/** The same desk in whole pixels, each part outlined, on a small canvas blown up. */
-function pixelArt(doc: Document, parts: Part[], width: number, height: number, pixel: number, line: string): HTMLCanvasElement {
-  const W = Math.round(width / pixel);
-  const H = Math.round(height / pixel);
-  const canvas = doc.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  canvas.className = 'desk-art';
-  canvas.style.width = `${W * pixel}px`;
-  canvas.style.height = `${H * pixel}px`;
-  const ctx = canvas.getContext?.('2d') ?? null;
-  if (!ctx) return canvas;
-  for (const p of parts) {
-    const x = Math.round(p.x / pixel);
-    const y = Math.round(p.y / pixel);
-    const w = Math.max(1, Math.round(p.w / pixel));
-    const h = Math.max(1, Math.round(p.h / pixel));
-    if (!p.flat) {
-      ctx.fillStyle = line;
-      ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
-    }
-    ctx.fillStyle = p.fill;
-    ctx.fillRect(x, y, w, h);
+/** Pseudo-random but steady numbers, for text that doesn't flicker. */
+function hash(n: number): number {
+  let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** A line of "text": words of a few pixels with gaps, `length` pixels long at most. */
+function textAt(line: number, x: number, length: number): boolean {
+  if (x >= length) return false;
+  let at = 0;
+  for (let w = 0; at < length; w++) {
+    const word = 1 + Math.floor(hash(line * 31 + w) * 4);
+    if (x >= at && x < at + word) return true;
+    at += word + 1;
   }
-  return canvas;
+  return false;
+}
+
+/** Draws `app` into `out` (row by row, `w` by `h` colours). */
+function paintScreen(app: DeskApp, clock: number, w: number, h: number, out: string[]): void {
+  const set = (x: number, y: number, c: string) => {
+    if (x >= 0 && y >= 0 && x < w && y < h) out[y * w + x] = c;
+  };
+  const fill = (c: string) => out.fill(c);
+  const t = clock / 1000;
+  switch (app) {
+    case 'idle': {
+      // A screen saver: a dot drifting about a dark screen.
+      fill('#10141c');
+      const x = Math.round((Math.sin(t * 0.7) * 0.5 + 0.5) * (w - 2));
+      const y = Math.round((Math.sin(t * 1.1 + 1) * 0.5 + 0.5) * (h - 2));
+      set(x, y, '#5a9e7c');
+      set(x + 1, y, '#5a9e7c');
+      return;
+    }
+    case 'terminal': {
+      // Lines of green and grey text scrolling up as he types, a prompt at the start of
+      // each command and a blinking cursor at the end of the one he's on.
+      fill('#12161d');
+      const rate = 9;
+      const typed = Math.floor(t * rate);
+      const lineLen = (i: number) => 3 + Math.floor(hash(i) * (w - 4));
+      let line = 0;
+      let left = typed;
+      while (left > lineLen(line)) left -= lineLen(line++);
+      const rows = Math.floor((h - 1) / 2);
+      for (let row = 0; row < rows; row++) {
+        const i = line - (rows - 1 - row);
+        if (i < 0) continue;
+        const y = 1 + row * 2;
+        const len = i === line ? left : lineLen(i);
+        const command = hash(i * 7) < 0.4;
+        if (command) set(0, y, '#ffd84a');
+        for (let x = 0; x < w - 2; x++) if (textAt(i, x, len)) set(x + (command ? 2 : 0), y, command ? '#e8e4da' : '#7fe0a8');
+        if (i === line && Math.floor(t * 2.5) % 2 === 0) set(Math.min(w - 1, len + (command ? 2 : 0)), y, '#e8e4da');
+      }
+      return;
+    }
+    case 'web': {
+      // A web page: the address bar, then a picture and paragraphs, scrolling slowly by.
+      fill('#f4f1ea');
+      const scroll = Math.floor(t * 1.2);
+      for (let y = 2; y < h; y++) {
+        const row = y - 2 + scroll;
+        const block = Math.floor(row / 8);
+        const inBlock = row % 8;
+        const picture = hash(block * 13) < 0.45;
+        for (let x = 0; x < w; x++) {
+          if (picture && inBlock < 5 && x >= 1 && x < Math.ceil(w * 0.55)) {
+            // A picture: sky over grass, with a sun.
+            const sun = x === 3 && inBlock === 1;
+            set(x, y, sun ? '#ffd84a' : inBlock < 3 ? '#9cc8ee' : '#7cbf6e');
+          } else if (inBlock % 2 === 1 && textAt(row, x - 1, w - 2) && x >= 1) {
+            set(x, y, row % 8 === 1 ? '#4d6fd6' : '#a7a196');
+          }
+        }
+      }
+      // The address bar and the tabs.
+      for (let x = 0; x < w; x++) {
+        set(x, 0, '#5b6ee0');
+        set(x, 1, x > 1 && x < w - 2 ? '#e9ecf8' : '#5b6ee0');
+      }
+      return;
+    }
+    case 'reels': {
+      // Short videos, one after another: a bright card in the middle of a dark screen,
+      // flicked away upwards for the next, with a heart and a caption.
+      fill('#0c0c11');
+      const every = REEL_MS / 1000;
+      const n = Math.floor(t / every);
+      const into = (t / every) % 1;
+      const swipe = into > 0.86 ? (into - 0.86) / 0.14 : 0;
+      const cw = Math.max(5, Math.round(h * 0.56));
+      const x0 = Math.floor((w - cw) / 2);
+      const palettes = [
+        ['#ff8fa6', '#ffd84a'],
+        ['#7fe0a8', '#5b6ee0'],
+        ['#ffb36b', '#e2435a'],
+        ['#9cc8ee', '#ffffff'],
+        ['#c59cf0', '#ffd84a'],
+      ];
+      for (const [k, offset] of [
+        [n, -Math.round(swipe * h)],
+        [n + 1, h - Math.round(swipe * h)],
+      ] as const) {
+        const [bg, blob] = palettes[Math.floor(hash(k) * palettes.length)]!;
+        const bounce = Math.round(Math.sin(t * 6 + k) * 1);
+        for (let y = 0; y < h; y++) {
+          const yy = y + offset;
+          if (yy < 0 || yy >= h) continue;
+          for (let x = x0; x < x0 + cw; x++) {
+            const dx = x - (x0 + cw / 2 - 0.5);
+            const dy = y - (h * 0.45 + bounce);
+            set(x, yy, dx * dx + dy * dy < (cw * cw) / 7 ? blob! : bg!);
+          }
+          // The caption.
+          if (y === h - 2) for (let x = x0 + 1; x < x0 + cw - 2; x++) set(x, yy, '#ffffff');
+        }
+      }
+      // The heart, beside the card.
+      const hx = x0 + cw + 1;
+      const hy = Math.round(h * 0.55);
+      for (const [x, y] of [[0, 0], [2, 0], [0, 1], [1, 1], [2, 1], [1, 2]] as const) set(hx + x, hy + y, '#ff4d6d');
+      return;
+    }
+  }
 }

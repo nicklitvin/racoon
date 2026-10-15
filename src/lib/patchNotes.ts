@@ -11,6 +11,16 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     date: '2026-10-14',
+    title: 'Outfits, and busy at the desk',
+    changes: [
+      'The pets are pixel art now: the raccoon, the tabby and the otter. If you had another pet, you get the same animal in pixel art (a fox gets the tabby).',
+      'New outfits: a suit and tie, pajamas, a sweater and a superhero cape that flies out behind as your pet runs. New hats: a nightcap, to go with the pajamas, and headphones. The dress-up settings are now simple lists to pick from.',
+      'At its desk, your pet now switches between tabs: typing away in a terminal, browsing the web with a paw on the mouse, and every once in a while flicking through a few reels and giggling at the funny ones. You can see each on its screen.',
+      'The desk’s monitor is turned towards your pet, as it would be, instead of facing you.',
+    ],
+  },
+  {
+    date: '2026-10-14',
     title: 'Dress up, and work mode',
     changes: [
       'Dress up your pet: pick a hat (a party hat, beanie, top hat, crown, cap or bow) and something for its neck (a scarf, bow tie, bandana, or a collar and bell) in the settings. Every pet wears them in its own style, and the settings show yours trying them on.',

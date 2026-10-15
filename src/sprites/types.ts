@@ -33,8 +33,12 @@ export const ANIMATION_NAMES = [
   'carry',
   /** Throwing the toy he's carrying, from up on his hind legs, and dropping back onto all fours. */
   'throw',
-  /** Sat at his desk typing away, now and then stopping to think or reach for the mouse. */
+  /** Sat at his desk typing away in a terminal, now and then stopping to think. */
   'work',
+  /** At his desk browsing the web: a paw on the mouse, clicking and scrolling, reading. */
+  'browse',
+  /** At his desk watching reels: leant back, flicking the mouse for the next one, giggling. */
+  'reels',
   /** Trying to get your attention: up on his toes, waving, bouncing. */
   'attention',
 ] as const;
@@ -141,6 +145,8 @@ export interface RaccoonRenderer {
    * feet facing right, px at scale 1. The desk is built to fit.
    */
   readonly deskReach?: { x: number; y: number };
+  /** Where a front paw rests on the mouse, browsing, from his feet facing right, px at scale 1. */
+  readonly mouseReach?: { x: number; y: number };
   /** Puts a hat on him and something round his neck (or takes them off). */
   dress?(dress: Dress): void;
   /** Draws its own marks over its head (z's asleep), so the page shouldn't add its own. */

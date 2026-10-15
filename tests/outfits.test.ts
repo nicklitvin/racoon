@@ -33,8 +33,9 @@ describe('outfits', () => {
   it('keeps hats sitting on the head: their bottom near the crown, nothing far below it', () => {
     for (const [id, item] of Object.entries(HAT_ITEMS)) {
       const ys = item.shapes.flatMap((s) => (s.kind === 'poly' ? s.points.map(([, y]) => y) : [s.cy + s.ry]));
-      // The head's top is at 0 and its middle at 1: a hat comes no lower than its middle.
-      expect(Math.max(...ys), id).toBeLessThan(0.8);
+      // The head's top is at 0 and its middle at 1: a hat comes no lower than its middle
+      // (headphones come down to the ears, at the sides).
+      expect(Math.max(...ys), id).toBeLessThan(id === 'headphones' ? 1.1 : 0.8);
       expect(Math.min(...ys), id).toBeLessThan(0.1);
     }
   });

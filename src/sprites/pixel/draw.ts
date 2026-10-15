@@ -49,6 +49,12 @@ const TUFTS: Record<PixelSpecies, [number, number][]> = {
   otter: [],
 };
 
+/** The palette slots for each of an item's paints. */
+const PAINT_SLOT = {
+  hat: { main: C.hatMain, trim: C.hatTrim, accent: C.hatAccent },
+  wear: { main: C.wearMain, trim: C.wearTrim, accent: C.wearAccent },
+} satisfies Record<string, Record<Paint, number>>;
+
 /** Samples a quadratic Bezier, for turning the chibi's curved markings into polygons. */
 function quad(a: Pt, c: Pt, b: Pt, steps = 4): Pt[] {
   const out: Pt[] = [];
@@ -139,6 +145,10 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   };
   if (p.tailFront <= 0.5) drawTail();
 
+  // What he's wearing on his body, if anything.
+  const clothes = outfitItem(dress.outfit)?.body ?? null;
+  const covered = clothes?.covered === true;
+
   // --- Legs ---
   const raised = (leg: LegName) => (leg === 'frontNear' && p.pawUp > 0.5) || (leg === 'frontFar' && p.pawUp > 1.5);
   const drawLeg = (leg: LegName) => {
@@ -148,6 +158,13 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     const far = leg.endsWith('Far');
     const c = capsule(root, paw, w);
     r.shape(c.sd, c.box, far ? C.far : C.fur, C.outline);
+    // Sleeves and trouser legs, down to the cuffs.
+    if (clothes && clothes.sleeves > 0) {
+      const k = clothes.sleeves;
+      const cuff = { x: root.x + (paw.x - root.x) * k, y: root.y + (paw.y - root.y) * k };
+      const sleeve = capsule(root, cuff, w + 0.5);
+      r.shape(intersect(sleeve.sd, c.sd), sleeve.box, far ? C.wearDark : C.wearMain, null);
+    }
   };
   for (const leg of ['backFar', 'frontFar'] as const) if (!raised(leg)) drawLeg(leg);
   for (const leg of ['backNear', 'frontNear'] as const) if (!raised(leg)) drawLeg(leg);
@@ -175,11 +192,55 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
       r.shape(intersect(stripe.sd, body.sd), stripe.box, C.band, null);
     }
   }
+  if (covered) dressBody();
   if (p.haunch > 0.5) {
     const rr = B.ry * 0.62;
     const at = T(frame.at({ x: b.hip.x + 2, y: b.hip.y - 2 }));
     const e = ellipse(at.x, at.y, rr * sx * K, rr * 0.9 * sy * K, bodyAngle);
-    r.shape(e.sd, e.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
+    if (covered) r.shape(e.sd, e.box, C.wearMain, C.outline, { light: C.wearLight, dark: C.wearDark });
+    else r.shape(e.sd, e.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
+  }
+  if (clothes?.cape) drawCape();
+
+  /** Clothes over the body: the cloth, then stripes, a shirt front and buttons on it. */
+  function dressBody(): void {
+    if (!clothes) return;
+    r.shape(body.sd, body.box, C.wearMain, null, { light: C.wearLight, dark: C.wearDark });
+    const onBody = (sd: Sd, box: Box, colour: number) => r.shape(intersect(sd, body.sd), box, colour, null);
+    if (clothes.bands) {
+      const { paint, count, width } = clothes.bands;
+      for (let i = 0; i < count; i++) {
+        const x = B.rx * (-0.75 + (1.5 * (i + 0.5)) / count);
+        const band = capsule(T(frame.at({ x, y: -B.ry - 2 })), T(frame.at({ x, y: B.ry + 2 })), Math.max(0.5, width * B.rx * sx * K));
+        onBody(band.sd, band.box, PAINT_SLOT.wear[paint]);
+      }
+    }
+    if (clothes.shirt) {
+      const shirt = polygon([frame.at({ x: B.rx * 0.45, y: -B.ry * 1.1 }), frame.at({ x: B.rx * 1.2, y: -B.ry * 1.1 }), frame.at({ x: B.rx * 0.95, y: B.ry * 0.55 })].map(T));
+      onBody(shirt.sd, shirt.box, C.wearTrim);
+    }
+    if (clothes.buttons) {
+      r.dots([0.15, 0.5, 0.85].map((k) => {
+        const at = T(frame.at({ x: B.rx * (0.62 + 0.1 * k), y: -B.ry * 0.35 + B.ry * 0.9 * k }));
+        return { x: Math.floor(at.x), y: Math.floor(at.y) };
+      }), C.wearAccent);
+    }
+  }
+
+  /** A cape over his back, flying out behind him as he goes. */
+  function drawCape(): void {
+    const fly = Math.min(1, moving) * (0.8 + 0.2 * Math.sin(clock / 120));
+    const cape = polygon(
+      [
+        { x: B.rx * 0.55, y: -B.ry * 1.05 },
+        { x: -B.rx * 0.5, y: -B.ry * 1.2 - fly * 2 },
+        { x: -B.rx * (1.3 + 0.35 * fly), y: -B.ry * (0.45 + 0.6 * fly) },
+        { x: -B.rx * (1.2 + 0.3 * fly), y: B.ry * (0.75 - 0.6 * fly) },
+        { x: -B.rx * 0.35, y: B.ry * 0.05 },
+        { x: B.rx * 0.35, y: -B.ry * 0.35 },
+      ].map((q) => T(frame.at(q))),
+    );
+    r.shape(cape.sd, cape.box, C.wearMain, C.outline, { light: C.wearLight, dark: C.wearAccent });
   }
   if (p.tailFront > 0.5) drawTail();
 

@@ -523,6 +523,29 @@ describe('Brain: work mode', () => {
     expect(run(brain, 50, atWork()).at(-1)!.say).toMatch(/Shh/);
   });
 
+  it('at the computer, switches between the terminal, the web and the odd few reels, sitting to suit each', () => {
+    const tasks = { terminal: { weight: 0.5, ms: { min: 2000, max: 3000 } }, web: { weight: 0.35, ms: { min: 2000, max: 3000 } }, reels: { weight: 0.15, ms: { min: 1500, max: 2000 } } };
+    const brain = makeBrain(4, { work: { ...SHORT.work, focusMs: 120_000, tasks } });
+    place(brain, { x: 400, y: 700 });
+    tapDesk(brain);
+    const { snap } = runUntil(brain, (s) => s.phase === 'type', atWork(), 20_000);
+    // Always starts in the terminal.
+    expect(snap.screen).toBe('terminal');
+    const snaps = run(brain, 100_000, atWork());
+    const animation = { terminal: 'work', web: 'browse', reels: 'reels' } as const;
+    for (const s of snaps) expect(s.animation).toBe(animation[s.screen!]);
+    const seen = snaps.map((s) => s.screen);
+    expect(new Set(seen)).toEqual(new Set(['terminal', 'web', 'reels']));
+    // Never the same thing twice in a row: each switch is to something else.
+    const switches = seen.filter((t, i) => i > 0 && t !== seen[i - 1]).length;
+    expect(switches).toBeGreaterThan(20);
+    // Reels are the rarest.
+    const share = (t: string) => seen.filter((x) => x === t).length / seen.length;
+    expect(share('reels')).toBeLessThan(share('terminal'));
+    // Away from the desk, the screen goes back to its screen saver.
+    expect(run(brain, 50, world()).at(-1)!.screen).toBe(null);
+  });
+
   it('after its time is up, gets restless, then comes over to you asking to play', () => {
     const brain = makeBrain(4, SHORT);
     place(brain, { x: 400, y: 700 });

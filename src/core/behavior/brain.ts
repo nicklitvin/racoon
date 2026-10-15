@@ -2,7 +2,7 @@ import { PLAY } from '../../sprites/animations';
 import type { AnimationName } from '../../sprites/types';
 import { clamp, type Point, type Rect } from '../geometry';
 import { Toybox, type Toy } from '../toys/toybox';
-import { DEFAULT_CONFIG, pick, type BehaviorConfig } from './config';
+import { DEFAULT_CONFIG, pick, type BehaviorConfig, type DeskTask } from './config';
 import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d, steerArc } from './motion';
 
 /** Top-level states of the behaviour state machine. */
@@ -74,6 +74,8 @@ export interface PetSnapshot {
   lookAt: Point | null;
   /** What he's saying, in a speech bubble, if anything. */
   say: string | null;
+  /** What's on his computer screen while he's at it (work mode), or null for the screen saver. */
+  screen: DeskTask | null;
 }
 
 /**
@@ -115,6 +117,9 @@ interface WorkState {
   until: number;
   /** When he'll have worked long enough, set when he first sits down. */
   focusUntil: number | null;
+  /** What he's doing at the computer, and when he'll switch to something else. */
+  task: DeskTask;
+  taskUntil: number;
   /** Where he's going, begging: next to the pointer, and where it was when he picked it. */
   spot: Point | null;
   cursorAt: Point | null;
@@ -184,6 +189,8 @@ const NAP_CURSOR_MOVED = 60;
 const DESK_GO_MS = 20_000;
 /** How long he says something for. */
 const SAY_MS = 2200;
+/** How he sits at the computer for each thing he does at it. */
+const TASK_ANIMATION: Record<DeskTask, AnimationName> = { terminal: 'work', web: 'browse', reels: 'reels' };
 /** What he says to get you to play, in turn. */
 const ASKS = ['Play time!', 'Let’s play!', 'Pleeease?', 'Play with me!'];
 
@@ -838,6 +845,19 @@ export class Brain {
     return s.mode === 'react' && s.reaction === 'work' && s.phase !== 'beg';
   }
 
+  /** Something else to do at the computer: never the same thing again straight away. */
+  private nextTask(current: DeskTask): DeskTask {
+    const { tasks } = this.config.work;
+    const others = (Object.keys(tasks) as DeskTask[]).filter((t) => t !== current);
+    const total = others.reduce((sum, t) => sum + tasks[t].weight, 0);
+    let roll = this.random() * total;
+    for (const t of others) {
+      roll -= tasks[t].weight;
+      if (roll <= 0) return t;
+    }
+    return others[others.length - 1]!;
+  }
+
   private speak(text: string | null, ms = SAY_MS): void {
     this.speech = text ? { text, until: this.now + ms } : null;
   }
@@ -852,6 +872,8 @@ export class Brain {
       phase: 'announce',
       until: this.now + 1200,
       focusUntil: null,
+      task: 'terminal',
+      taskUntil: 0,
       spot: null,
       cursorAt: null,
       look: null,
@@ -886,7 +908,11 @@ export class Brain {
         if (dist(this.pos, desk.seat) < 4 && length(this.vel) < 15) {
           this.vel = { x: 0, y: 0 };
           this.facing = desk.facing;
-          s.focusUntil ??= this.now + w.focusMs;
+          if (s.focusUntil === null) {
+            s.focusUntil = this.now + w.focusMs;
+            s.task = 'terminal';
+            s.taskUntil = this.now + pick(w.tasks.terminal.ms, this.random);
+          }
           s.phase = 'type';
           s.until = s.focusUntil;
         } else if (this.now >= s.until) {
@@ -910,6 +936,12 @@ export class Brain {
           s.phase = 'restless';
           s.until = this.now + w.restlessMs;
           s.nextLook = this.now;
+          return;
+        }
+        // Over to another tab now and then: some terminal, some browsing, a few reels.
+        if (this.now >= s.taskUntil) {
+          s.task = this.nextTask(s.task);
+          s.taskUntil = this.now + pick(w.tasks[s.task].ms, this.random);
         }
         return;
 
@@ -1360,7 +1392,7 @@ export class Brain {
               s.phase === 'announce'
                 ? 'attention'
                 : s.phase === 'type'
-                  ? 'work'
+                  ? TASK_ANIMATION[s.task]
                   : s.phase === 'restless'
                     ? 'sit'
                     : speed > this.config.motion.walkSpeed * 1.5
@@ -1405,6 +1437,7 @@ export class Brain {
       aim = this.facing > 0 ? 0.6 : Math.PI - 0.6;
     }
     const say = this.speech && this.now < this.speech.until ? this.speech.text : null;
+    const screen = s.mode === 'react' && s.reaction === 'work' && s.phase === 'type' && desk ? s.task : null;
 
     return {
       position: { ...this.pos },
@@ -1419,6 +1452,7 @@ export class Brain {
       aim,
       lookAt,
       say,
+      screen,
     };
   }
 

@@ -1,7 +1,6 @@
 import type { Point, Rect } from '../../shared/ipc';
 import type { Desk } from '../core/behavior/brain';
-import { createDeskDrawing, type DeskDrawing } from '../sprites/desk';
-import type { ToyLook } from '../sprites/types';
+import { createDeskDrawing, type DeskApp, type DeskDrawing } from '../sprites/desk';
 
 /** Pointer travel that stops a press on the desk counting as a tap. */
 const TAP_PX = 6;
@@ -15,10 +14,10 @@ export interface DeskFit {
   floor: number;
   /** His height above the feet, px. */
   unit: number;
-  /** Where his paws come down on a keyboard, from his feet facing right, px. */
+  /** Where his paws come down on a keyboard, and where one goes on the mouse, from his feet facing right, px. */
   reach: Point;
-  look: ToyLook;
-  /** For pixel art: px per art pixel. */
+  mouse: Point;
+  /** Px per art pixel. */
   pixel: number;
 }
 
@@ -45,12 +44,12 @@ export class DeskLayer {
       this.remove();
       return null;
     }
-    const { bounds, floor, unit, reach, look, pixel } = fit;
-    const key = `${look}|${unit.toFixed(1)}|${reach.x.toFixed(1)}|${reach.y.toFixed(1)}|${pixel}`;
+    const { bounds, floor, unit, reach, mouse, pixel } = fit;
+    const key = `${unit.toFixed(1)}|${reach.x.toFixed(1)}|${reach.y.toFixed(1)}|${mouse.x.toFixed(1)}|${pixel}`;
     if (key !== this.key || !this.drawing) {
       this.remove();
       this.key = key;
-      this.drawing = createDeskDrawing(this.doc, look, unit, -reach.y, pixel);
+      this.drawing = createDeskDrawing(this.doc, unit, -reach.y, mouse.x - reach.x, pixel);
       this.listen(this.drawing);
       this.stage.appendChild(this.drawing.element);
     }
@@ -67,9 +66,9 @@ export class DeskLayer {
     };
   }
 
-  /** The screen shows work going on while he types. */
-  setWorking(on: boolean): void {
-    this.drawing?.setWorking(on);
+  /** What's on the screen: whatever he's doing at it, or a screen saver. */
+  show(app: DeskApp, clock: number): void {
+    this.drawing?.show(app, clock);
   }
 
   /** The desk on screen, for deciding when the window should take the mouse. */

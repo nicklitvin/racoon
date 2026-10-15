@@ -415,7 +415,7 @@ export class PetRuntime {
       sprite.classList.toggle('facing-left', facing < 0);
       this.lastFacing = facing;
     }
-    this.deskLayer.setWorking(snap.reaction === 'work' && snap.phase === 'type');
+    this.deskLayer.show(snap.screen ?? 'idle', now);
     const speech = this.els.speech;
     if (speech && snap.say !== this.lastSaid) {
       // Keeps the last words while the bubble fades away.
@@ -499,13 +499,15 @@ export class PetRuntime {
     }
     const wa = this.display.workArea;
     const reach = this.renderer.deskReach ?? { x: this.size.width * 0.3, y: -this.size.height * 0.35 };
+    const mouse = this.renderer.mouseReach ?? { x: reach.x + this.size.height * 0.15, y: reach.y };
     this.desk = this.deskLayer.fit({
       bounds: wa,
       floor: wa.y + wa.height - this.belowFeet,
       unit: this.size.height,
       reach: { x: reach.x * this.scale, y: reach.y * this.scale },
-      look: this.renderer.toyLook ?? 'paint',
-      pixel: this.renderer.pixelated ? PIXEL_PX * this.scale : 0,
+      mouse: { x: mouse.x * this.scale, y: mouse.y * this.scale },
+      // The desk is pixel art, at the pixel pets' pixel size.
+      pixel: PIXEL_PX * this.scale,
     });
   }
 

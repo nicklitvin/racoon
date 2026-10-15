@@ -2,7 +2,7 @@ import { PLAY } from '../animations';
 import { bump, clamp, clamp01, DEG, easeOut, keyed, lerp, noise1, smooth, span, wave } from '../critter/kit';
 import type { AnimationName, EyeStyle } from '../types';
 import { CHIBI_TOY, type ChibiBuild, type Pt } from './species';
-import { typing } from '../typing';
+import { reel, typing } from '../typing';
 
 export const LEGS = ['frontNear', 'frontFar', 'backNear', 'backFar'] as const;
 export type LegName = (typeof LEGS)[number];
@@ -621,6 +621,49 @@ function work(b: ChibiBuild, input: ChibiInput): ChibiPose {
   return p;
 }
 
+/** Browsing the web: a paw on the mouse, now and then clicking, reading down the page. */
+function browse(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { clock } = input;
+  const p = work(b, input);
+  p.bx += 2;
+  const click = Math.max(0, Math.sin((clock / 1000) * Math.PI * 2 * 0.45)) ** 14;
+  p.paws.frontNear = { x: b.mouse.x + Math.sin(clock / 900) * 0.8, y: b.mouse.y - click * 1.6 };
+  p.paws.frontFar = { x: b.desk.x - 1.5, y: b.desk.y };
+  // Reading: the eyes run down the page, and back up to the top of the next bit.
+  const read = (clock % 2600) / 2600;
+  p.lookX = 0.9;
+  p.lookY = lerp(-0.6, 0.3, read);
+  p.hrot = 3 * Math.sin(clock / 2300) - 2;
+  return p;
+}
+
+/** Watching reels: leant back, flicking the mouse for the next one, giggling at the funny ones. */
+function watchReels(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { clock } = input;
+  const p = work(b, input);
+  const r = reel(clock);
+  p.rot -= 6;
+  p.bx += 1;
+  p.paws.frontNear = { x: b.mouse.x - r.flick * 2, y: b.mouse.y - r.flick * 2.2 };
+  // The other paw back on his tummy.
+  p.pawUp = 1;
+  const chest = legRoot(b, p, 'frontFar');
+  p.paws.frontFar = { x: chest.x + 4, y: chest.y + 5 };
+  p.lookX = 0.9;
+  p.lookY = -0.4;
+  const giggle = r.funny && r.into > 0.2 && r.into < 0.8;
+  if (giggle) {
+    const shake = Math.sin(clock / 70);
+    p.eyes = 'happy';
+    p.mouth = 0.35 + 0.15 * shake;
+    p.hrot += 4 * shake;
+    p.blush = 1;
+  } else {
+    p.hrot = 2;
+  }
+  return p;
+}
+
 /** Wants to play: up on his toes, bouncing and waving a paw over his head at you. */
 function attention(b: ChibiBuild, input: ChibiInput): ChibiPose {
   const { t } = input;
@@ -776,6 +819,10 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return b.species === 'raccoon' ? throwIt(b, input) : toss(b, input);
     case 'work':
       return work(b, input);
+    case 'browse':
+      return browse(b, input);
+    case 'reels':
+      return watchReels(b, input);
     case 'attention':
       return attention(b, input);
     case 'happy': {
@@ -1044,17 +1091,27 @@ function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return otterToss(b, input);
     case 'carry':
       return otterPose(b, { ...input, animation: 'walk' });
-    case 'work': {
-      // Treading water at its desk, paws up on the keyboard.
+    case 'work':
+    case 'browse':
+    case 'reels': {
+      // Treading water at its desk, paws up on the keyboard, or one on the mouse.
       const k = typing(clock);
+      const r = reel(clock);
       const p = tread(b, clock);
-      p.paws.frontNear = { x: b.desk.x + 1.2, y: b.desk.y - k.near * 1.8 };
-      p.paws.frontFar = { x: b.desk.x - 1.2, y: b.desk.y - k.far * 1.8 };
+      const mouse = input.animation !== 'work';
+      const flick = input.animation === 'reels' ? r.flick : 0;
+      p.paws.frontNear = mouse ? { x: b.mouse.x - flick * 1.5, y: b.mouse.y - flick * 1.8 } : { x: b.desk.x + 1.2, y: b.desk.y - k.near * 1.8 };
+      p.paws.frontFar = { x: b.desk.x - 1.2, y: b.desk.y - (mouse ? 0 : k.far * 1.8) };
       p.pawUp = 2;
       p.hrot = lerp(-3, 8, k.pause);
       p.lookX = 0.8;
       p.lookY = lerp(0, -0.6, k.pause);
       p.eyes = eyesFrom(input);
+      if (input.animation === 'reels' && r.funny && r.into > 0.2 && r.into < 0.8) {
+        p.eyes = 'happy';
+        p.mouth = 0.4;
+        p.blush = 1;
+      }
       return p;
     }
     case 'attention': {

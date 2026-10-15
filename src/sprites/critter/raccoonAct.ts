@@ -294,6 +294,8 @@ export function raccoonAct(input: ActInput): Act {
       return throwIt(input);
 
     case 'work':
+    case 'browse':
+    case 'reels':
       return work(input);
 
     case 'attention':

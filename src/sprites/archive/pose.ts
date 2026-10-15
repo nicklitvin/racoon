@@ -187,6 +187,8 @@ export function poseFor(animation: AnimationName, t: number, keystrokes = 0): Po
     case 'carry':
     case 'throw':
     case 'work':
+    case 'browse':
+    case 'reels':
     case 'attention':
     case 'happy': {
       // Being petted: sits, eyes shut, leans his head up into the pat and wags.

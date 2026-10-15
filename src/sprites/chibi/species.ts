@@ -38,8 +38,9 @@ export interface ChibiBuild {
   peekSink: number;
   /** How far in front of his feet a toy block sits for him to swat or pick up (its middle). */
   toyReach: number;
-  /** Where his front paws rest on a keyboard, typing at his desk (the middle of the keys). */
+  /** Where his front paws rest on a keyboard, typing at his desk (the middle of the keys), and on the mouse. */
   desk: Pt;
+  mouse: Pt;
   swims?: boolean;
 }
 
@@ -65,6 +66,7 @@ export const CHIBI_RACCOON: ChibiBuild = {
   peekSink: 28,
   toyReach: 26,
   desk: { x: 15, y: -16 },
+  mouse: { x: 27, y: -15 },
 };
 
 export const CHIBI_CAT: ChibiBuild = {
@@ -86,6 +88,7 @@ export const CHIBI_CAT: ChibiBuild = {
   peekSink: 26,
   toyReach: 25,
   desk: { x: 14.5, y: -15 },
+  mouse: { x: 26.5, y: -14 },
 };
 
 export const CHIBI_FOX: ChibiBuild = {
@@ -107,6 +110,7 @@ export const CHIBI_FOX: ChibiBuild = {
   peekSink: 28,
   toyReach: 25.5,
   desk: { x: 15, y: -15.5 },
+  mouse: { x: 27, y: -14.5 },
 };
 
 export const CHIBI_OTTER: ChibiBuild = {
@@ -128,5 +132,6 @@ export const CHIBI_OTTER: ChibiBuild = {
   peekSink: 26,
   toyReach: 30,
   desk: { x: 12, y: -13 },
+  mouse: { x: 21, y: -12 },
   swims: true,
 };

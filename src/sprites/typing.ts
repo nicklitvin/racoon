@@ -11,6 +11,21 @@ export interface Typing {
   pause: number;
 }
 
+/** How long each reel plays before it's flicked away for the next (the screen and his paw keep time). */
+export const REEL_MS = 2400;
+
+/**
+ * Watching reels: how far through this one, how hard he's flicking the mouse for the next
+ * (0..1, at the end of each), and whether this one's funny.
+ */
+export function reel(clock: number): { into: number; flick: number; funny: boolean; index: number } {
+  const index = Math.floor(clock / REEL_MS);
+  const into = (clock / REEL_MS) % 1;
+  const flick = into > 0.8 ? Math.sin(((into - 0.8) / 0.2) * Math.PI) : 0;
+  const funny = ((Math.imul(index + 7, 2654435761) >>> 0) % 5) < 2;
+  return { into, flick, funny, index };
+}
+
 const CYCLE_MS = 7400;
 const TAPS_PER_S = 3.4;
 

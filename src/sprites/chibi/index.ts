@@ -110,6 +110,7 @@ export function createChibi(doc: Document, build: ChibiBuild, className: string,
     toyLook: 'chibi',
     carriesToys: build.species === 'raccoon',
     deskReach: { x: build.desk.x * PX_PER_UNIT, y: build.desk.y * PX_PER_UNIT },
+    mouseReach: { x: build.mouse.x * PX_PER_UNIT, y: build.mouse.y * PX_PER_UNIT },
     drawsMarks: true,
     toyPoint: () => (toy ? { x: toy.x * motion.facing * PX_PER_UNIT * scale, y: toy.y * PX_PER_UNIT * scale } : null),
     dress(d) {

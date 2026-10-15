@@ -2,8 +2,9 @@ import type { Hat, Outfit } from '../../shared/settings';
 import { n, svgWriter } from './svg';
 
 /**
- * Hats and things to wear round the neck, as plain shapes that every art style draws its
- * own way: the painted and chibi pets as SVG, the pixel pets rasterised into pixels.
+ * Hats, clothes and things to wear round the neck, as plain shapes that every art style
+ * draws its own way: the painted and chibi pets as SVG, the pixel pets rasterised into
+ * pixels.
  *
  * A hat is drawn in head units: the head's half-width is 1, the origin is the crown of the
  * head (its top, a little back from the middle), x points the way he faces and y down. The
@@ -11,6 +12,9 @@ import { n, svgWriter } from './svg';
  *
  * Neckwear is drawn in neck units: the neck's half-width is 1, the origin is the middle of
  * the collar, x points the way he faces and y down, away from the head.
+ *
+ * Clothes are neckwear (a tie, a collar) plus `body`: what covers the body and legs. Only
+ * the pixel pets dress the body for now; the others wear just the neck part.
  */
 
 /** Which of the item's colours a shape is painted in. */
@@ -25,6 +29,25 @@ export interface Wearable {
   colours: Record<Paint, string>;
   /** Back to front. */
   shapes: Shape[];
+  body?: BodyWear;
+  /** Its picture in the settings, when the shapes alone (just the neck part of clothes) wouldn't say what it is. */
+  icon?: Shape[];
+}
+
+/** Clothes on the body: covered in the main colour, with stripes, a shirt front, buttons, or a cape. */
+export interface BodyWear {
+  /** Body covered in `main`; false for a cape, which hangs behind instead. */
+  covered: boolean;
+  /** How far down the legs the sleeves and trouser legs come, 0 (none) to 1 (to the paws). */
+  sleeves: number;
+  /** Rings round the body (seen side on, bands across it), in this paint. */
+  bands?: { paint: Paint; count: number; width: number };
+  /** A white shirt showing at the chest (in `trim`), as under a jacket. */
+  shirt?: boolean;
+  /** A row of buttons down the chest, in `accent`. */
+  buttons?: boolean;
+  /** A cape over the back, flying out behind as he goes, in `main` lined with `accent`. */
+  cape?: boolean;
 }
 
 export interface Dress {
@@ -47,6 +70,15 @@ function dome(cx: number, cy: number, rx: number, ry: number, steps = 14): [numb
     const a = Math.PI * (1 - i / steps);
     out.push([cx + Math.cos(a) * rx, cy - Math.sin(a) * ry]);
   }
+  return out;
+}
+
+/** A thick arc round (cx, cy), between radii `inner` and `outer`, from `from` to `to` degrees (90 = up). */
+function arc(cx: number, cy: number, outer: number, inner: number, from: number, to: number, steps = 12): [number, number][] {
+  const at = (r: number, deg: number): [number, number] => [cx + Math.cos((deg * Math.PI) / 180) * r, cy - Math.sin((deg * Math.PI) / 180) * r];
+  const out: [number, number][] = [];
+  for (let i = 0; i <= steps; i++) out.push(at(outer, from + ((to - from) * i) / steps));
+  for (let i = steps; i >= 0; i--) out.push(at(inner, from + ((to - from) * i) / steps));
   return out;
 }
 
@@ -109,6 +141,25 @@ export const HAT_ITEMS: Record<Exclude<Hat, 'none'>, Wearable> = {
       ellipse('accent', 0, -0.26, 0.1),
     ],
   },
+  nightcap: {
+    label: 'Nightcap',
+    colours: { main: '#7d8fe0', trim: '#f4f1ea', accent: '#ffe27a' },
+    shapes: [
+      poly('main', [-0.86, 0.5], [0.86, 0.5], [0.62, -0.35], [0.05, -0.62], [-0.7, -0.75], [-1.3, -0.25], [-1.0, 0.1]),
+      poly('trim', [-0.92, 0.3], [0.92, 0.3], [0.92, 0.6], [-0.92, 0.6]),
+      ellipse('accent', -1.32, -0.18, 0.22),
+    ],
+  },
+  headphones: {
+    label: 'Headphones',
+    colours: { main: '#33363f', trim: '#5a5f6d', accent: '#58c4a8' },
+    shapes: [
+      poly('main', ...arc(0, 1, 1.12, 0.94, 165, 15)),
+      ellipse('trim', -1.0, 0.72, 0.26, 0.32),
+      ellipse('accent', -0.98, 0.72, 0.15, 0.22),
+      ellipse('trim', 1.0, 0.68, 0.2, 0.28),
+    ],
+  },
   bow: {
     label: 'Bow',
     colours: { main: '#ff7ab0', trim: '#d94f8a', accent: '#ffffff' },
@@ -120,7 +171,55 @@ export const HAT_ITEMS: Record<Exclude<Hat, 'none'>, Wearable> = {
   },
 };
 
+/** A shirt laid out flat, for pictures of clothes: sleeves out, the neck at the top. */
+const SHIRT: [number, number][] = [[-0.35, -0.6], [-1.1, -0.25], [-0.85, 0.15], [-0.6, 0], [-0.6, 0.95], [0.6, 0.95], [0.6, 0], [0.85, 0.15], [1.1, -0.25], [0.35, -0.6], [0, -0.42]];
+const band = (paint: Paint, y0: number, y1: number, x0 = -0.6, x1 = 0.6) => poly(paint, [x0, y0], [x1, y0], [x1, y1], [x0, y1]);
+
 export const OUTFIT_ITEMS: Record<Exclude<Outfit, 'none'>, Wearable> = {
+  suit: {
+    label: 'Suit and tie',
+    colours: { main: '#2f3440', trim: '#f7f5ef', accent: '#c8323e' },
+    shapes: [
+      // Shirt collar points, then the tie: its knot and blade down the chest.
+      poly('trim', [0.25, -0.3], [0.95, -0.25], [0.6, 0.3]),
+      poly('accent', [0.68, -0.12], [1.0, -0.12], [0.94, 0.2], [0.74, 0.2]),
+      poly('accent', [0.74, 0.2], [0.94, 0.2], [1.06, 1.25], [0.86, 1.55], [0.66, 1.25]),
+    ],
+    body: { covered: true, sleeves: 0.6, shirt: true },
+    icon: [
+      poly('main', ...SHIRT),
+      poly('trim', [-0.32, -0.58], [0.32, -0.58], [0, 0.32]),
+      poly('accent', [-0.08, -0.5], [0.08, -0.5], [0.12, 0.2], [0, 0.36], [-0.12, 0.2]),
+    ],
+  },
+  pajamas: {
+    label: 'Pajamas',
+    colours: { main: '#9cc1ee', trim: '#f7f5ef', accent: '#ffd84a' },
+    shapes: [poly('trim', [-1.05, -0.2], [1.05, -0.2], [1.05, 0.16], [-1.05, 0.16])],
+    body: { covered: true, sleeves: 0.78, bands: { paint: 'trim', count: 5, width: 0.08 }, buttons: true },
+    icon: [
+      poly('main', ...SHIRT),
+      band('trim', -0.45, 0.95, -0.36, -0.28),
+      band('trim', -0.45, 0.95, 0.28, 0.36),
+      ellipse('accent', 0.08, -0.15, 0.07),
+      ellipse('accent', 0.08, 0.2, 0.07),
+      ellipse('accent', 0.08, 0.55, 0.07),
+    ],
+  },
+  sweater: {
+    label: 'Sweater',
+    colours: { main: '#d9534f', trim: '#f4f1ea', accent: '#f4f1ea' },
+    shapes: [poly('main', [-1.08, -0.3], [1.08, -0.3], [1.08, 0.25], [-1.08, 0.25])],
+    body: { covered: true, sleeves: 0.55, bands: { paint: 'trim', count: 2, width: 0.12 } },
+    icon: [poly('main', ...SHIRT), band('trim', 0.12, 0.28), band('trim', 0.5, 0.66), band('trim', -0.62, -0.5, -0.32, 0.32)],
+  },
+  cape: {
+    label: 'Superhero cape',
+    colours: { main: '#d63a4a', trim: '#ffcf3f', accent: '#8e2230' },
+    shapes: [ellipse('trim', 0.7, 0.05, 0.26)],
+    body: { covered: false, sleeves: 0, cape: true },
+    icon: [poly('main', [-0.42, -0.6], [0.42, -0.6], [0.9, 0.95], [-0.9, 0.95]), poly('accent', [-0.2, -0.45], [0.2, -0.45], [0.5, 0.82], [-0.5, 0.82]), ellipse('trim', 0, -0.58, 0.15)],
+  },
   scarf: {
     label: 'Scarf',
     colours: { main: '#e2435a', trim: '#f4f1ea', accent: '#e2435a' },
@@ -195,7 +294,8 @@ export function wearableIcon(doc: Document, item: Wearable): SVGSVGElement {
   // Fitted round the item's own shapes, so each fills its button.
   const xs: number[] = [];
   const ys: number[] = [];
-  for (const s of item.shapes) {
+  const shapes = item.icon ?? item.shapes;
+  for (const s of shapes) {
     if (s.kind === 'poly') {
       for (const [x, y] of s.points) xs.push(x), ys.push(y);
     } else {
@@ -217,6 +317,6 @@ export function wearableIcon(doc: Document, item: Wearable): SVGSVGElement {
   const box = `${n(cx - w / 2)} ${n(cy - h / 2)} ${n(w)} ${n(h)}`;
   const svg = make('svg', { viewBox: box, width: 34, height: 26, 'aria-hidden': 'true', class: 'wear-icon' }) as SVGSVGElement;
   const g = make('g', {}, svg);
-  drawWearable(doc, g, item, 1, { line: '#2b2630', width: 0.09 });
+  drawWearable(doc, g, { ...item, shapes }, 1, { line: '#2b2630', width: 0.09 });
   return svg;
 }

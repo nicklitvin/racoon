@@ -40,6 +40,9 @@ export const SLOTS = [
   'wearMain',
   'wearTrim',
   'wearAccent',
+  /** Clothes' lit and shaded edges, from the main colour. */
+  'wearLight',
+  'wearDark',
 ] as const;
 
 export type Slot = (typeof SLOTS)[number];
@@ -68,6 +71,8 @@ const SHARED = {
   wearMain: '#000000',
   wearTrim: '#000000',
   wearAccent: '#000000',
+  wearLight: '#000000',
+  wearDark: '#000000',
 };
 
 export const PIXEL_COATS = {
@@ -119,6 +124,13 @@ export const PIXEL_COATS = {
 } satisfies Record<string, Palette>;
 
 export type PixelCoat = keyof typeof PIXEL_COATS;
+
+/** A colour mixed `k` of the way towards white (k > 0) or black (k < 0). */
+export function shade(hex: string, k: number): string {
+  const v = parseInt(hex.slice(1, 7), 16);
+  const mix = (c: number) => Math.round(k > 0 ? c + (255 - c) * k : c * (1 + k));
+  return `#${[(v >> 16) & 255, (v >> 8) & 255, v & 255].map((c) => mix(c).toString(16).padStart(2, '0')).join('')}`;
+}
 
 /** The palette as packed RGBA words, ready to write into an ImageData. Slot 0 is transparent. */
 export function rgbaTable(palette: Palette): Uint32Array {

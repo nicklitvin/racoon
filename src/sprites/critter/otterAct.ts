@@ -379,7 +379,9 @@ export function otterAct(input: ActInput): Act {
     case 'carry':
       return otterAct({ ...input, animation: 'walk' });
 
-    case 'work': {
+    case 'work':
+    case 'browse':
+    case 'reels': {
       // Treading water at its desk, paws up on the keyboard, typing.
       const p = tread();
       const k = typing(clock);

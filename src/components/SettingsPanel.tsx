@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { HATS, OUTFITS, RACCOON_TYPES, type Hat, type KeyboardStatus, type Outfit, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
-import { RACCOON_STYLES, type Species } from '../sprites';
-import { HAT_ITEMS, OUTFIT_ITEMS, wearableIcon, type Dress } from '../sprites/outfits';
+import { RACCOON_STYLES } from '../sprites';
+import { HAT_ITEMS, OUTFIT_ITEMS, wearableIcon } from '../sprites/outfits';
 import { PatchNotes, VersionChip } from './PatchNotes';
 
 interface SettingsPanelProps {
@@ -35,56 +35,42 @@ interface TypePickerProps {
   onChange: (value: RaccoonType) => void;
 }
 
-const GROUPS: { group: Species | 'chibi' | 'pixel'; title: string }[] = [
-  { group: 'raccoon', title: 'Raccoons' },
-  { group: 'cat', title: 'Cats' },
-  { group: 'fox', title: 'Foxes' },
-  { group: 'otter', title: 'Otters' },
-  { group: 'chibi', title: 'Chibi' },
-  { group: 'pixel', title: 'Pixel art' },
-];
-
-/** A small still of the pet in what it's wearing, drawn once. */
-function PetPreview({ type, dress, scale = 0.5, className = 'type-preview' }: { type: RaccoonType; dress: Dress; scale?: number; className?: string }) {
+/** A small still of the pet, drawn once. */
+function PetPreview({ type }: { type: RaccoonType }) {
   const ref = useRef<HTMLSpanElement>(null);
+  const scale = 0.5;
   useEffect(() => {
     const host = ref.current;
     if (!host) return;
     const renderer = RACCOON_STYLES[type].create();
     renderer.setScale(scale);
-    renderer.dress?.(dress);
     renderer.draw({ animation: 'idle', timeMs: 1000, keystrokes: 0, eyes: 'open', heading: 0.5 });
     // Stand every pet on the same floor, whatever empty space its drawing has below the feet.
     const below = renderer.baseSize.height * scale * (1 - (renderer.anchor?.y ?? 1));
     (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${6 - below}px`;
     host.replaceChildren(renderer.element);
     return () => host.replaceChildren();
-  }, [type, dress.hat, dress.outfit, scale]);
-  return <span className={className} ref={ref} aria-hidden="true" />;
+  }, [type]);
+  return <span className="type-preview" ref={ref} aria-hidden="true" />;
 }
 
-function TypePicker({ value, onChange, dress }: TypePickerProps & { dress: Dress }) {
+function TypePicker({ value, onChange }: TypePickerProps) {
   return (
     <fieldset className="field type-picker">
       <legend>Pet</legend>
-      {GROUPS.map(({ group, title }) => (
-        <div key={group} className="type-group">
-          <h2 className="type-group-title">{title}</h2>
-          <div className="type-grid">
-            {RACCOON_TYPES.filter((type) => (RACCOON_STYLES[type].group ?? RACCOON_STYLES[type].species) === group).map((type) => {
-              const style = RACCOON_STYLES[type];
-              return (
-                <label key={type} className={type === value ? 'type-option selected' : 'type-option'} title={style.description}>
-                  <input type="radio" name="raccoonType" checked={type === value} onChange={() => onChange(type)} />
-                  <PetPreview type={type} dress={dress} />
-                  <span className="type-name">{style.label}</span>
-                  <span className="type-description">{style.description}</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+      <div className="type-grid">
+        {RACCOON_TYPES.map((type) => {
+          const style = RACCOON_STYLES[type];
+          return (
+            <label key={type} className={type === value ? 'type-option selected' : 'type-option'} title={style.description}>
+              <input type="radio" name="raccoonType" checked={type === value} onChange={() => onChange(type)} />
+              <PetPreview type={type} />
+              <span className="type-name">{style.label}</span>
+              <span className="type-description">{style.description}</span>
+            </label>
+          );
+        })}
+      </div>
     </fieldset>
   );
 }
@@ -127,14 +113,12 @@ function WearRow<T extends Hat | Outfit>({ kind, title, options, value, label, o
   );
 }
 
-/** Hats and things round the neck, with your pet modelling them. */
+/** A hat, and clothes or something round the neck: two lists to pick from. */
 function DressUp({ settings, update }: { settings: Settings; update: (patch: Partial<Settings>) => void }) {
-  const dress = { hat: settings.hat, outfit: settings.outfit };
   return (
     <fieldset className="field dress-up">
       <legend>Dress up</legend>
       <div className="dress-up-body">
-        <PetPreview type={settings.raccoonType} dress={dress} scale={0.85} className="type-preview dress-preview" />
         <div className="dress-up-rows">
           <WearRow
             kind="hat"
@@ -146,7 +130,7 @@ function DressUp({ settings, update }: { settings: Settings; update: (patch: Par
           />
           <WearRow
             kind="outfit"
-            title="Round the neck"
+            title="Outfit"
             options={OUTFITS}
             value={settings.outfit}
             label={(id) => (id === 'none' ? 'Nothing' : OUTFIT_ITEMS[id].label)}
@@ -191,7 +175,7 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
     <section className="settings" aria-label="Racoon settings">
       {header}
 
-      <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} dress={{ hat: settings.hat, outfit: settings.outfit }} />
+      <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
 
       <DressUp settings={settings} update={update} />
 
@@ -213,7 +197,8 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
         </label>
         <p className="hint">
           Puts a little desk in the corner of the screen. Tap the desk three times and your pet sits down at it and
-          types away while you work. After 20 minutes it decides it’s play time and comes to find you.
+          gets busy while you work: a bit of coding, a bit of browsing, the odd reel. After 20 minutes it decides it’s
+          play time and comes to find you.
         </p>
       </div>
 
