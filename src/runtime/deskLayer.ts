@@ -56,7 +56,7 @@ export class DeskLayer {
     const d = this.drawing;
     // In the bottom right corner, standing on his floor.
     const left = Math.round(bounds.x + bounds.width - MARGIN_PX - d.width);
-    const top = Math.round(floor - d.height);
+    const top = Math.round(floor - d.height + d.below);
     d.element.style.transform = `translate(${left - bounds.x}px, ${top - bounds.y}px)`;
     const keys = left + d.keyboardX;
     return {
