@@ -241,6 +241,7 @@ To add an animation for them too, add a `case` to `walkerPose()` and `otterPose(
 
 - `raster.ts` is a tiny rasteriser: shapes are signed distance functions sampled at each pixel's centre, filled with one palette colour and ringed with a one-pixel outline. Nothing is anti-aliased.
 - `draw.ts` draws a chibi pose with it: the same parts in the same order, with a lit top edge on the body and head, two-by-three pixel eyes with a glint, and pixel z's, hearts, "!" and "?".
+- `facing.ts` draws him from the front and from behind, for walking and running up and down the screen, as sprites in old games have a picture for each way they face: from the front his face, his front legs stepping towards you and his tail out to one side; from behind the back of his head, and his tail nearest you (a cat's curled up, a raccoon's hanging down). `ChibiMotion.view` says which: front when he's heading clearly down the screen, behind when clearly up, side on again only once he's clearly going across, so it doesn't flicker on a slant. Standing still or doing anything else, he's always side on.
 - `species.ts` has their builds: the chibis' builds, but with an even bigger head on a smaller, rounder body and a smaller tail, which is what a sprite this small needs to read as cute rather than squat.
 - `palette.ts` holds each coat as a palette.
 - `index.ts` is the renderer. It draws a new picture 12 times a second, like an old game, and the page places it on whole screen pixels.

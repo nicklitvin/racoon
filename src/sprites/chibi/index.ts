@@ -31,6 +31,11 @@ export class ChibiMotion {
   flip = 1;
   pose: ChibiPose | null = null;
   moving = 0;
+  /**
+   * Which way you see him: side on, or (walking towards you down the screen, or away up it)
+   * from the front or behind. Only drawings that have those views use it.
+   */
+  view: 'side' | 'front' | 'back' = 'side';
   private clock = -1;
   private animation: AnimationName | null = null;
   private from: ChibiPose | null = null;
@@ -51,6 +56,13 @@ export class ChibiMotion {
     const heading = frame.heading ?? 0;
     const cos = Math.cos(heading);
     if (frame.animation !== 'dangle' && Math.abs(cos) > 0.2) this.facing = cos < 0 ? -1 : 1;
+    // Going up or down the screen, you see him from behind or in front. Not until he's
+    // clearly going that way, and he only turns side on again once he's clearly going across.
+    const sin = Math.sin(heading);
+    const walking = frame.animation === 'walk' || frame.animation === 'run' || frame.animation === 'chase' || frame.animation === 'leap';
+    if (!walking) this.view = 'side';
+    else if (this.view === 'side' && Math.abs(sin) > 0.82) this.view = sin > 0 ? 'front' : 'back';
+    else if (this.view !== 'side' && Math.abs(sin) < 0.6) this.view = 'side';
     const turn = dt / (FLIP_MS / 1000);
     this.flip = this.flip < this.facing ? Math.min(this.facing, this.flip + turn) : Math.max(this.facing, this.flip - turn);
 

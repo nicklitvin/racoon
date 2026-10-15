@@ -16,7 +16,7 @@ import type { PixelBuild, PixelSpecies } from './species';
 export const PIXEL = { width: 64, height: 54, feetX: 32, feetY: 46, k: 0.5 };
 
 /** Bands across the tail (from 0 at the root to 1 at the tip). */
-const TAIL_BANDS: Record<PixelSpecies, [number, number][]> = {
+export const TAIL_BANDS: Record<PixelSpecies, [number, number][]> = {
   raccoon: [
     [0.3, 0.42],
     [0.55, 0.67],
@@ -30,7 +30,7 @@ const TAIL_BANDS: Record<PixelSpecies, [number, number][]> = {
 };
 
 /** Ears: half width and height at the base, and where on the head they sit (degrees, 90 = top). */
-const EARS: Record<PixelSpecies, { w: number; h: number; near: number; far: number }> = {
+export const EARS: Record<PixelSpecies, { w: number; h: number; near: number; far: number }> = {
   cat: { w: 6.4, h: 10.5, near: 58, far: 122 },
   raccoon: { w: 6.6, h: 9.5, near: 56, far: 124 },
   otter: { w: 3.6, h: 3.4, near: 42, far: 138 },
@@ -50,7 +50,7 @@ const TUFTS: Record<PixelSpecies, [number, number][]> = {
 };
 
 /** The palette slots for each of an item's paints. */
-const PAINT_SLOT = {
+export const PAINT_SLOT = {
   hat: { main: C.hatMain, trim: C.hatTrim, accent: C.hatAccent },
   wear: { main: C.wearMain, trim: C.wearTrim, accent: C.wearAccent },
 } satisfies Record<string, Record<Paint, number>>;

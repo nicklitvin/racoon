@@ -10,6 +10,14 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-15',
+    title: 'Coming and going',
+    changes: [
+      'Walking or running up and down the screen, your pet now faces the way it’s going: towards you, you see its face and its paws stepping towards you; going away, you see the back of its head and its tail (a cat’s curled up, a raccoon’s hanging down).',
+      'The desk’s monitor faces straight out, and the desk stands properly on its legs instead of looking cut off at the bottom.',
+    ],
+  },
+  {
     date: '2026-10-14',
     title: 'Outfits, and busy at the desk',
     changes: [

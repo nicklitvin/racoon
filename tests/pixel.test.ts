@@ -3,6 +3,7 @@ import { ChibiMotion } from '../src/sprites/chibi';
 import { headCentre, scruffPoint, WATER_Y, type ChibiPose } from '../src/sprites/chibi/pose';
 import { CHIBI_CAT, CHIBI_RACCOON } from '../src/sprites/chibi/species';
 import { drawPixelPet, PIXEL } from '../src/sprites/pixel/draw';
+import { drawPixelFacing } from '../src/sprites/pixel/facing';
 import { C, PIXEL_COATS, rgbaTable, SLOTS } from '../src/sprites/pixel/palette';
 import { ellipse, Raster } from '../src/sprites/pixel/raster';
 import { PIXEL_CAT, PIXEL_OTTER, PIXEL_RACCOON, type PixelBuild } from '../src/sprites/pixel/species';
@@ -198,5 +199,59 @@ describe('pixel otter', () => {
     for (let y = surface + 1; y < PIXEL.height; y++) {
       for (let x = 0; x < PIXEL.width; x++) expect(water.has(r.get(x, y)), `${x},${y}`).toBe(true);
     }
+  });
+});
+
+describe('pixel pets walking up and down the screen', () => {
+  /** Drives the motion like the page does, heading `heading`, and says which way you see him. */
+  function viewWalking(heading: number, animation: AnimationName = 'walk') {
+    const motion = new ChibiMotion(PIXEL_RACCOON);
+    let clock = 10_000;
+    for (let t = 0; t < 400; t += 16) {
+      clock += 16;
+      motion.update({ animation, timeMs: t, keystrokes: 0, eyes: 'open', heading, clockMs: clock, velocity: { x: Math.cos(heading) * 80, y: Math.sin(heading) * 80 } }, 1);
+    }
+    return motion.view;
+  }
+
+  it('is seen from the front walking down towards you, from behind walking away, side on across', () => {
+    expect(viewWalking(Math.PI / 2)).toBe('front');
+    expect(viewWalking(-Math.PI / 2)).toBe('back');
+    expect(viewWalking(0)).toBe('side');
+    expect(viewWalking(Math.PI)).toBe('side');
+    // On a slant he's still side on; and stood still, always.
+    expect(viewWalking(Math.PI / 4)).toBe('side');
+    expect(viewWalking(Math.PI / 2, 'idle')).toBe('side');
+  });
+
+  it('draws a face from the front and none from behind, the whole animal inside its canvas', () => {
+    for (const build of [PIXEL_RACCOON, PIXEL_CAT, PIXEL_OTTER]) {
+      for (const view of ['front', 'back'] as const) {
+        const r = new Raster(PIXEL.width, PIXEL.height);
+        const { pose, clock } = poseAt(build, 'walk');
+        const box = drawPixelFacing(r, build, pose, view, { phase: 0.3, moving: 1, running: false, side: 1 }, clock, { hat: 'tophat', outfit: 'suit' });
+        expect(box, `${build.species} ${view}`).not.toBe(null);
+        expect(box!.x0).toBeGreaterThanOrEqual(0);
+        expect(box!.x1).toBeLessThanOrEqual(PIXEL.width);
+        expect(box!.y0).toBeGreaterThan(0);
+        expect(count(r, C.eye) > 0, `${build.species} ${view} eyes`).toBe(view === 'front');
+        expect(count(r, C.hatMain), `${build.species} ${view} hat`).toBeGreaterThan(5);
+      }
+    }
+  });
+
+  it('steps its legs in turn as it walks towards you', () => {
+    const rows = (phase: number) => {
+      const r = new Raster(PIXEL.width, PIXEL.height);
+      const { pose, clock } = poseAt(PIXEL_CAT, 'walk');
+      drawPixelFacing(r, PIXEL_CAT, pose, 'front', { phase, moving: 1, running: false, side: 1 }, clock, { hat: 'none', outfit: 'none' });
+      // The lowest row the legs reach, on the left half and the right half.
+      const lowest = (left: boolean) => Math.max(...Array.from(r.data).flatMap((v, i) => ((v === C.fur || v === C.far) && (i % PIXEL.width < PIXEL.feetX) === left ? [Math.floor(i / PIXEL.width)] : [])));
+      return [lowest(true), lowest(false)];
+    };
+    const [a, b] = rows(0.25);
+    const [c, d] = rows(0.75);
+    // A quarter of the way round one front paw is up; three quarters round, the other.
+    expect(a === b && c === d).toBe(false);
   });
 });

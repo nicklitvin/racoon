@@ -4,6 +4,7 @@ import type { Pt } from '../chibi/species';
 import { hatItem, outfitItem, UNDRESSED, type Dress } from '../outfits';
 import type { RaccoonRenderer } from '../types';
 import { drawPixelPet, PIXEL } from './draw';
+import { drawPixelFacing } from './facing';
 import { rgbaTable, shade, type Palette } from './palette';
 import { Raster } from './raster';
 import type { PixelBuild } from './species';
@@ -50,6 +51,7 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
   let toy: Pt | null = null;
   let shownTick = NaN;
   let shownFacing = 0;
+  let shownView = '';
 
   const sizeTo = () => {
     const dpr = doc.defaultView?.devicePixelRatio || 1;
@@ -109,12 +111,17 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
       // A new picture only every so often, but at once when he turns round.
       const tick = Math.floor(clock / (1000 / PIXEL_FPS));
       const facing = motion.facing;
-      if (tick === shownTick && facing === shownFacing) return;
+      const view = motion.view;
+      if (tick === shownTick && facing === shownFacing && view === shownView) return;
       shownTick = tick;
       shownFacing = facing;
+      shownView = view;
       scruff = scruffPoint(build, pose);
       toy = toyHoldPoint(build, pose);
-      const box = drawPixelPet(raster, build, pose, clock, facing, motion.moving, scruff, dressed);
+      const box =
+        view === 'side'
+          ? drawPixelPet(raster, build, pose, clock, facing, motion.moving, scruff, dressed)
+          : drawPixelFacing(raster, build, pose, view, { phase: motion.phase, moving: motion.moving, running: frame.animation !== 'walk', side: facing }, clock, dressed);
       paint();
       if (box) {
         figure.style.left = `${box.x0 * cell}px`;
