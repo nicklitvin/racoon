@@ -53,6 +53,11 @@ export interface ChibiPose {
   shell: number;
   /** 1 holds a toy block in both front paws (a raccoon), rather than in the mouth. */
   hold: number;
+  /**
+   * How far the face is turned from three-quarters towards you round to the way he faces,
+   * 0..1: looking at something beside him (his screen) rather than out at you.
+   */
+  turn: number;
   /** How much of a pond there is round him (swimmers only). */
   wet: number;
   /** Rocking on the end of your grip, in degrees round the scruff. */
@@ -104,6 +109,7 @@ const NUMBERS = [
   'pawUp',
   'shell',
   'hold',
+  'turn',
   'wet',
   'swing',
   'splash',
@@ -189,6 +195,7 @@ function stand(b: ChibiBuild): ChibiPose {
     pawUp: 0,
     shell: 0,
     hold: 0,
+    turn: 0,
     wet: 0,
     swing: 0,
     eyes: 'open',
@@ -611,8 +618,13 @@ function work(b: ChibiBuild, input: ChibiInput): ChibiPose {
   p.paws.frontNear = { x: b.desk.x + 1.5, y: b.desk.y - k.near * 2.2 };
   p.paws.frontFar = { x: b.desk.x - 1.5, y: b.desk.y - k.far * 2.2 };
   p.pawUp = 2;
+  // Face turned round to the screen, eyes on it (the brain says where it is), the chin up
+  // a little more to think.
+  p.turn = 0.9;
   p.lookX = 0.9;
-  p.lookY = lerp(0.1, -0.6, k.pause);
+  p.lookY = -0.4;
+  look(b, p, input.gaze);
+  p.lookY -= 0.25 * k.pause;
   p.ears = 0.3;
   p.tailA = 125;
   p.tailCurl = 20 + 20 * Math.sin(input.clock / 500) * k.pause;
@@ -631,9 +643,8 @@ function browse(b: ChibiBuild, input: ChibiInput): ChibiPose {
   p.paws.frontFar = { x: b.desk.x - 1.5, y: b.desk.y };
   // Reading: the eyes run down the page, and back up to the top of the next bit.
   const read = (clock % 2600) / 2600;
-  p.lookX = 0.9;
-  p.lookY = lerp(-0.6, 0.3, read);
-  p.hrot = 3 * Math.sin(clock / 2300) - 2;
+  p.lookY = clamp(p.lookY + lerp(-0.3, 0.3, read), -1, 1);
+  p.hrot += 2 * Math.sin(clock / 2300);
   return p;
 }
 
@@ -649,8 +660,6 @@ function watchReels(b: ChibiBuild, input: ChibiInput): ChibiPose {
   p.pawUp = 1;
   const chest = legRoot(b, p, 'frontFar');
   p.paws.frontFar = { x: chest.x + 4, y: chest.y + 5 };
-  p.lookX = 0.9;
-  p.lookY = -0.4;
   const giggle = r.funny && r.into > 0.2 && r.into < 0.8;
   if (giggle) {
     const shake = Math.sin(clock / 70);
@@ -658,8 +667,6 @@ function watchReels(b: ChibiBuild, input: ChibiInput): ChibiPose {
     p.mouth = 0.35 + 0.15 * shake;
     p.hrot += 4 * shake;
     p.blush = 1;
-  } else {
-    p.hrot = 2;
   }
   return p;
 }
@@ -1104,8 +1111,10 @@ function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       p.paws.frontFar = { x: b.desk.x - 1.2, y: b.desk.y - (mouse ? 0 : k.far * 1.8) };
       p.pawUp = 2;
       p.hrot = lerp(-3, 8, k.pause);
+      p.turn = 0.8;
       p.lookX = 0.8;
-      p.lookY = lerp(0, -0.6, k.pause);
+      p.lookY = -0.4;
+      look(b, p, input.gaze);
       p.eyes = eyesFrom(input);
       if (input.animation === 'reels' && r.funny && r.into > 0.2 && r.into < 0.8) {
         p.eyes = 'happy';

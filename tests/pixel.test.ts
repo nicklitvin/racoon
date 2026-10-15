@@ -168,6 +168,26 @@ describe('pixel outfits', () => {
   });
 });
 
+describe('pixel faces', () => {
+  it('turn round to look at something beside them: the eyes come round towards the way they face', () => {
+    for (const build of [PIXEL_RACCOON, PIXEL_CAT]) {
+      const eyesAt = (turn: number) => {
+        const r = new Raster(PIXEL.width, PIXEL.height);
+        const { pose, clock } = poseAt(build, 'idle');
+        drawPixelPet(r, build, { ...pose, turn, eyes: 'open' }, clock, 1, 0, scruffPoint(build, pose));
+        const xs = Array.from(r.data).flatMap((v, i) => (v === C.eye ? [i % PIXEL.width] : []));
+        return Math.min(...xs);
+      };
+      expect(eyesAt(0.9), build.species).toBeGreaterThan(eyesAt(0));
+    }
+  });
+
+  it('turn to the screen at the desk', () => {
+    for (const animation of ['work', 'browse', 'reels'] as const) expect(poseAt(PIXEL_RACCOON, animation).pose.turn, animation).toBeGreaterThan(0.5);
+    expect(poseAt(PIXEL_RACCOON, 'idle').pose.turn).toBe(0);
+  });
+});
+
 describe('pixel otter', () => {
   it('swims in a pixel pond, nothing of it showing below the surface but water', () => {
     const { r, pose } = draw(PIXEL_OTTER, 'walk');

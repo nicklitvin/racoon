@@ -304,15 +304,24 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   r.shape(head, headBox, C.fur, C.outline, { light: C.furLight, dark: C.fur });
   const rx = H.rx;
   const ry = H.ry;
+  /**
+   * A point on the face, with the face turned round towards where he's looking: everything
+   * slides forward, the back of it most, so the near eye and the nose come round to the
+   * front of the head.
+   */
+  const onFace = (l: Pt): Pt => {
+    const back = 1 - 0.6 * clamp01((l.x / rx + 1) / 2);
+    return onHead({ x: l.x + p.turn * rx * 0.3 * back, y: l.y });
+  };
   /** A marking on the face, cut to the head. */
   const faceMark = (sd: Sd, box: Box, colour: number) => r.shape(intersect(sd, head), box, colour, null);
   const faceEllipse = (x: number, y: number, ex: number, ey: number, colour: number) => {
-    const at = onHead({ x, y });
+    const at = onFace({ x, y });
     const e = ellipse(at.x, at.y, ex * K, ey * K, headAngle);
     faceMark(e.sd, e.box, colour);
   };
   const facePoly = (points: [number, number][], colour: number) => {
-    const poly = polygon(curvy(points, rx, ry).map(onHead));
+    const poly = polygon(curvy(points, rx, ry).map(onFace));
     faceMark(poly.sd, poly.box, colour);
   };
   switch (species) {
@@ -340,7 +349,7 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
       break;
     case 'cat':
       for (const x of [-0.18, 0.04, 0.26]) {
-        const stripe = capsule(onHead({ x: rx * x, y: -ry * 1.05 }), onHead({ x: rx * x + 0.6, y: -ry * 0.62 }), 0.5);
+        const stripe = capsule(onFace({ x: rx * x, y: -ry * 1.05 }), onFace({ x: rx * x + 0.6, y: -ry * 0.62 }), 0.5);
         faceMark(stripe.sd, stripe.box, C.band);
       }
       faceEllipse(rx * 0.6, ry * 0.55, rx * 0.42, ry * 0.3, C.light);
@@ -352,7 +361,7 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   const nose = species === 'otter' ? { x: rx * 0.78, y: ry * 0.22 } : { x: rx * 0.8, y: ry * 0.3 };
   if (species === 'otter') {
     for (const dx of [-1.9, 1.9]) {
-      const at = onHead({ x: nose.x + dx * 0.8 - 0.5, y: nose.y + 2.7 });
+      const at = onFace({ x: nose.x + dx * 0.8 - 0.5, y: nose.y + 2.7 });
       const pad = ellipse(at.x, at.y, 1.3, 1.1);
       r.shape(pad.sd, pad.box, C.light, C.furDark);
     }
@@ -360,7 +369,7 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
 
   // Eyes.
   const pix = (l: Pt) => {
-    const q = onHead(l);
+    const q = onFace(l);
     return { x: Math.floor(q.x), y: Math.floor(q.y) };
   };
   const look = { x: p.lookX > 0.5 ? 1 : p.lookX < -0.5 ? -1 : 0, y: p.lookY > 0.6 ? 1 : p.lookY < -0.7 ? -1 : 0 };

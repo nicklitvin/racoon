@@ -4,9 +4,11 @@
  * mouse sit just where his paws come down, and everything else is in proportion to him.
  *
  * Drawn facing right, as he sits at it: keyboard nearest him, then the mouse, then the
- * monitor, turned towards him: you see its screen at an angle, its far edge shorter and its
- * side showing. What's on the screen is drawn too, a few times a second: a terminal, a web
- * page, reels, or a screen saver while nobody's using it.
+ * monitor. The monitor is "cheated out", as on a stage: turned halfway, towards him and
+ * towards you, so you can see him and his screen at once. It's drawn the way pixel art
+ * draws things at an angle, its face slanting up away from him in clean steps, with the
+ * depth of its case showing behind. What's on the screen is drawn on the slant too, a few
+ * times a second: a terminal, a web page, reels, or a screen saver while nobody's using it.
  */
 
 import { REEL_MS } from './typing';
@@ -77,15 +79,17 @@ export function createDeskDrawing(doc: Document, unit: number, keysTop: number, 
   const keysMid = keysX + keysW / 2;
   const mouseLeft = Math.round(keysMid + mouseX - mouseW / 2);
   const mugX = mouseLeft + mouseW + 2;
-  // The monitor: its face foreshortened, turned towards him, its far edge `fall` shorter top and bottom.
-  const faceW = r(u * 0.4);
-  const faceH = r(u * 0.34);
-  const fall = Math.max(2, Math.round(faceH * 0.2));
-  const side = 3;
-  const stand = r(u * 0.07) + 1;
+  // The monitor: turned halfway towards him, its face slants up away from him, a pixel
+  // for every `RUN` across, and its case shows `depth` deep behind.
+  const faceW = r(u * 0.46);
+  const faceH = r(u * 0.33);
+  const RUN = 3;
+  const rise = (i: number) => Math.floor(i / RUN);
+  const depth = 2;
+  const stand = r(u * 0.08) + 2;
   const monX = mugX + 6;
-  const width = monX + faceW + side + 3;
-  const height = surface + stand + faceH + 2;
+  const width = monX + faceW + depth + 3;
+  const height = surface + stand + faceH + rise(faceW - 1) + depth + 2;
   // y from the top of the canvas for a height off the floor.
   const Y = (up: number) => height - up;
   const C = COLOURS;
@@ -97,9 +101,6 @@ export function createDeskDrawing(doc: Document, unit: number, keysTop: number, 
     { x: drawerX + 2, y: Y(surface - top - 1), w: width - drawerX - 6, h: Math.max(1, Math.floor((surface - top) / 2) - 1), fill: C.woodLight },
     { x: 0, y: Y(surface), w: width, h: top, fill: C.wood },
     { x: 1, y: Y(surface), w: width - 2, h: 1, fill: C.woodLight, flat: true },
-    // The monitor's stand: a base and a neck up to the middle of the screen.
-    { x: monX + Math.round(faceW / 2) - 3, y: Y(surface + 1), w: 6, h: 1, fill: C.metal },
-    { x: monX + Math.round(faceW / 2) - 1, y: Y(surface + stand), w: 2, h: stand - 1, fill: C.metalLight },
     // A mug, keyboard and mouse.
     { x: mugX, y: Y(surface + 3), w: 3, h: 3, fill: C.mug },
     { x: keysX, y: Y(surface + keysH), w: keysW, h: keysH, fill: C.keys },
@@ -134,27 +135,40 @@ export function createDeskDrawing(doc: Document, unit: number, keysTop: number, 
     px(mugX + 4, Y(surface + 1), C.line);
   }
 
-  // The monitor's face, column by column: each column a little shorter than the last.
-  const faceTop = Y(surface + stand + faceH);
-  const colTop = (i: number) => faceTop + Math.round((i * fall) / (faceW - 1));
-  const colBottom = (i: number) => faceTop + faceH - 1 - Math.round((i * fall) / (faceW - 1));
+  // The monitor. Column i of its face runs from colTop(i) down to colBottom(i).
+  const faceBottom = Y(surface + stand);
+  const colBottom = (i: number) => faceBottom - rise(i);
+  const colTop = (i: number) => colBottom(i) - faceH + 1;
+  const mid = Math.floor(faceW / 2);
   if (ctx) {
-    for (let i = -1; i <= faceW + side; i++) {
-      // Outline round the face and its side.
-      const c = Math.min(Math.max(i, 0), faceW - 1);
-      for (let y = colTop(c) - 1; y <= colBottom(c) + 1; y++) px(monX + i, y, C.line);
+    // Everything that's monitor, so it can be outlined as one: the case behind (the face
+    // pushed back, up and away from him), the face, and the stand.
+    const mask = new Uint8Array(width * height);
+    const mark = (x: number, y: number, v: number) => {
+      if (x >= 0 && y >= 0 && x < width && y < height) mask[y * width + x] = v;
+    };
+    for (let d = depth; d >= 1; d--) for (let i = 0; i < faceW; i++) for (let y = colTop(i); y <= colBottom(i); y++) mark(monX + i + d, y - d, 1);
+    for (let i = 0; i < faceW; i++) for (let y = colTop(i); y <= colBottom(i); y++) mark(monX + i, y, 2);
+    const neckX = monX + mid;
+    for (let y = colBottom(mid) + 1; y < Y(surface + 1); y++) mark(neckX, y, 3), mark(neckX + 1, y, 3);
+    for (let x = -3; x <= 3; x++) mark(neckX + x, Y(surface + 1), 3);
+    for (let x = -1; x <= 4; x++) mark(neckX + x, Y(surface + 2), 3);
+    const colour = [null, C.metalSide, C.metal, C.metalLight];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const v = mask[y * width + x]!;
+        if (v) px(x, y, colour[v]!);
+        else if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => mask[(y + dy!) * width + x + dx!] && x + dx! >= 0 && x + dx! < width)) px(x, y, C.line);
+      }
     }
-    for (let i = 0; i < faceW; i++) for (let y = colTop(i); y <= colBottom(i); y++) px(monX + i, y, C.metal);
-    // Its side, seen past the far edge.
-    for (let i = 0; i < side; i++) {
-      for (let y = colTop(faceW - 1) + 1 + i; y <= colBottom(faceW - 1) - 1 - i; y++) px(monX + faceW + i, y, C.metalSide);
-    }
+    // A glint on the case's top edge, where the light catches it.
+    for (let i = 2; i < faceW - 1; i += 1) if (i % RUN !== 0) px(monX + i + 1, colTop(i) - 1, C.metalLight);
   }
-  // The screen inside the bezel.
+  // The screen inside the bezel: the same slant, the picture drawn on it pixel for pixel.
   const scr = { x0: 1, x1: faceW - 2 };
   const screenW = scr.x1 - scr.x0 + 1;
-  const screenRows = (i: number) => ({ top: colTop(i) + 1, bottom: colBottom(i) - 2 });
-  const screenH = screenRows(0).bottom - screenRows(0).top + 1;
+  const screenH = faceH - 3;
+  const screenTop = (i: number) => colTop(i) + 1;
 
   const element = doc.createElement('div');
   element.className = 'desk';
@@ -170,22 +184,17 @@ export function createDeskDrawing(doc: Document, unit: number, keysTop: number, 
     width: width * P,
     height: height * P,
     keyboardX: (keysX + keysW / 2) * P,
-    screen: { x: (monX + faceW / 2) * P, y: (surface + stand + faceH / 2) * P },
+    screen: { x: (monX + mid) * P, y: (surface + stand + faceH / 2 + rise(mid)) * P },
     show(app, clock) {
       const frame = app === 'idle' ? Math.floor(clock / 250) : Math.floor(clock / (1000 / SCREEN_FPS));
       const key = `${app}|${frame}`;
       if (key === shown || !ctx) return;
       shown = key;
       paintScreen(app, clock, screenW, screenH, content);
-      // Each column of the screen is a little shorter: squeeze the picture into it.
       for (let i = scr.x0; i <= scr.x1; i++) {
-        const { top, bottom } = screenRows(i);
-        const h = bottom - top + 1;
+        const top = screenTop(i);
         const cx = i - scr.x0;
-        for (let y = 0; y < h; y++) {
-          const cy = Math.min(screenH - 1, Math.floor(((y + 0.5) * screenH) / h));
-          px(monX + i, top + y, content[cy * screenW + cx]!);
-        }
+        for (let y = 0; y < screenH; y++) px(monX + i, top + y, content[y * screenW + cx]!);
       }
     },
   };
