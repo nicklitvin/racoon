@@ -10,6 +10,15 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-16',
+    title: 'Modes, and eight ways to walk',
+    changes: [
+      'Modes: the settings now have four buttons. Play: blocks, chasing the pointer and watching you type. Work: your pet sits at its desk and works for as long as you like; drag it off and it gets cross and goes straight back. Sleep: it curls up and sleeps. Hide: it runs off the screen until you want it back.',
+      'The blocks and work-mode switches are gone from the settings (they’re part of Play and Work), and so is tapping the desk to start work.',
+      'Your pet now faces the way it’s going in eight directions: walking diagonally you see it three-quarters on, coming towards you or going away, instead of side on and gliding.',
+    ],
+  },
+  {
     date: '2026-10-15',
     title: 'Coming and going',
     changes: [

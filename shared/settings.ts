@@ -15,6 +15,13 @@ export type Hat = (typeof HATS)[number];
 export const OUTFITS = ['none', 'suit', 'pajamas', 'sweater', 'cape', 'scarf', 'bowtie', 'bandana', 'collar'] as const;
 export type Outfit = (typeof OUTFITS)[number];
 
+/**
+ * What the pet's up to, picked in the settings: playing about (its blocks, chasing the
+ * pointer, watching you type), working at its desk, sleeping, or hiding off the screen.
+ */
+export const PET_MODES = ['play', 'work', 'sleep', 'hide'] as const;
+export type PetMode = (typeof PET_MODES)[number];
+
 export interface Settings {
   /** Which drawing of the raccoon to use. */
   raccoonType: RaccoonType;
@@ -22,26 +29,19 @@ export interface Settings {
   keyboardReactions: boolean;
   /** Start the desktop app when you log in. */
   launchAtLogin: boolean;
-  /** A few toy blocks lying about for the pet to play with (and for you to throw for it). */
-  toys: boolean;
   /** What the pet wears on its head, and round its neck. */
   hat: Hat;
   outfit: Outfit;
-  /**
-   * A little desk in the corner. Tap it a few times and the pet sits down at it to work for
-   * a while, then wants to play.
-   */
-  workMode: boolean;
+  mode: PetMode;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   raccoonType: RACCOON_TYPES[0],
   keyboardReactions: false,
   launchAtLogin: false,
-  toys: true,
   hat: 'none',
   outfit: 'none',
-  workMode: false,
+  mode: 'play',
 };
 
 function isRaccoonType(value: unknown): value is RaccoonType {
@@ -69,10 +69,10 @@ export function normalizeSettings(raw: unknown): Settings {
       : ((typeof r.raccoonType === 'string' && retired(r.raccoonType)) || DEFAULT_SETTINGS.raccoonType),
     keyboardReactions: r.keyboardReactions === true,
     launchAtLogin: r.launchAtLogin === true,
-    toys: r.toys !== false,
     hat: (HATS as readonly unknown[]).includes(r.hat) ? (r.hat as Hat) : DEFAULT_SETTINGS.hat,
     outfit: (OUTFITS as readonly unknown[]).includes(r.outfit) ? (r.outfit as Outfit) : DEFAULT_SETTINGS.outfit,
-    workMode: r.workMode === true,
+    // Before there were modes, work mode was a switch of its own.
+    mode: (PET_MODES as readonly unknown[]).includes(r.mode) ? (r.mode as PetMode) : r.workMode === true ? 'work' : 'play',
   };
 }
 

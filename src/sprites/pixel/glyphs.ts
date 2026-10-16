@@ -9,6 +9,8 @@ export const GLYPHS = {
   '!': ['#', '#', '#', '.', '#'],
   '?': ['##.', '..#', '.#.', '...', '.#.'],
   heart: ['.#.#.', '#####', '.###.', '..#..'],
+  /** A cross little vein, as cartoons have over an angry head. */
+  angry: ['##.##', '#...#', '.....', '#...#', '##.##'],
 } as const;
 
 /** The letters on the toy blocks, in order. */

@@ -467,135 +467,148 @@ describe('Brain: naps', () => {
 
 describe('Brain: work mode', () => {
   const desk = { seat: { x: 1300, y: bottom }, facing: 1 as const, screen: { x: 1420, y: bottom - 80 } };
-  const atWork = (overrides: Partial<WorldInput> = {}) => world({ desk, ...overrides });
-  const SHORT: ConfigOverrides = { work: { focusMs: 30_000, restlessMs: 3000, begMs: 20_000, askEveryMs: 4000 } };
+  const atWork = (overrides: Partial<WorldInput> = {}) => world({ desk, mode: 'work', ...overrides });
 
-  /** Three quick taps on the desk. */
-  function tapDesk(brain: Brain, input = atWork(), gap = 200) {
-    run(brain, 50, input);
-    for (let i = 0; i < 3; i++) {
-      brain.deskTapped();
-      run(brain, gap, input);
-    }
-  }
-
-  it('ignores a tap or two, but three quick taps make it work time', () => {
-    const brain = makeBrain(4, SHORT);
+  it('says it’s work time when you switch to work mode, goes to its desk, and sits down at it facing it', () => {
+    const brain = makeBrain(4);
     place(brain, { x: 400, y: 700 });
-    run(brain, 100, atWork());
-    brain.deskTapped();
-    run(brain, 300, atWork());
-    brain.deskTapped();
-    run(brain, 2000, atWork());
-    // Too slow: the first two have run out.
-    brain.deskTapped();
-    expect(run(brain, 100, atWork()).at(-1)!.reaction).not.toBe('work');
-    run(brain, 2000, atWork());
-    tapDesk(brain);
-    const snap = run(brain, 50, atWork()).at(-1)!;
-    expect(snap.reaction).toBe('work');
-    expect(snap.say).toBe('Work time!');
-  });
-
-  it('does nothing without a desk (work mode off)', () => {
-    const brain = makeBrain(4, SHORT);
-    tapDesk(brain, world());
-    expect(run(brain, 500).some((s) => s.reaction === 'work')).toBe(false);
-  });
-
-  it('goes to its desk, sits down facing it and types, eyes on the screen, not distracted by anything', () => {
-    const brain = makeBrain(4, SHORT);
-    place(brain, { x: 400, y: 700 });
-    tapDesk(brain);
+    expect(run(brain, 50, atWork()).at(-1)!.say).toBe('Work time!');
     const { snap } = runUntil(brain, (s) => s.animation === 'work', atWork(), 20_000);
     expect(Math.hypot(snap.position.x - desk.seat.x, snap.position.y - desk.seat.y)).toBeLessThan(5);
     expect(snap.facing).toBe(1);
     expect(snap.aim).toBe(0);
     expect(snap.lookAt).toEqual(desk.screen);
-    // Busy: shaking the mouse, typing and the pointer right on top of him don't move him.
+  });
+
+  it('works for as long as work mode lasts, not distracted by anything', () => {
+    const brain = makeBrain(4);
+    place(brain, { x: 400, y: 700 });
+    runUntil(brain, (s) => s.phase === 'type', atWork(), 20_000);
+    // Shaking the mouse, typing and the pointer right on top of him don't move him.
     const busy = atWork({ cursor: { x: desk.seat.x, y: desk.seat.y - 40 }, cursorExcited: true, cursorStillMs: 0, typingActive: true });
-    const snaps = run(brain, 5000, busy);
-    expect(snaps.every((s) => s.animation === 'work')).toBe(true);
-    // Resting, so the page can tick slowly through twenty minutes of typing.
+    const snaps = run(brain, 15 * 60_000, busy);
+    expect(snaps.every((s) => s.reaction === 'work' && s.phase === 'type')).toBe(true);
     expect(snaps.at(-1)!.resting).toBe(true);
-    // A tap on the desk now just gets you shushed.
+    // A tap on the desk gets you shushed.
     brain.deskTapped();
     expect(run(brain, 50, atWork()).at(-1)!.say).toMatch(/Shh/);
   });
 
-  it('at the computer, switches between the terminal, the web and the odd few reels, sitting to suit each', () => {
+  it('switches between the terminal, the web and the odd few reels, sitting to suit each', () => {
     const tasks = { terminal: { weight: 0.5, ms: { min: 2000, max: 3000 } }, web: { weight: 0.35, ms: { min: 2000, max: 3000 } }, reels: { weight: 0.15, ms: { min: 1500, max: 2000 } } };
-    const brain = makeBrain(4, { work: { ...SHORT.work, focusMs: 120_000, tasks } });
+    const brain = makeBrain(4, { work: { tasks } });
     place(brain, { x: 400, y: 700 });
-    tapDesk(brain);
     const { snap } = runUntil(brain, (s) => s.phase === 'type', atWork(), 20_000);
-    // Always starts in the terminal.
     expect(snap.screen).toBe('terminal');
     const snaps = run(brain, 100_000, atWork());
     const animation = { terminal: 'work', web: 'browse', reels: 'reels' } as const;
     for (const s of snaps) expect(s.animation).toBe(animation[s.screen!]);
     const seen = snaps.map((s) => s.screen);
     expect(new Set(seen)).toEqual(new Set(['terminal', 'web', 'reels']));
-    // Never the same thing twice in a row: each switch is to something else.
-    const switches = seen.filter((t, i) => i > 0 && t !== seen[i - 1]).length;
-    expect(switches).toBeGreaterThan(20);
-    // Reels are the rarest.
+    expect(seen.filter((t, i) => i > 0 && t !== seen[i - 1]).length).toBeGreaterThan(20);
     const share = (t: string) => seen.filter((x) => x === t).length / seen.length;
     expect(share('reels')).toBeLessThan(share('terminal'));
-    // Away from the desk, the screen goes back to its screen saver.
-    expect(run(brain, 50, world()).at(-1)!.screen).toBe(null);
   });
 
-  it('after its time is up, gets restless, then comes over to you asking to play', () => {
-    const brain = makeBrain(4, SHORT);
+  it('dragged off its desk, it’s cross, and goes straight back to work', () => {
+    const brain = makeBrain(4);
     place(brain, { x: 400, y: 700 });
-    tapDesk(brain);
-    runUntil(brain, (s) => s.animation === 'work', atWork(), 20_000);
-    const cursor = { x: 600, y: 500 };
-    const input = atWork({ cursor, cursorStillMs: 10_000 });
-    const typing = runUntil(brain, (s) => s.phase !== 'type', input, 40_000);
-    expect(typing.elapsed).toBeGreaterThan(25_000);
-    expect(typing.snap.phase).toBe('restless');
-    // Looking about at anything but the screen.
-    const looks = new Set(run(brain, 2900, input).map((s) => JSON.stringify(s.lookAt)));
-    expect(looks.size).toBeGreaterThan(1);
-    const { snap } = runUntil(brain, (s) => s.phase === 'beg' && s.animation === 'attention', input, 20_000);
-    expect(Math.abs(snap.position.x - cursor.x)).toBeLessThan(size.width);
-    expect(snap.facing).toBe(cursor.x < snap.position.x ? -1 : 1);
-    const said = run(brain, 9000, input).map((s) => s.say).filter((t): t is string => t !== null);
-    expect(new Set(said).size).toBeGreaterThan(1);
+    runUntil(brain, (s) => s.phase === 'type', atWork(), 20_000);
+    brain.grab();
+    brain.dragTo({ x: 500, y: 500 });
+    run(brain, 300, atWork());
+    brain.release();
+    const cross = run(brain, 100, atWork()).at(-1)!;
+    expect(cross.animation).toBe('angry');
+    expect(cross.say).toMatch(/working/i);
+    const { snap } = runUntil(brain, (s) => s.phase === 'type', atWork(), 20_000);
+    expect(Math.hypot(snap.position.x - desk.seat.x, snap.position.y - desk.seat.y)).toBeLessThan(5);
   });
 
-  it('pet it while it asks, and it’s delighted and goes off to play', () => {
-    const brain = makeBrain(4, { ...SHORT, work: { ...SHORT.work, focusMs: 1000, restlessMs: 500 } });
-    place(brain, { x: 1000, y: 700 });
-    tapDesk(brain);
-    const input = atWork({ cursor: { x: 700, y: 500 }, cursorStillMs: 10_000 });
-    runUntil(brain, (s) => s.phase === 'beg' && s.animation === 'attention', input, 30_000);
-    brain.poke();
-    const snaps = run(brain, 2500, input);
-    expect(snaps[0]!.animation).toBe('happy');
-    expect(snaps[0]!.say).toBe('Yay!');
-    expect(snaps.at(-1)!.reaction).not.toBe('work');
-  });
-
-  it('pet it while it works, and it enjoys it, then gets back to work', () => {
-    const brain = makeBrain(4, SHORT);
+  it('enjoys a pat, then gets back to work', () => {
+    const brain = makeBrain(4);
     place(brain, { x: 400, y: 700 });
-    tapDesk(brain);
-    runUntil(brain, (s) => s.animation === 'work', atWork(), 20_000);
+    runUntil(brain, (s) => s.phase === 'type', atWork(), 20_000);
     brain.poke();
     expect(run(brain, 100, atWork()).at(-1)!.animation).toBe('happy');
-    const { snap } = runUntil(brain, (s) => s.animation === 'work', atWork(), 10_000);
-    expect(snap.reaction).toBe('work');
+    runUntil(brain, (s) => s.phase === 'type', atWork(), 10_000);
   });
 
-  it('stops working when the desk is put away', () => {
-    const brain = makeBrain(4, SHORT);
+  it('leaves its desk when you switch back to play mode, and the screen goes to its screen saver', () => {
+    const brain = makeBrain(4);
     place(brain, { x: 400, y: 700 });
-    tapDesk(brain);
-    runUntil(brain, (s) => s.animation === 'work', atWork(), 20_000);
-    expect(run(brain, 200, world()).at(-1)!.reaction).not.toBe('work');
+    runUntil(brain, (s) => s.phase === 'type', atWork(), 20_000);
+    const snap = run(brain, 200, world()).at(-1)!;
+    expect(snap.reaction).not.toBe('work');
+    expect(snap.screen).toBe(null);
   });
 });
 
+describe('Brain: sleep mode', () => {
+  const asleep = (overrides: Partial<WorldInput> = {}) => world({ mode: 'sleep', ...overrides });
+
+  it('goes off somewhere cosy and sleeps, and stays asleep whatever the pointer does', () => {
+    const brain = makeBrain(6);
+    place(brain, { x: 800, y: 500 });
+    runUntil(brain, (s) => s.mode === 'sleep', asleep(), 60_000);
+    const shaken = asleep({ cursor: { x: 700, y: 400 }, cursorExcited: true, cursorStillMs: 0, typingActive: true });
+    expect(run(brain, 20_000, shaken).every((s) => s.mode === 'sleep')).toBe(true);
+  });
+
+  it('woken by a pat or a drag, goes back to sleep', () => {
+    const brain = makeBrain(6);
+    place(brain, { x: 800, y: 500 });
+    runUntil(brain, (s) => s.mode === 'sleep', asleep(), 60_000);
+    brain.poke();
+    expect(run(brain, 100, asleep()).at(-1)!.animation).toBe('happy');
+    runUntil(brain, (s) => s.mode === 'sleep', asleep(), 60_000);
+    brain.grab();
+    run(brain, 200, asleep());
+    brain.release();
+    runUntil(brain, (s) => s.mode === 'sleep', asleep(), 60_000);
+  });
+
+  it('wakes up with a yawn when you switch back to play', () => {
+    const brain = makeBrain(6);
+    runUntil(brain, (s) => s.mode === 'sleep', asleep(), 60_000);
+    expect(run(brain, 100).at(-1)!.animation).toBe('yawn');
+  });
+});
+
+describe('Brain: hide mode', () => {
+  const hiding = world({ mode: 'hide' });
+
+  it('runs off the nearer side of the screen and stays out of sight', () => {
+    const brain = makeBrain(8);
+    place(brain, { x: 1300, y: 600 });
+    const { snap } = runUntil(brain, (s) => s.hidden, hiding, 20_000);
+    expect(snap.position.x).toBeGreaterThan(bounds.x + bounds.width);
+    const later = run(brain, 30_000, world({ mode: 'hide', cursorExcited: true, cursor: { x: 800, y: 400 }, cursorStillMs: 0 }));
+    expect(later.every((s) => s.hidden && s.resting)).toBe(true);
+  });
+
+  it('comes back on from the same side when you switch back', () => {
+    const brain = makeBrain(8);
+    place(brain, { x: 300, y: 600 });
+    runUntil(brain, (s) => s.hidden, hiding, 20_000);
+    const back = run(brain, 50).at(-1)!;
+    expect(back.hidden).toBe(false);
+    expect(back.position.x).toBeLessThan(bounds.x);
+    const { snap } = runUntil(brain, (s) => s.mode === 'idle', world(), 20_000);
+    expect(inBounds(snap)).toBe(true);
+  });
+});
+
+describe('Brain: play mode', () => {
+  it('chases the pointer and watches you type only in play mode', () => {
+    for (const mode of ['play', 'work', 'sleep'] as const) {
+      const brain = makeBrain(9);
+      const shake = world({ mode, cursor: { x: 800, y: 400 }, cursorExcited: true, cursorStillMs: 0 });
+      const chased = run(brain, 3000, shake).some((s) => s.reaction === 'chase' || s.reaction === 'surprised');
+      expect(chased, mode).toBe(mode === 'play');
+      const typing = makeBrain(9);
+      const peeked = run(typing, 5000, world({ mode, typingActive: true })).some((s) => s.reaction === 'peek');
+      expect(peeked, mode).toBe(mode === 'play');
+    }
+  });
+});

@@ -16,6 +16,29 @@ export const TIMING: Partial<Record<AnimationName, Partial<AnimationSpec>>> = {
   peek: { fps: 12 },
 };
 
+/** Which way you see him: side on, three-quarters towards you or away, or straight on. */
+export type ChibiView = 'side' | 'frontQuarter' | 'backQuarter' | 'front' | 'back';
+
+/** How steep a heading (0 across the screen, 1 straight up or down it) each view starts at. */
+const QUARTER_FROM = 0.38;
+const STRAIGHT_FROM = 0.9;
+/** How far past a boundary he has to go to change view. */
+const HOLD = 0.05;
+
+/** The view for a heading, given the one he's in now. */
+export function viewFor(heading: number, current: ChibiView): ChibiView {
+  const sin = Math.sin(heading);
+  const steep = Math.abs(sin);
+  const level = current === 'side' ? 0 : current === 'frontQuarter' || current === 'backQuarter' ? 1 : 2;
+  // Each boundary sits a little further away from the view he's in, so he has to go
+  // clearly past it to change.
+  const quarterFrom = QUARTER_FROM + (level === 0 ? HOLD : -HOLD);
+  const straightFrom = STRAIGHT_FROM + (level === 2 ? -HOLD : HOLD);
+  if (steep > straightFrom) return sin > 0 ? 'front' : 'back';
+  if (steep > quarterFrom) return sin > 0 ? 'frontQuarter' : 'backQuarter';
+  return 'side';
+}
+
 /** How long a change of animation takes to blend through, and a turn round to flip. */
 const BLEND_MS = 240;
 const FLIP_MS = 90;
@@ -35,7 +58,7 @@ export class ChibiMotion {
    * Which way you see him: side on, or (walking towards you down the screen, or away up it)
    * from the front or behind. Only drawings that have those views use it.
    */
-  view: 'side' | 'front' | 'back' = 'side';
+  view: ChibiView = 'side';
   private clock = -1;
   private animation: AnimationName | null = null;
   private from: ChibiPose | null = null;
@@ -56,13 +79,11 @@ export class ChibiMotion {
     const heading = frame.heading ?? 0;
     const cos = Math.cos(heading);
     if (frame.animation !== 'dangle' && Math.abs(cos) > 0.2) this.facing = cos < 0 ? -1 : 1;
-    // Going up or down the screen, you see him from behind or in front. Not until he's
-    // clearly going that way, and he only turns side on again once he's clearly going across.
-    const sin = Math.sin(heading);
+    // Going up or down the screen, you see him from behind or in front, and going diagonally,
+    // three-quarters. Each view holds until he's clearly going another way, so it doesn't
+    // flicker between two on a heading halfway between them.
     const walking = frame.animation === 'walk' || frame.animation === 'run' || frame.animation === 'chase' || frame.animation === 'leap';
-    if (!walking) this.view = 'side';
-    else if (this.view === 'side' && Math.abs(sin) > 0.82) this.view = sin > 0 ? 'front' : 'back';
-    else if (this.view !== 'side' && Math.abs(sin) < 0.6) this.view = 'side';
+    this.view = walking ? viewFor(heading, this.view) : 'side';
     const turn = dt / (FLIP_MS / 1000);
     this.flip = this.flip < this.facing ? Math.min(this.facing, this.flip + turn) : Math.max(this.facing, this.flip - turn);
 

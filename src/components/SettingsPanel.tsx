@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { HATS, OUTFITS, RACCOON_TYPES, type Hat, type KeyboardStatus, type Outfit, type RaccoonType, type Settings } from '../../shared/settings';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { HATS, OUTFITS, PET_MODES, RACCOON_TYPES, type Hat, type KeyboardStatus, type Outfit, type PetMode, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
 import { RACCOON_STYLES } from '../sprites';
 import { HAT_ITEMS, OUTFIT_ITEMS, wearableIcon } from '../sprites/outfits';
@@ -71,6 +71,76 @@ function TypePicker({ value, onChange }: TypePickerProps) {
           );
         })}
       </div>
+    </fieldset>
+  );
+}
+
+/** The modes, each a button with a little picture and its name. */
+const MODES: Record<PetMode, { label: string; hint: string; icon: ReactNode }> = {
+  play: {
+    label: 'Play',
+    hint: 'Plays with its blocks, chases the pointer when you shake it, and watches you type.',
+    icon: (
+      <>
+        <rect x="4" y="4" width="16" height="16" rx="3" />
+        <path d="M9 16.5 12 8l3 8.5M10.1 13.5h3.8" />
+      </>
+    ),
+  },
+  work: {
+    label: 'Work',
+    hint: 'Sits at its desk in the corner and works away. Drag it off and it’ll go straight back, cross.',
+    icon: (
+      <>
+        <rect x="3" y="4" width="18" height="12" rx="2" />
+        <path d="M12 16v4M8 20h8M7 8.5h5M7 11.5h7" />
+      </>
+    ),
+  },
+  sleep: {
+    label: 'Sleep',
+    hint: 'Curls up somewhere cosy and sleeps until you change the mode.',
+    icon: (
+      <>
+        <path d="M19 14.5A7.5 7.5 0 1 1 10 5a6 6 0 0 0 9 9.5z" />
+        <path d="M15 3h4l-4 4h4" />
+      </>
+    ),
+  },
+  hide: {
+    label: 'Hide',
+    hint: 'Runs off the edge of the screen and stays out of the way until you want it back.',
+    icon: (
+      <>
+        <path d="M3 3l18 18" />
+        <path d="M10.6 6.1A9 9 0 0 1 12 6c5 0 9 6 9 6a16 16 0 0 1-2.7 3.2M6.6 7.6C4.4 9.1 3 12 3 12s4 6 9 6c1.5 0 2.9-.4 4.1-1" />
+        <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      </>
+    ),
+  },
+};
+
+function ModePicker({ value, onChange }: { value: PetMode; onChange: (mode: PetMode) => void }) {
+  return (
+    <fieldset className="field mode-picker">
+      <legend>Mode</legend>
+      <div className="mode-options">
+        {PET_MODES.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            className={mode === value ? 'mode-option selected' : 'mode-option'}
+            aria-pressed={mode === value}
+            onClick={() => onChange(mode)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="mode-icon">
+              {MODES[mode].icon}
+            </svg>
+            <span>{MODES[mode].label}</span>
+          </button>
+        ))}
+      </div>
+      <p className="hint">{MODES[value].hint}</p>
     </fieldset>
   );
 }
@@ -175,32 +245,12 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
     <section className="settings" aria-label="Racoon settings">
       {header}
 
+      <ModePicker value={settings.mode} onChange={(mode) => update({ mode })} />
+
       <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
 
       <DressUp settings={settings} update={update} />
 
-      <div className="field">
-        <label className="toggle">
-          <input type="checkbox" checked={settings.toys} onChange={(e) => update({ toys: e.target.checked })} />
-          <span>Toy blocks</span>
-        </label>
-        <p className="hint">
-          A few wooden blocks to play with: your pet swats them about and throws them. Pick one up and throw it, and
-          it’ll chase after it.
-        </p>
-      </div>
-
-      <div className="field">
-        <label className="toggle">
-          <input type="checkbox" checked={settings.workMode} onChange={(e) => update({ workMode: e.target.checked })} />
-          <span>Work mode</span>
-        </label>
-        <p className="hint">
-          Puts a little desk in the corner of the screen. Tap the desk three times and your pet sits down at it and
-          gets busy while you work: a bit of coding, a bit of browsing, the odd reel. After 20 minutes it decides it’s
-          play time and comes to find you.
-        </p>
-      </div>
 
       {/* Everything else is desktop-only: the web gear just picks the raccoon. */}
       {desktop && (

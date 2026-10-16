@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, HATS, normalizeSettings, OUTFITS, RACCOON_TYPES } from '../shared/settings';
+import { DEFAULT_SETTINGS, HATS, normalizeSettings, OUTFITS, PET_MODES, RACCOON_TYPES } from '../shared/settings';
 
 describe('normalizeSettings', () => {
   it('falls back to defaults for missing or broken input', () => {
@@ -15,10 +15,10 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ keyboardReactions: true }).keyboardReactions).toBe(true);
   });
 
-  it('puts the toy blocks out unless they were switched off', () => {
-    expect(DEFAULT_SETTINGS.toys).toBe(true);
-    expect(normalizeSettings({}).toys).toBe(true);
-    expect(normalizeSettings({ toys: false }).toys).toBe(false);
+  it('starts in play mode, and keeps only modes there are', () => {
+    expect(DEFAULT_SETTINGS.mode).toBe('play');
+    for (const mode of PET_MODES) expect(normalizeSettings({ mode }).mode).toBe(mode);
+    expect(normalizeSettings({ mode: 'party' }).mode).toBe('play');
   });
 
   it('offers the three pixel pets, defaulting to the raccoon', () => {
@@ -55,10 +55,11 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ hat: 'sombrero', outfit: 42 })).toMatchObject({ hat: 'none', outfit: 'none' });
   });
 
-  it('keeps work mode off unless switched on', () => {
-    expect(DEFAULT_SETTINGS.workMode).toBe(false);
-    expect(normalizeSettings({ workMode: 'yes' }).workMode).toBe(false);
-    expect(normalizeSettings({ workMode: true }).workMode).toBe(true);
+  it('carries over the old work mode switch as work mode', () => {
+    expect(normalizeSettings({ workMode: true }).mode).toBe('work');
+    expect(normalizeSettings({ workMode: false, toys: false }).mode).toBe('play');
+    // A mode, once there is one, wins.
+    expect(normalizeSettings({ workMode: true, mode: 'sleep' }).mode).toBe('sleep');
   });
 
   it('drops unknown and retired keys', () => {

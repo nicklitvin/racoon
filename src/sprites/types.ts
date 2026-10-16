@@ -41,6 +41,8 @@ export const ANIMATION_NAMES = [
   'reels',
   /** Trying to get your attention: up on his toes, waving, bouncing. */
   'attention',
+  /** Cross: stamping a foot, ears back, a scowl. */
+  'angry',
 ] as const;
 
 export type AnimationName = (typeof ANIMATION_NAMES)[number];

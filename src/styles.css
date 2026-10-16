@@ -1394,6 +1394,71 @@ html[data-view='settings'] .settings {
   cursor: pointer;
 }
 
+/* --- Modes: a row of four buttons --- */
+.mode-picker {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+
+.mode-picker legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.mode-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mode-option:hover {
+  color: inherit;
+}
+
+.mode-option.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: inherit;
+  font-weight: 600;
+}
+
+.mode-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mode-icon {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mode-picker .hint {
+  margin-top: 8px;
+}
+
 /* --- Dress up: hats and neckwear --- */
 .dress-up {
   margin: 0;

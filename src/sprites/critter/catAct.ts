@@ -254,6 +254,7 @@ export function catAct(input: ActInput): Act {
     case 'peek':
       return peek(input);
 
+    case 'angry':
     case 'surprised':
       return startle(input);
 

@@ -73,11 +73,19 @@ function curvy(points: [number, number][], rx: number, ry: number): Pt[] {
   return out;
 }
 
+/** Three-quarter views, for going diagonally: towards you (down the screen) or away (up it). */
+export type Quarter = 'front' | 'back' | null;
+
+/** In a three-quarter view the body is this much shorter, end on to you. */
+const QUARTER_SQUASH = 0.62;
+
 /**
  * Draws the pet into `r` (cleared first) and returns the box round the figure itself, for
  * grabbing it. `facing` -1 mirrors it to face left; the marks over its head stay readable.
+ * `quarter` turns him three-quarters towards you or away from you: his body foreshortened,
+ * from the front his face turned out to you, from behind no face and his tail nearest you.
  */
-export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: number, facing: number, moving: number, scruff: Pt, dress: Dress = UNDRESSED): Box | null {
+export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: number, facing: number, moving: number, scruff: Pt, dress: Dress = UNDRESSED, quarter: Quarter = null): Box | null {
   const { feetX: FX, feetY: FY, k: K } = PIXEL;
   const species = b.species;
   r.clear();
@@ -95,8 +103,10 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
       x = scruff.x + dx * cs - dy * ss;
       y = scruff.y + dx * ss + dy * cs;
     }
-    return { x: FX + x * K, y: FY + y * K };
+    return { x: FX + x * K * squash, y: FY + y * K };
   };
+  const squash = quarter ? QUARTER_SQUASH : 1;
+  const behind = quarter === 'back';
 
   const frame = bodyFrame(b, p);
   const bodyAngle = -p.rot * DEG + sw;
@@ -107,7 +117,7 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   const hidden = p.swing !== 0 || wet || p.paws.frontNear.y < -b.peekSink + 2;
   if (!hidden) {
     const at = T({ x: -2, y: 0.5 });
-    const e = ellipse(at.x, at.y, (b.body.rx + 7) * K * (1 - lifted * 0.6), 1.4);
+    const e = ellipse(at.x, at.y, (b.body.rx * squash + 7) * K * (1 - lifted * 0.6), 1.4);
     r.shape(e.sd, e.box, C.shadow, null);
   }
   const pond = { cx: -3 - moving * 4, rx: 34 + moving * 6, ry: 7 };
@@ -143,7 +153,8 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
       return bands.some(([a, z]) => s >= a && s < z) ? C.band : C.fur;
     }, C.outline);
   };
-  if (p.tailFront <= 0.5) drawTail();
+  // Going away from you, his tail is the nearest thing to you: it comes after his body.
+  if (p.tailFront <= 0.5 && !behind) drawTail();
 
   // What he's wearing on his body, if anything.
   const clothes = outfitItem(dress.outfit)?.body ?? null;
@@ -173,17 +184,18 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   const bc = T({ x: frame.cx, y: frame.cy });
   const sx = Math.abs(p.sx);
   const sy = Math.abs(p.sy);
-  const body = ellipse(bc.x, bc.y, b.body.rx * sx * K, b.body.ry * sy * K, bodyAngle);
+  const body = ellipse(bc.x, bc.y, b.body.rx * sx * K * squash, b.body.ry * sy * K, bodyAngle);
   r.shape(body.sd, body.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
   /** A marking on the body: an ellipse in the body's own frame, cut to the body. */
   const bodyMark = (lx: number, ly: number, rx: number, ry: number, colour: number) => {
     const at = T(frame.at({ x: lx, y: ly }));
-    const e = ellipse(at.x, at.y, rx * sx * K, ry * sy * K, bodyAngle);
+    const e = ellipse(at.x, at.y, rx * sx * K * squash, ry * sy * K, bodyAngle);
     r.shape(intersect(e.sd, body.sd), e.box, colour, null);
   };
   const B = b.body;
-  bodyMark(B.rx * 0.2, B.ry * 0.62, B.rx * 0.78, B.ry * 0.55, C.belly);
-  if (species === 'raccoon') bodyMark(B.rx * 0.82, B.ry * 0.25, B.rx * 0.38, B.ry * 0.8, C.light);
+  // From behind, his tummy and chest are out of sight.
+  if (!behind) bodyMark(B.rx * 0.2, B.ry * 0.62, B.rx * 0.78, B.ry * 0.55, C.belly);
+  if (species === 'raccoon' && !behind) bodyMark(B.rx * 0.82, B.ry * 0.25, B.rx * 0.38, B.ry * 0.8, C.light);
   if (species === 'cat') {
     for (const x of [-0.45, -0.1, 0.25]) {
       const a = T(frame.at({ x: B.rx * x - 2, y: -B.ry - 1 }));
@@ -242,7 +254,7 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     );
     r.shape(cape.sd, cape.box, C.wearMain, C.outline, { light: C.wearLight, dark: C.wearAccent });
   }
-  if (p.tailFront > 0.5) drawTail();
+  if (p.tailFront > 0.5 || (behind && p.tailFront <= 0.5)) drawTail();
 
   // --- Head ---
   const H = b.head;
@@ -251,9 +263,14 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   const hcos = Math.cos(th);
   const hsin = Math.sin(th);
   /** A point on the head (head units from its middle) in pixels. */
-  const onHead = (l: Pt): Pt => T({ x: hc.x + l.x * hcos - l.y * hsin, y: hc.y + l.x * hsin + l.y * hcos });
-  const headAngle = th + sw;
   const centre = T(hc);
+  // The head is round whichever way he's turned: only where it is foreshortens, not its shape.
+  const onHead = (l: Pt): Pt => {
+    const lx = l.x * hcos - l.y * hsin;
+    const ly = l.x * hsin + l.y * hcos;
+    return { x: centre.x + (lx * cs - ly * ss) * K, y: centre.y + (lx * ss + ly * cs) * K };
+  };
+  const headAngle = th + sw;
 
   /** Something he's wearing, its units `size` head units across, placed at `origin` on the head. */
   const wear = (item: Wearable | null, origin: Pt, size: number, slots: Record<Paint, number>) => {
@@ -287,8 +304,10 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     const tri = (size: number, dx = 0, dy = 0) => polygon([{ x: -ear.w * size, y: 1.5 }, { x: -0.8 * size, y: -ear.h * size }, { x: ear.w * size, y: 1.5 }].map((q) => place({ x: q.x + dx, y: q.y + dy })));
     const outer = tri(1);
     r.shape(outer.sd, outer.box, near ? C.fur : C.far, C.outline);
-    const inner = tri(0.55);
-    r.shape(intersect(inner.sd, outer.sd), inner.box, C.inner, null);
+    if (!behind) {
+      const inner = tri(0.55);
+      r.shape(intersect(inner.sd, outer.sd), inner.box, C.inner, null);
+    }
   };
   drawEar(ear.far, false);
   drawEar(ear.near, true);
@@ -311,7 +330,9 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
    */
   const onFace = (l: Pt): Pt => {
     const back = 1 - 0.6 * clamp01((l.x / rx + 1) / 2);
-    return onHead({ x: l.x + p.turn * rx * 0.3 * back, y: l.y });
+    // Three-quarters towards you, his face is turned out to you: the features come in towards the middle.
+    const out = quarter === 'front' ? 0.7 : 1;
+    return onHead({ x: (l.x + p.turn * rx * 0.3 * back) * out, y: l.y });
   };
   /** A marking on the face, cut to the head. */
   const faceMark = (sd: Sd, box: Box, colour: number) => r.shape(intersect(sd, head), box, colour, null);
@@ -324,92 +345,95 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     const poly = polygon(curvy(points, rx, ry).map(onFace));
     faceMark(poly.sd, poly.box, colour);
   };
-  switch (species) {
-    case 'raccoon':
-      // White brows over the mask, one over each eye.
-      faceEllipse(-rx * 0.26, -ry * 0.46, rx * 0.24, ry * 0.15, C.light);
-      faceEllipse(rx * 0.5, -ry * 0.5, rx * 0.24, ry * 0.15, C.light);
-      facePoly(
-        [
-          [-0.62, 0.12],
-          [-0.3, -0.42],
-          [0.1, -0.08],
-          [0.45, -0.5],
-          [0.95, -0.05],
-          [0.7, 0.42],
-          [0.35, 0.38],
-          [0.1, 0.2],
-          [-0.15, 0.4],
-          [-0.5, 0.45],
-          [-0.62, 0.12],
-        ],
-        C.dark,
-      );
-      faceEllipse(rx * 0.62, ry * 0.58, rx * 0.45, ry * 0.32, C.light);
-      break;
-    case 'cat':
-      for (const x of [-0.18, 0.04, 0.26]) {
-        const stripe = capsule(onFace({ x: rx * x, y: -ry * 1.05 }), onFace({ x: rx * x + 0.6, y: -ry * 0.62 }), 0.5);
-        faceMark(stripe.sd, stripe.box, C.band);
-      }
-      faceEllipse(rx * 0.6, ry * 0.55, rx * 0.42, ry * 0.3, C.light);
-      break;
-    case 'otter':
-      faceEllipse(rx * 0.42, ry * 0.5, rx * 0.72, ry * 0.42, C.light);
-      break;
-  }
-  const nose = species === 'otter' ? { x: rx * 0.78, y: ry * 0.22 } : { x: rx * 0.8, y: ry * 0.3 };
-  if (species === 'otter') {
-    for (const dx of [-1.9, 1.9]) {
-      const at = onFace({ x: nose.x + dx * 0.8 - 0.5, y: nose.y + 2.7 });
-      const pad = ellipse(at.x, at.y, 1.3, 1.1);
-      r.shape(pad.sd, pad.box, C.light, C.furDark);
+  // From behind, there's no face to see.
+  if (!behind) {
+    switch (species) {
+      case 'raccoon':
+        // White brows over the mask, one over each eye.
+        faceEllipse(-rx * 0.26, -ry * 0.46, rx * 0.24, ry * 0.15, C.light);
+        faceEllipse(rx * 0.5, -ry * 0.5, rx * 0.24, ry * 0.15, C.light);
+        facePoly(
+          [
+            [-0.62, 0.12],
+            [-0.3, -0.42],
+            [0.1, -0.08],
+            [0.45, -0.5],
+            [0.95, -0.05],
+            [0.7, 0.42],
+            [0.35, 0.38],
+            [0.1, 0.2],
+            [-0.15, 0.4],
+            [-0.5, 0.45],
+            [-0.62, 0.12],
+          ],
+          C.dark,
+        );
+        faceEllipse(rx * 0.62, ry * 0.58, rx * 0.45, ry * 0.32, C.light);
+        break;
+      case 'cat':
+        for (const x of [-0.18, 0.04, 0.26]) {
+          const stripe = capsule(onFace({ x: rx * x, y: -ry * 1.05 }), onFace({ x: rx * x + 0.6, y: -ry * 0.62 }), 0.5);
+          faceMark(stripe.sd, stripe.box, C.band);
+        }
+        faceEllipse(rx * 0.6, ry * 0.55, rx * 0.42, ry * 0.3, C.light);
+        break;
+      case 'otter':
+        faceEllipse(rx * 0.42, ry * 0.5, rx * 0.72, ry * 0.42, C.light);
+        break;
     }
-  }
-
-  // Eyes.
-  const pix = (l: Pt) => {
-    const q = onFace(l);
-    return { x: Math.floor(q.x), y: Math.floor(q.y) };
-  };
-  const look = { x: p.lookX > 0.5 ? 1 : p.lookX < -0.5 ? -1 : 0, y: p.lookY > 0.6 ? 1 : p.lookY < -0.7 ? -1 : 0 };
-  const eye = (at: Pt) => {
-    const { x, y } = pix(at);
-    switch (p.eyes) {
-      case 'closed':
-        r.dots([{ x: x - 1, y }, { x, y: y + 1 }, { x: x + 1, y: y + 1 }, { x: x + 2, y }], C.eye);
-        return;
-      case 'happy':
-        r.dots([{ x: x - 1, y: y + 1 }, { x, y }, { x: x + 1, y }, { x: x + 2, y: y + 1 }], C.eye);
-        return;
-      case 'blink':
-        r.dots([{ x: x - 1, y: y + 1 }, { x, y: y + 1 }, { x: x + 1, y: y + 1 }, { x: x + 2, y: y + 1 }], C.eye);
-        return;
-      default: {
-        const wide = p.eyes === 'wide';
-        const ex = x + (wide ? 0 : look.x);
-        const ey = y + look.y;
-        const cols = wide ? [ex - 1, ex, ex + 1] : [ex, ex + 1];
-        const rows = wide ? [ey - 1, ey, ey + 1] : [ey - 1, ey, ey + 1];
-        for (const cx of cols) for (const cy of rows) r.set(cx, cy, C.eye);
-        r.set(cols[cols.length - 1]!, rows[0]!, C.glint);
+    const nose = species === 'otter' ? { x: rx * 0.78, y: ry * 0.22 } : { x: rx * 0.8, y: ry * 0.3 };
+    if (species === 'otter') {
+      for (const dx of [-1.9, 1.9]) {
+        const at = onFace({ x: nose.x + dx * 0.8 - 0.5, y: nose.y + 2.7 });
+        const pad = ellipse(at.x, at.y, 1.3, 1.1);
+        r.shape(pad.sd, pad.box, C.light, C.furDark);
       }
     }
-  };
-  eye({ x: -rx * 0.18, y: ry * 0.04 });
-  eye({ x: rx * 0.4, y: ry * 0.06 });
 
-  // Nose, mouth and blush.
-  const n = pix(nose);
-  r.dots(species === 'otter' ? [{ x: n.x - 1, y: n.y }, n, { x: n.x + 1, y: n.y }, { x: n.x, y: n.y + 1 }] : [{ x: n.x - 1, y: n.y }, n], C.nose);
-  if (p.mouth > 0.12) {
-    const h = 1 + Math.round(p.mouth * 2.5);
-    for (let i = 1; i <= h; i++) r.dots([{ x: n.x - 1, y: n.y + i }, { x: n.x, y: n.y + i }], i === h && p.tongue > 0.25 ? C.tongue : C.mouth);
-  }
-  if (p.blush >= 0.6) {
-    const near = pix({ x: rx * 0.62, y: ry * 0.42 });
-    const far = pix({ x: -rx * 0.32, y: ry * 0.4 });
-    r.dots([near, { x: near.x + 1, y: near.y }, far], C.blush);
+    // Eyes.
+    const pix = (l: Pt) => {
+      const q = onFace(l);
+      return { x: Math.floor(q.x), y: Math.floor(q.y) };
+    };
+    const look = { x: p.lookX > 0.5 ? 1 : p.lookX < -0.5 ? -1 : 0, y: p.lookY > 0.6 ? 1 : p.lookY < -0.7 ? -1 : 0 };
+    const eye = (at: Pt) => {
+      const { x, y } = pix(at);
+      switch (p.eyes) {
+        case 'closed':
+          r.dots([{ x: x - 1, y }, { x, y: y + 1 }, { x: x + 1, y: y + 1 }, { x: x + 2, y }], C.eye);
+          return;
+        case 'happy':
+          r.dots([{ x: x - 1, y: y + 1 }, { x, y }, { x: x + 1, y }, { x: x + 2, y: y + 1 }], C.eye);
+          return;
+        case 'blink':
+          r.dots([{ x: x - 1, y: y + 1 }, { x, y: y + 1 }, { x: x + 1, y: y + 1 }, { x: x + 2, y: y + 1 }], C.eye);
+          return;
+        default: {
+          const wide = p.eyes === 'wide';
+          const ex = x + (wide ? 0 : look.x);
+          const ey = y + look.y;
+          const cols = wide ? [ex - 1, ex, ex + 1] : [ex, ex + 1];
+          const rows = wide ? [ey - 1, ey, ey + 1] : [ey - 1, ey, ey + 1];
+          for (const cx of cols) for (const cy of rows) r.set(cx, cy, C.eye);
+          r.set(cols[cols.length - 1]!, rows[0]!, C.glint);
+        }
+      }
+    };
+    eye({ x: -rx * 0.18, y: ry * 0.04 });
+    eye({ x: rx * 0.4, y: ry * 0.06 });
+
+    // Nose, mouth and blush.
+    const n = pix(nose);
+    r.dots(species === 'otter' ? [{ x: n.x - 1, y: n.y }, n, { x: n.x + 1, y: n.y }, { x: n.x, y: n.y + 1 }] : [{ x: n.x - 1, y: n.y }, n], C.nose);
+    if (p.mouth > 0.12) {
+      const h = 1 + Math.round(p.mouth * 2.5);
+      for (let i = 1; i <= h; i++) r.dots([{ x: n.x - 1, y: n.y + i }, { x: n.x, y: n.y + i }], i === h && p.tongue > 0.25 ? C.tongue : C.mouth);
+    }
+    if (p.blush >= 0.6) {
+      const near = pix({ x: rx * 0.62, y: ry * 0.42 });
+      const far = pix({ x: -rx * 0.32, y: ry * 0.4 });
+      r.dots([near, { x: near.x + 1, y: near.y }, far], C.blush);
+    }
   }
 
   // A hat, over the ears and the top of the head.
@@ -486,6 +510,12 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
         r.stamp(GLYPHS.heart, top.x + f * (4 + i * 5 + Math.sin(age * 6 + i) * 1.5) * K, top.y + (6 - age * 16) * K, C.heart, C.outline);
       }
       break;
+    case 'angry': {
+      // Throbbing.
+      const big = Math.sin(clock / 120) > 0;
+      r.stamp(GLYPHS.angry, top.x + f * (8 + (big ? 0 : 1)) * K, top.y - 2, C.heart, big ? C.outline : null);
+      break;
+    }
   }
   return box ? joinBoxes(box) : null;
 }

@@ -88,22 +88,11 @@ export interface PlayConfig {
 export type DeskTask = 'terminal' | 'web' | 'reels';
 
 export interface WorkConfig {
-  /** Taps on the desk, each within `tapWindowMs` of the first, that send him to work. */
-  taps: number;
-  tapWindowMs: number;
-  /** How long he works before he's had enough. */
-  focusMs: number;
   /**
    * What he does at the computer, switching from one to another: how likely each is to be
    * next, and how long it lasts. He always starts in the terminal.
    */
   tasks: Record<DeskTask, { weight: number; ms: Range }>;
-  /** Then how long he sits there looking about, restless, before he comes to find you. */
-  restlessMs: number;
-  /** How long he keeps on at you to play before he gives up. */
-  begMs: number;
-  /** How often he asks. */
-  askEveryMs: number;
 }
 
 export interface ReactionConfig {
@@ -168,18 +157,12 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     waitMs: 9000,
   },
   work: {
-    taps: 3,
-    tapWindowMs: 1500,
-    focusMs: 20 * 60_000,
     tasks: {
       terminal: { weight: 0.5, ms: { min: 40_000, max: 110_000 } },
       web: { weight: 0.35, ms: { min: 25_000, max: 70_000 } },
       // Every once in a while, a few reels.
       reels: { weight: 0.15, ms: { min: 12_000, max: 30_000 } },
     },
-    restlessMs: 9000,
-    begMs: 3 * 60_000,
-    askEveryMs: 6500,
   },
 };
 

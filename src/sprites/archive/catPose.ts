@@ -289,6 +289,7 @@ export function catPoseFor(animation: AnimationName, t: number, keystrokes = 0):
       return pose;
     }
 
+    case 'angry':
     case 'surprised': {
       // The Halloween-cat startle: squash, then spring straight up arched and puffed.
       const pose = standing();

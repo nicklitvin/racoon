@@ -325,6 +325,7 @@ export function otterAct(input: ActInput): Act {
     case 'peek':
       return peek(input);
 
+    case 'angry':
     case 'surprised': {
       // Straight up out of the water to see what that was.
       const p = tread();

@@ -10,7 +10,7 @@ export type LegName = (typeof LEGS)[number];
 /** How the eyes are drawn: open, shut in a relaxed curve, happy ^ ^, wide, or mid-blink. */
 export type ChibiEyes = 'open' | 'closed' | 'happy' | 'wide' | 'blink';
 /** Little marks that float about him: sleep, alarm, puzzlement, love. */
-export type ChibiMark = 'zzz' | 'alarm' | 'puzzled' | 'hearts' | null;
+export type ChibiMark = 'zzz' | 'alarm' | 'puzzled' | 'hearts' | 'angry' | null;
 
 /**
  * Everything the drawing needs for one moment. Positions are in drawing units from his
@@ -693,6 +693,26 @@ function attention(b: ChibiBuild, input: ChibiInput): ChibiPose {
   return p;
 }
 
+/** Cross: stamping a front paw, ears flat back, a scowl, tail lashing. */
+function angry(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t, clock } = input;
+  const p = stand(b);
+  const stamp = Math.max(0, Math.sin((t / 400) * Math.PI * 2));
+  p.paws.frontNear = { x: p.paws.frontNear.x + 1, y: -4 * stamp };
+  p.by += 1.2 * (1 - stamp);
+  p.sy *= 1 + 0.04 * stamp;
+  p.hrot = -6;
+  p.hy += 1;
+  p.ears = -1;
+  p.tailPuff = 1.25;
+  p.tailA += 18 * Math.sin(clock / 90);
+  p.mouth = 0.18;
+  p.blush = 0;
+  p.eyes = 'blink';
+  p.mark = 'angry';
+  return p;
+}
+
 /** The pose for a land animal at this moment. */
 function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
   const { t, clock, phase } = input;
@@ -832,6 +852,8 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return watchReels(b, input);
     case 'attention':
       return attention(b, input);
+    case 'angry':
+      return angry(b, input);
     case 'happy': {
       const p = stand(b);
       const hop = Math.abs(Math.sin((t / 600) * Math.PI * 2));
@@ -1098,6 +1120,21 @@ function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return otterToss(b, input);
     case 'carry':
       return otterPose(b, { ...input, animation: 'walk' });
+    case 'angry': {
+      // Slapping the water, ears back.
+      const p = tread(b, clock);
+      const slap = Math.max(0, Math.sin((t / 400) * Math.PI * 2));
+      const shoulder = legRoot(b, p, 'frontNear');
+      p.paws.frontNear = { x: shoulder.x + 6, y: shoulder.y + 2 - 4 * slap };
+      p.pawUp = 1;
+      p.ears = -1;
+      p.hrot = -6;
+      p.mouth = 0.18;
+      p.splash = 1.5 * slap;
+      p.eyes = 'blink';
+      p.mark = 'angry';
+      return p;
+    }
     case 'work':
     case 'browse':
     case 'reels': {

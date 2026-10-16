@@ -116,6 +116,7 @@ export function poseFor(animation: AnimationName, t: number, keystrokes = 0): Po
       return pose;
     }
 
+    case 'angry':
     case 'surprised': {
       const pose = standing();
       const up = bump(t, 450);

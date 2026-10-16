@@ -118,9 +118,10 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
       shownView = view;
       scruff = scruffPoint(build, pose);
       toy = toyHoldPoint(build, pose);
+      const quarter = view === 'frontQuarter' ? 'front' : view === 'backQuarter' ? 'back' : null;
       const box =
-        view === 'side'
-          ? drawPixelPet(raster, build, pose, clock, facing, motion.moving, scruff, dressed)
+        view !== 'front' && view !== 'back'
+          ? drawPixelPet(raster, build, pose, clock, facing, motion.moving, scruff, dressed, quarter)
           : drawPixelFacing(raster, build, pose, view, { phase: motion.phase, moving: motion.moving, running: frame.animation !== 'walk', side: facing }, clock, dressed);
       paint();
       if (box) {

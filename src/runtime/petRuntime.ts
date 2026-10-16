@@ -90,6 +90,7 @@ export class PetRuntime {
   /** His desk, in work mode. */
   private desk: Desk | null = null;
   private lastSaid: string | null = null;
+  private lastHidden = false;
 
   private cursor: Point | null = null;
   /** Where the pointer last was over the page, to tell when it strokes him. */
@@ -375,6 +376,7 @@ export class PetRuntime {
       toyReach: this.renderer.toyReach === undefined ? undefined : this.renderer.toyReach * this.scale,
       carries: this.renderer.carriesToys === true,
       desk: this.desk,
+      mode: this.settings.mode,
     };
   }
 
@@ -416,6 +418,11 @@ export class PetRuntime {
       this.lastFacing = facing;
     }
     this.deskLayer.show(snap.screen ?? 'idle', now);
+    // Gone into hiding: nothing of him on the page at all, so nothing to catch the mouse.
+    if (snap.hidden !== this.lastHidden) {
+      pet.style.visibility = snap.hidden ? 'hidden' : '';
+      this.lastHidden = snap.hidden;
+    }
     const speech = this.els.speech;
     if (speech && snap.say !== this.lastSaid) {
       // Keeps the last words while the bubble fades away.
@@ -443,9 +450,9 @@ export class PetRuntime {
     this.toybox.moveHeld(toy.id, { x: snap.position.x + at.x, y: floor }, floor - bottom);
   }
 
-  /** Puts the toy blocks out (or tidies them away) as the settings say. */
+  /** Puts the toy blocks out in play mode, and tidies them away otherwise. */
   private syncToys(): void {
-    if (!this.settings.toys) {
+    if (this.settings.mode !== 'play') {
       this.toybox.clear();
       this.toyLayer.render(this.snap?.position ?? { x: 0, y: 0 });
       return;
@@ -493,7 +500,7 @@ export class PetRuntime {
 
   /** Puts his desk out in work mode, built to fit him, or puts it away. */
   private syncDesk(): void {
-    if (!this.settings.workMode) {
+    if (this.settings.mode !== 'work') {
       this.desk = this.deskLayer.fit(null);
       return;
     }
@@ -551,6 +558,7 @@ export class PetRuntime {
 
   /** The visible part of the raccoon: the drawn figure clipped to the stage. */
   private hitRect(): Rect | null {
+    if (this.lastHidden) return null;
     const r = this.renderer.figure.getBoundingClientRect();
     if (r.width === 0) return null;
     const wa = this.display.workArea;

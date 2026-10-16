@@ -252,6 +252,7 @@ export function raccoonAct(input: ActInput): Act {
     case 'peek':
       return peek(input);
 
+    case 'angry':
     case 'surprised':
       return standUp(input);
 

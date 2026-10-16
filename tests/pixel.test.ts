@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ChibiMotion } from '../src/sprites/chibi';
+import { ChibiMotion, viewFor } from '../src/sprites/chibi';
 import { headCentre, scruffPoint, WATER_Y, type ChibiPose } from '../src/sprites/chibi/pose';
 import { CHIBI_CAT, CHIBI_RACCOON } from '../src/sprites/chibi/species';
 import { drawPixelPet, PIXEL } from '../src/sprites/pixel/draw';
@@ -214,14 +214,38 @@ describe('pixel pets walking up and down the screen', () => {
     return motion.view;
   }
 
-  it('is seen from the front walking down towards you, from behind walking away, side on across', () => {
+  it('is seen from the front walking down towards you, from behind walking away, side on across, three-quarters on the diagonals', () => {
     expect(viewWalking(Math.PI / 2)).toBe('front');
     expect(viewWalking(-Math.PI / 2)).toBe('back');
     expect(viewWalking(0)).toBe('side');
     expect(viewWalking(Math.PI)).toBe('side');
-    // On a slant he's still side on; and stood still, always.
-    expect(viewWalking(Math.PI / 4)).toBe('side');
+    expect(viewWalking(Math.PI / 4)).toBe('frontQuarter');
+    expect(viewWalking((3 * Math.PI) / 4)).toBe('frontQuarter');
+    expect(viewWalking(-Math.PI / 4)).toBe('backQuarter');
+    expect(viewWalking((-3 * Math.PI) / 4)).toBe('backQuarter');
+    // Stood still, always side on.
     expect(viewWalking(Math.PI / 2, 'idle')).toBe('side');
+  });
+
+  it(`holds a view until he's clearly going another way, so it doesn't flicker on the boundary`, () => {
+    const edge = Math.asin(0.38);
+    expect(viewFor(edge + 0.02, 'side')).toBe('side');
+    expect(viewFor(edge - 0.02, 'frontQuarter')).toBe('frontQuarter');
+    expect(viewFor(edge + 0.2, 'side')).toBe('frontQuarter');
+    expect(viewFor(edge - 0.2, 'frontQuarter')).toBe('side');
+  });
+
+  it('three-quarters, draws him shorter, with his face turned to you from the front and none from behind', () => {
+    const width = (quarter: 'front' | 'back' | null) => {
+      const r = new Raster(PIXEL.width, PIXEL.height);
+      const { pose, motion, clock } = poseAt(PIXEL_CAT, 'walk');
+      const box = drawPixelPet(r, PIXEL_CAT, pose, clock, 1, motion.moving, scruffPoint(PIXEL_CAT, pose), { hat: 'none', outfit: 'none' }, quarter);
+      return { w: box!.x1 - box!.x0, eyes: count(r, C.eye) };
+    };
+    const side = width(null);
+    expect(width('front').w).toBeLessThan(side.w);
+    expect(width('front').eyes).toBeGreaterThan(0);
+    expect(width('back').eyes).toBe(0);
   });
 
   it('draws a face from the front and none from behind, the whole animal inside its canvas', () => {

@@ -46,4 +46,5 @@ export const ANIMATIONS: Record<AnimationName, AnimationSpec> = {
   browse: { fps: 20, durationMs: 6000, loop: true, eyes: 'open' },
   reels: { fps: 20, durationMs: 6000, loop: true, eyes: 'open' },
   attention: { fps: 30, durationMs: 1200, loop: true, eyes: 'open' },
+  angry: { fps: 30, durationMs: 800, loop: true, eyes: 'open' },
 };

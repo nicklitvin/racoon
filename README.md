@@ -6,11 +6,16 @@ The pets are pixel art, drawn in chunky whole pixels like sprites from an old ga
 
 (The code also has lifelike and 2D chibi drawings of a raccoon, cats, a fox and an otter, in `src/sprites/critter` and `src/sprites/chibi`. They aren't offered in the settings for now; the pixel pets move with the chibis' poses.)
 
-A few wooden alphabet blocks lie about for your pet to play with. Now and then it goes over to one and swats it along the floor, or picks it up and flings it, then watches where it lands and goes after it. Running about, it kicks any block in its way. You can pick a block up and throw it yourself: your pet waits with its eyes on it while you hold it, and chases after it when you let go. (Click a block to flick it over.) You can put the blocks away in the settings.
+A few wooden alphabet blocks lie about for your pet to play with. Now and then it goes over to one and swats it along the floor, or picks it up and flings it, then watches where it lands and goes after it. Running about, it kicks any block in its way. You can pick a block up and throw it yourself: your pet waits with its eyes on it while you hold it, and chases after it when you let go. (Click a block to flick it over.)
+
+The settings have four **modes**, each a button:
+
+- **Play** (the usual): it wanders about, plays with its blocks, chases the pointer when you shake the mouse, and watches you type.
+- **Work**: a little desk appears in the bottom right corner with a computer on it, and your pet says "Work time!", sits down at it and works away for as long as work mode lasts: typing in a terminal, browsing the web, and every once in a while flicking through a few reels (giggling at the funny ones). Nothing distracts it, and tapping the desk gets you shushed. Drag it off its desk and it's cross ("Hey! I was working!") and stomps straight back.
+- **Sleep**: it goes off somewhere cosy, curls up and sleeps. Pat it or move it and it goes back to sleep.
+- **Hide**: it runs off the nearest edge of the screen and stays out of sight, until you pick another mode and it runs back on.
 
 You can dress your pet up: in the settings, pick a hat (a party hat, beanie, top hat, crown, cap, bow, nightcap or headphones) and an outfit (a suit and tie, pajamas, a sweater, a superhero cape, a scarf, a bow tie, a bandana, or a collar and bell).
-
-Switch on **work mode** and a little desk appears in the bottom right corner of the screen, with a computer on it. Tap the desk three times and your pet says "Work time!", goes and sits down at it and gets busy, eyes on the screen, while you work: typing away in a terminal, browsing the web, and every once in a while flicking through a few reels (and giggling at the funny ones). It isn't distracted by anything while it works (tap the desk and it shushes you). After 20 minutes it's had enough: it gets restless and looks about, then comes and finds your mouse pointer and asks you to play. Give it a pat and it's delighted, and off it goes to play with its blocks.
 
 It runs two ways from one codebase:
 
@@ -143,17 +148,18 @@ You can play too: `ToyLayer` (`src/runtime/toyLayer.ts`) puts a block in your ha
 
 The settings panel lists them with a little picture of each, drawn from the same shapes (`wearableIcon`).
 
-### Work mode
+### Modes
 
-With `workMode` on, `DeskLayer` (`src/runtime/deskLayer.ts`) puts a desk in the bottom right corner, built to fit the pet: each drawing says where its paws come down when it types (`deskReach` on the renderer), and the keyboard goes just there. The brain is told where the desk is (`WorldInput.desk`: the seat, which way he faces, the screen) and counts taps on it (`deskTapped`). Three quick ones start the **work** reaction:
+The brain is told the mode (`WorldInput.mode`, from the settings) and keeps to it (`followMode` in `brain.ts`): whatever he's doing, in work mode he goes back to his desk, in sleep mode back to sleep, and in hide mode off the screen; and when the mode changes he changes what he's doing to suit (back to play from work, he gets up; from sleep, he wakes with a yawn). Only in play mode does he chase the pointer, watch you type or run off from the pointer; the blocks are only out in play mode, and the desk only in work mode.
 
-1. **announce**: "Work time!" in a speech bubble (`PetSnapshot.say`), waving.
+**Hide** is the **away** reaction: he runs off the nearer side (nothing holds him on the screen now), and once he's off it he's gone (`PetSnapshot.hidden`: the page hides him altogether, so nothing of him catches the mouse) until the mode changes, when he runs back on from the same side.
+
+**Work**: `DeskLayer` (`src/runtime/deskLayer.ts`) puts a desk in the bottom right corner, built to fit the pet: each drawing says where its paws come down when it types (`deskReach` on the renderer) and where one goes on the mouse (`mouseReach`), and the keyboard and mouse go just there. The brain is told where the desk is (`WorldInput.desk`: the seat, which way he faces, the screen). The **work** reaction:
+
+1. **announce**: "Work time!" in a speech bubble (`PetSnapshot.say`), waving (the `attention` animation), when you've just picked work mode.
 2. **go**: over to the desk.
-3. **type**: sat at it, eyes on the screen, for `work.focusMs` (20 minutes). He switches between tasks (`work.tasks`): typing in the terminal (the `work` animation), browsing the web with a paw on the mouse (`browse`), and now and then a few reels, leant back flicking the mouse for the next one (`reels`). He always starts in the terminal and never does the same thing twice in a row; reels are the rarest and shortest. The snapshot says what's on the screen (`PetSnapshot.screen`). Nothing distracts him: no chasing, peeking, fleeing or toys, and taps on the desk get "Shh! Working." A pat, and he enjoys it and goes back to work. He counts as resting, so the page ticks slowly all the while.
-4. **restless**: still sat there, looking about everywhere but the screen.
-5. **beg**: off to find you, next to the pointer (or out in the middle of the screen), turned towards you, waving (the `attention` animation) and asking to play every few seconds. Pat him and he's delighted and goes off to play with a block; throw him a block and he chases it. After `work.begMs` he gives up.
-
-Picking him up, or switching work mode off, ends it.
+3. **type**: sat at it, eyes on the screen, for as long as work mode lasts. He switches between tasks (`work.tasks`): typing in the terminal (the `work` animation), browsing the web with a paw on the mouse (`browse`), and now and then a few reels, leant back flicking the mouse for the next one (`reels`). He always starts in the terminal and never does the same thing twice in a row; reels are the rarest and shortest. The snapshot says what's on the screen (`PetSnapshot.screen`). Nothing distracts him, and taps on the desk get "Shh! Working." A pat, and he enjoys it and goes back to work. He counts as resting, so the page ticks slowly all the while.
+4. **angry**: dragged off his desk and let go, he's cross (the `angry` animation: stamping, ears back, a red anger mark over his head) and says so, then goes straight back to it.
 
 The desk (`src/sprites/desk.ts`) is pixel art on a small canvas. Its monitor faces out, with the depth of its case showing behind, so you can see what's on the screen while he works at it; he turns his face round to it (`turn` in the chibi pose: the eyes, nose and markings slide round towards the way he faces), with his eyes on the screen. What's on the screen is drawn into it a few times a second: a terminal with commands and output scrolling up and a blinking cursor, a web page with pictures and paragraphs scrolling by, reels flicked away upwards one after another in time with his paw (`REEL_MS`), or a screen saver when nobody's at it.
 
@@ -241,7 +247,7 @@ To add an animation for them too, add a `case` to `walkerPose()` and `otterPose(
 
 - `raster.ts` is a tiny rasteriser: shapes are signed distance functions sampled at each pixel's centre, filled with one palette colour and ringed with a one-pixel outline. Nothing is anti-aliased.
 - `draw.ts` draws a chibi pose with it: the same parts in the same order, with a lit top edge on the body and head, two-by-three pixel eyes with a glint, and pixel z's, hearts, "!" and "?".
-- `facing.ts` draws him from the front and from behind, for walking and running up and down the screen, as sprites in old games have a picture for each way they face: from the front his face, his front legs stepping towards you and his tail out to one side; from behind the back of his head, and his tail nearest you (a cat's curled up, a raccoon's hanging down). `ChibiMotion.view` says which: front when he's heading clearly down the screen, behind when clearly up, side on again only once he's clearly going across, so it doesn't flicker on a slant. Standing still or doing anything else, he's always side on.
+- Walking and running, he faces the way he's going in any of eight directions, as sprites in old games have a picture for each way they face. `facing.ts` draws him from the front and from behind, for going straight down and up the screen: from the front his face, his front legs stepping towards you and his tail out to one side; from behind the back of his head, and his tail nearest you (a cat's curled up, a raccoon's hanging down). Going diagonally, `draw.ts` turns him three-quarters (`quarter`): his body foreshortened, his face turned out to you from the front, and from behind no face and his tail nearest you; the page mirrors each for the other side. `ChibiMotion.view` says which (`viewFor`), each view holding until he's clearly going another way, so it doesn't flicker on a heading between two. Standing still or doing anything else, he's side on.
 - `species.ts` has their builds: the chibis' builds, but with an even bigger head on a smaller, rounder body and a smaller tail, which is what a sprite this small needs to read as cute rather than squat.
 - `palette.ts` holds each coat as a palette.
 - `index.ts` is the renderer. It draws a new picture 12 times a second, like an old game, and the page places it on whole screen pixels.
@@ -302,6 +308,6 @@ In the browser, the page is the raccoon's whole world. Wandering, chasing, pounc
 5. Drag it and let go: it dangles while held and stays where you drop it. Click it: it startles.
 6. Settings (double-click it): change size and speed and watch them apply live. Turn on "React to typing" and type steadily for a few seconds: it peeks over the bottom edge and its eyes follow your typing. Stop typing: it comes back out after about 5 seconds.
 7. Change display scaling or resolution: it stays on screen.
-8. Settings: pick a hat and an outfit: your pet wears them straight away. Switch on work mode: a desk appears in the bottom right corner, standing on the pet's floor on two legs, its screen facing out. Tap it three times: "Work time!", and it goes and works at it, switching between the terminal, the web and reels every minute or so. Tap it again: "Shh! Working." (To see the end of the session without waiting 20 minutes, shorten `work.focusMs` in `config.ts`.)
+8. Settings: pick a hat and an outfit: your pet wears them straight away. Pick **Work**: "Work time!", a desk appears in the bottom right corner and it goes and works at it, switching between the terminal, the web and reels every minute or so. Tap the desk: "Shh! Working." Drag it off: it's cross and goes back. Pick **Sleep**: it curls up and sleeps, whatever the mouse does. Pick **Hide**: it runs off the screen, and clicks go straight through where it was. Pick **Play**: it runs back on, and the blocks are back.
 9. Toy blocks: wait a while and it goes over to a block, swats it or throws it, and goes after it. A raccoon sometimes picks it up and walks off with it on his hind legs, then throws it. Pick a block up: it watches it. Throw it: it chases after it. Click a block: it flips over. Clicks next to a block still go through to the window behind.
 10. Quit from the tray icon.
