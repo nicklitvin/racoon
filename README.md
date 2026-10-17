@@ -146,7 +146,7 @@ You can play too: `ToyLayer` (`src/runtime/toyLayer.ts`) puts a block in your ha
 - The chibis draw the hat inside the head group and the neckwear just under the chin.
 - The pixel pets rasterise the same shapes, with the item's colours in palette slots of their own, and dress the body too. (Only they dress the body for now: the others wear just the neck part of clothes.)
 
-The settings panel lists them with a little picture of each, drawn from the same shapes (`wearableIcon`).
+The settings panel shows them as tiles, each a little picture drawn from the same shapes (`wearableIcon`), with the name in its tooltip and over the grid for the one picked. Above everything is a big live picture of your pet in what it's wearing (asleep in sleep mode, faded in hide mode).
 
 ### Modes
 
@@ -258,7 +258,7 @@ To add an animation for them too, add a `case` to `walkerPose()` and `otterPose(
 
 ## Version and patch notes
 
-The version is the date of the build, stamped in by `vite.config.mts` (`__BUILD_DATE__`), and shows at the bottom of the settings panel. Clicking it opens "What's new", the hand-written notes in `src/lib/patchNotes.ts`. When you ship something worth noticing, add an entry at the top, written for someone watching their pet rather than reading the code.
+The version is the date of the build, stamped in by `vite.config.mts` (`__BUILD_DATE__`), and shows at the top of the settings panel. Clicking it opens "What's new", the hand-written notes in `src/lib/patchNotes.ts`. When you ship something worth noticing, add an entry at the top, written for someone watching their pet rather than reading the code.
 
 ## Building and packaging
 

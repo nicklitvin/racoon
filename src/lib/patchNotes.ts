@@ -10,6 +10,14 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-17',
+    title: 'A cleaner settings panel',
+    changes: [
+      'The settings are tidier: a big picture of your pet at the top, wearing what you pick (and asleep in sleep mode), modes as one row of buttons, and hats and outfits as picture tiles.',
+      'Fewer words: the long descriptions are gone. The typing privacy note is still there, one tap away.',
+    ],
+  },
+  {
     date: '2026-10-16',
     title: 'Modes, and eight ways to walk',
     changes: [

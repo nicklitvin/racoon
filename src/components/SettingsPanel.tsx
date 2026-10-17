@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { HATS, OUTFITS, PET_MODES, RACCOON_TYPES, type Hat, type KeyboardStatus, type Outfit, type PetMode, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
 import { RACCOON_STYLES } from '../sprites';
@@ -30,15 +30,69 @@ function useHostState(host: Host) {
   return { settings, keyboard };
 }
 
-interface TypePickerProps {
-  value: RaccoonType;
-  onChange: (value: RaccoonType) => void;
+/** "Pixel raccoon" is just "Raccoon" on its tile: they're all pixel pets. */
+const shortName = (type: RaccoonType) => {
+  const name = RACCOON_STYLES[type].label.replace(/^pixel\s+/i, '');
+  return name.charAt(0).toUpperCase() + name.slice(1);
+};
+
+interface StageProps {
+  type: RaccoonType;
+  hat: Hat;
+  outfit: Outfit;
+  mode: PetMode;
+}
+
+/** Your pet, big, in what it's wearing, breathing and blinking (or asleep, in sleep mode). */
+function PetStage({ type, hat, outfit, mode }: StageProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const renderer = useMemo(() => RACCOON_STYLES[type].create(), [type]);
+  // Three screen pixels to each of its pixels, as on the screen: big, and still crisp.
+  const scale = 1;
+
+  useEffect(() => {
+    const host = ref.current;
+    if (!host) return;
+    renderer.setScale(scale);
+    const below = renderer.baseSize.height * scale * (1 - (renderer.anchor?.y ?? 1));
+    (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${10 - below}px`;
+    host.replaceChildren(renderer.element);
+    return () => host.replaceChildren();
+  }, [renderer]);
+
+  useEffect(() => {
+    renderer.dress?.({ hat, outfit });
+    const asleep = mode === 'sleep';
+    const start = performance.now();
+    const draw = (now: number) =>
+      renderer.draw({
+        animation: asleep ? 'sleep' : 'idle',
+        timeMs: now - start + 1000,
+        clockMs: now,
+        keystrokes: 0,
+        eyes: asleep ? 'closed' : 'open',
+        heading: 0.5,
+      });
+    draw(start);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    let frame = requestAnimationFrame(function tick(now) {
+      draw(now);
+      frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [renderer, hat, outfit, mode]);
+
+  return (
+    <div className={`pet-stage pet-stage-${mode}`} aria-hidden="true">
+      <div className="pet-stage-pet" ref={ref} />
+    </div>
+  );
 }
 
 /** A small still of the pet, drawn once. */
 function PetPreview({ type }: { type: RaccoonType }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const scale = 0.5;
+  const scale = 2 / 3;
   useEffect(() => {
     const host = ref.current;
     if (!host) return;
@@ -47,39 +101,44 @@ function PetPreview({ type }: { type: RaccoonType }) {
     renderer.draw({ animation: 'idle', timeMs: 1000, keystrokes: 0, eyes: 'open', heading: 0.5 });
     // Stand every pet on the same floor, whatever empty space its drawing has below the feet.
     const below = renderer.baseSize.height * scale * (1 - (renderer.anchor?.y ?? 1));
-    (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${6 - below}px`;
+    (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${4 - below}px`;
     host.replaceChildren(renderer.element);
     return () => host.replaceChildren();
   }, [type]);
   return <span className="type-preview" ref={ref} aria-hidden="true" />;
 }
 
-function TypePicker({ value, onChange }: TypePickerProps) {
+/** A titled block of the panel; `aside` sits at the right of the title (what's picked). */
+function Section({ title, aside, children }: { title: string; aside?: string; children: ReactNode }) {
   return (
-    <fieldset className="field type-picker">
-      <legend>Pet</legend>
-      <div className="type-grid">
-        {RACCOON_TYPES.map((type) => {
-          const style = RACCOON_STYLES[type];
-          return (
-            <label key={type} className={type === value ? 'type-option selected' : 'type-option'} title={style.description}>
-              <input type="radio" name="raccoonType" checked={type === value} onChange={() => onChange(type)} />
-              <PetPreview type={type} />
-              <span className="type-name">{style.label}</span>
-              <span className="type-description">{style.description}</span>
-            </label>
-          );
-        })}
-      </div>
-    </fieldset>
+    <section className="settings-section" aria-label={title}>
+      <h2 className="section-title">
+        <span>{title}</span>
+        {aside && <span className="section-aside">{aside}</span>}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function TypePicker({ value, onChange }: { value: RaccoonType; onChange: (value: RaccoonType) => void }) {
+  return (
+    <div className="type-grid" role="radiogroup" aria-label="Pet">
+      {RACCOON_TYPES.map((type) => (
+        <label key={type} className={type === value ? 'tile type-option selected' : 'tile type-option'} title={RACCOON_STYLES[type].label}>
+          <input type="radio" name="raccoonType" checked={type === value} onChange={() => onChange(type)} />
+          <PetPreview type={type} />
+          <span className="tile-name">{shortName(type)}</span>
+        </label>
+      ))}
+    </div>
   );
 }
 
 /** The modes, each a button with a little picture and its name. */
-const MODES: Record<PetMode, { label: string; hint: string; icon: ReactNode }> = {
+const MODES: Record<PetMode, { label: string; icon: ReactNode }> = {
   play: {
     label: 'Play',
-    hint: 'Plays with its blocks, chases the pointer when you shake it, and watches you type.',
     icon: (
       <>
         <rect x="4" y="4" width="16" height="16" rx="3" />
@@ -89,7 +148,6 @@ const MODES: Record<PetMode, { label: string; hint: string; icon: ReactNode }> =
   },
   work: {
     label: 'Work',
-    hint: 'Sits at its desk in the corner and works away. Drag it off and it’ll go straight back, cross.',
     icon: (
       <>
         <rect x="3" y="4" width="18" height="12" rx="2" />
@@ -99,7 +157,6 @@ const MODES: Record<PetMode, { label: string; hint: string; icon: ReactNode }> =
   },
   sleep: {
     label: 'Sleep',
-    hint: 'Curls up somewhere cosy and sleeps until you change the mode.',
     icon: (
       <>
         <path d="M19 14.5A7.5 7.5 0 1 1 10 5a6 6 0 0 0 9 9.5z" />
@@ -109,7 +166,6 @@ const MODES: Record<PetMode, { label: string; hint: string; icon: ReactNode }> =
   },
   hide: {
     label: 'Hide',
-    hint: 'Runs off the edge of the screen and stays out of the way until you want it back.',
     icon: (
       <>
         <path d="M3 3l18 18" />
@@ -122,30 +178,26 @@ const MODES: Record<PetMode, { label: string; hint: string; icon: ReactNode }> =
 
 function ModePicker({ value, onChange }: { value: PetMode; onChange: (mode: PetMode) => void }) {
   return (
-    <fieldset className="field mode-picker">
-      <legend>Mode</legend>
-      <div className="mode-options">
-        {PET_MODES.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            className={mode === value ? 'mode-option selected' : 'mode-option'}
-            aria-pressed={mode === value}
-            onClick={() => onChange(mode)}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="mode-icon">
-              {MODES[mode].icon}
-            </svg>
-            <span>{MODES[mode].label}</span>
-          </button>
-        ))}
-      </div>
-      <p className="hint">{MODES[value].hint}</p>
-    </fieldset>
+    <div className="mode-options" role="group" aria-label="Mode">
+      {PET_MODES.map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          className={mode === value ? 'mode-option selected' : 'mode-option'}
+          aria-pressed={mode === value}
+          onClick={() => onChange(mode)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="mode-icon">
+            {MODES[mode].icon}
+          </svg>
+          <span>{MODES[mode].label}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
-/** A picture of a hat or a scarf on its own, for its button. */
+/** A picture of a hat or a scarf on its own, for its tile. */
 function WearIcon({ kind, id }: { kind: 'hat' | 'outfit'; id: Hat | Outfit }) {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -157,7 +209,7 @@ function WearIcon({ kind, id }: { kind: 'hat' | 'outfit'; id: Hat | Outfit }) {
   return <span className={id === 'none' ? 'wear-glyph wear-none' : 'wear-glyph'} ref={ref} aria-hidden="true" />;
 }
 
-interface WearRowProps<T extends string> {
+interface WearGridProps<T extends string> {
   kind: 'hat' | 'outfit';
   title: string;
   options: readonly T[];
@@ -166,49 +218,32 @@ interface WearRowProps<T extends string> {
   onChange: (id: T) => void;
 }
 
-function WearRow<T extends Hat | Outfit>({ kind, title, options, value, label, onChange }: WearRowProps<T>) {
+/** Icon tiles to pick from; the name is in the tooltip, and over the grid for the one picked. */
+function WearGrid<T extends Hat | Outfit>({ kind, title, options, value, label, onChange }: WearGridProps<T>) {
   return (
-    <div className="wear-row" role="radiogroup" aria-label={title}>
-      <h2 className="type-group-title">{title}</h2>
-      <div className="wear-options">
+    <Section title={title} aside={label(value)}>
+      <div className="wear-options" role="radiogroup" aria-label={title}>
         {options.map((id) => (
-          <label key={id} className={id === value ? 'wear-option selected' : 'wear-option'} title={label(id)}>
-            <input type="radio" name={kind} checked={id === value} onChange={() => onChange(id)} />
+          <label key={id} className={id === value ? 'tile wear-option selected' : 'tile wear-option'} title={label(id)}>
+            <input type="radio" name={kind} checked={id === value} onChange={() => onChange(id)} aria-label={label(id)} />
             <WearIcon kind={kind} id={id} />
-            <span className="wear-name">{label(id)}</span>
           </label>
         ))}
       </div>
-    </div>
+    </Section>
   );
 }
 
-/** A hat, and clothes or something round the neck: two lists to pick from. */
-function DressUp({ settings, update }: { settings: Settings; update: (patch: Partial<Settings>) => void }) {
+/** An on/off row: the name, a switch, and maybe a line under it. */
+function Switch({ label, checked, onChange, title, children }: { label: string; checked: boolean; onChange: (on: boolean) => void; title?: string; children?: ReactNode }) {
   return (
-    <fieldset className="field dress-up">
-      <legend>Dress up</legend>
-      <div className="dress-up-body">
-        <div className="dress-up-rows">
-          <WearRow
-            kind="hat"
-            title="Hat"
-            options={HATS}
-            value={settings.hat}
-            label={(id) => (id === 'none' ? 'No hat' : HAT_ITEMS[id].label)}
-            onChange={(hat) => update({ hat })}
-          />
-          <WearRow
-            kind="outfit"
-            title="Outfit"
-            options={OUTFITS}
-            value={settings.outfit}
-            label={(id) => (id === 'none' ? 'Nothing' : OUTFIT_ITEMS[id].label)}
-            onChange={(outfit) => update({ outfit })}
-          />
-        </div>
-      </div>
-    </fieldset>
+    <div className="switch-row" title={title}>
+      <label className="switch">
+        <span className="switch-label">{label}</span>
+        <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      </label>
+      {children}
+    </div>
   );
 }
 
@@ -223,12 +258,15 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
 
   const header = (
     <header className="settings-header">
-      <h1>Racoon settings</h1>
-      {onClose && (
-        <button type="button" className="icon-button" onClick={onClose} aria-label="Close settings">
-          ×
-        </button>
-      )}
+      <h1>Racoon</h1>
+      <div className="settings-header-end">
+        {!notes && <VersionChip onClick={() => setNotes(true)} />}
+        {onClose && (
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close settings">
+            ×
+          </button>
+        )}
+      </div>
     </header>
   );
 
@@ -245,77 +283,70 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
     <section className="settings" aria-label="Racoon settings">
       {header}
 
+      <PetStage type={settings.raccoonType} hat={settings.hat} outfit={settings.outfit} mode={settings.mode} />
+
       <ModePicker value={settings.mode} onChange={(mode) => update({ mode })} />
 
-      <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
+      <Section title="Pet">
+        <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
+      </Section>
 
-      <DressUp settings={settings} update={update} />
+      <WearGrid
+        kind="hat"
+        title="Hat"
+        options={HATS}
+        value={settings.hat}
+        label={(id) => (id === 'none' ? 'None' : HAT_ITEMS[id].label)}
+        onChange={(hat) => update({ hat })}
+      />
+      <WearGrid
+        kind="outfit"
+        title="Outfit"
+        options={OUTFITS}
+        value={settings.outfit}
+        label={(id) => (id === 'none' ? 'None' : OUTFIT_ITEMS[id].label)}
+        onChange={(outfit) => update({ outfit })}
+      />
 
-
-      {/* Everything else is desktop-only: the web gear just picks the raccoon. */}
+      {/* Everything else is desktop-only. */}
       {desktop && (
-        <>
-          <div className="field">
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={settings.keyboardReactions}
-                onChange={(e) => update({ keyboardReactions: e.target.checked })}
-              />
-              <span>React to typing</span>
-            </label>
-            <div className="privacy">
-              <p>
-                <strong>What this measures:</strong> only <em>that</em> a key was pressed, and when. Racoon counts key presses
-                over the last few seconds to work out your typing rate. When you type steadily, the raccoon peeks up from the
-                bottom of the screen and watches.
-              </p>
-              <p>
-                <strong>What it never does:</strong> it never reads which keys or characters you press, and never records,
-                stores, logs or sends them anywhere. Timestamps older than a few seconds are thrown away. Nothing leaves
-                your computer.
-              </p>
-              <p>Counting works system-wide while this is on, and stops completely when you switch it off.</p>
-            </div>
-            {blocked && (
-              <div className="notice" role="status">
-                <p>{keyboard.message}</p>
-                {keyboard.access === 'denied' && (
-                  <div className="notice-actions">
-                    <button type="button" onClick={() => host.openKeyboardPrivacySettings()}>
-                      Open System Settings
-                    </button>
-                    <button type="button" onClick={() => void host.recheckKeyboardAccess()}>
-                      Check again
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            {settings.keyboardReactions && keyboard?.listening && <p className="hint ok">Counting key presses.</p>}
+        <Section title="Desktop">
+          <div className="switch-list">
+            <Switch label="React to typing" checked={settings.keyboardReactions} onChange={(keyboardReactions) => update({ keyboardReactions })}>
+              <details className="privacy">
+                <summary>Counts key presses only, never which keys</summary>
+                <p>
+                  Racoon only notices <em>that</em> a key was pressed, and when, to work out your typing rate. It never
+                  reads which keys or characters you press, and never records, stores, logs or sends them anywhere.
+                  Timestamps older than a few seconds are thrown away, and nothing leaves your computer. Counting stops
+                  completely when this is off.
+                </p>
+              </details>
+              {blocked && (
+                <div className="notice" role="status">
+                  <p>{keyboard.message}</p>
+                  {keyboard.access === 'denied' && (
+                    <div className="notice-actions">
+                      <button type="button" onClick={() => host.openKeyboardPrivacySettings()}>
+                        Open System Settings
+                      </button>
+                      <button type="button" onClick={() => void host.recheckKeyboardAccess()}>
+                        Check again
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Switch>
+            <Switch
+              label="Start at login"
+              checked={settings.launchAtLogin}
+              onChange={(launchAtLogin) => update({ launchAtLogin })}
+              title="Applies to the installed app, not to development builds."
+            />
           </div>
-          <div className="field">
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={settings.launchAtLogin}
-                onChange={(e) => update({ launchAtLogin: e.target.checked })}
-              />
-              <span>Start when I log in</span>
-            </label>
-            <p className="hint">Applies to the installed app, not to development builds.</p>
-          </div>
-        </>
+        </Section>
       )}
-
-      <div className="settings-footer">
-        <p className="hint footer">
-          {desktop
-            ? 'Tip: drag your pet to move it, click to pet it, throw it one of its blocks. Settings live in the tray menu.'
-            : 'Tip: drag your pet, tap to pet it, throw it a block, or swipe your finger (or mouse) around fast.'}
-        </p>
-        <VersionChip onClick={() => setNotes(true)} />
-      </div>
     </section>
   );
 }
