@@ -13,7 +13,8 @@ export const PATCH_NOTES: PatchNote[] = [
     date: '2026-10-17',
     title: 'A cleaner settings panel',
     changes: [
-      'The settings are tidier: a big picture of your pet at the top, wearing what you pick (and asleep in sleep mode), modes as one row of buttons, and hats and outfits as picture tiles.',
+      'The settings are tidier: each mode is a little moving picture of your pet doing it (playing with its blocks, working at its desk, asleep, running off), and hats and outfits are picture tiles.',
+      'The settings scroll properly again when there’s more than fits.',
       'Fewer words: the long descriptions are gone. The typing privacy note is still there, one tap away.',
     ],
   },

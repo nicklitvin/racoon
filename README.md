@@ -146,7 +146,7 @@ You can play too: `ToyLayer` (`src/runtime/toyLayer.ts`) puts a block in your ha
 - The chibis draw the hat inside the head group and the neckwear just under the chin.
 - The pixel pets rasterise the same shapes, with the item's colours in palette slots of their own, and dress the body too. (Only they dress the body for now: the others wear just the neck part of clothes.)
 
-The settings panel shows them as tiles, each a little picture drawn from the same shapes (`wearableIcon`), with the name in its tooltip and over the grid for the one picked. Above everything is a big live picture of your pet in what it's wearing (asleep in sleep mode, faded in hide mode).
+The settings panel shows them as tiles, each a little picture drawn from the same shapes (`wearableIcon`), with the name in its tooltip and over the grid for the one picked. The modes are cards, each a little moving picture of your pet, dressed as it is, doing that mode (`ModeScene`): swatting its blocks, typing at its desk, asleep under the moon, running off the edge. They're drawn with the same renderer, desk and blocks as the screen.
 
 ### Modes
 

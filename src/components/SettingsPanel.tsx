@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { HATS, OUTFITS, PET_MODES, RACCOON_TYPES, type Hat, type KeyboardStatus, type Outfit, type PetMode, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
 import { RACCOON_STYLES } from '../sprites';
 import { HAT_ITEMS, OUTFIT_ITEMS, wearableIcon } from '../sprites/outfits';
+import { ModeScene } from './ModeScene';
 import { PatchNotes, VersionChip } from './PatchNotes';
 
 interface SettingsPanelProps {
@@ -35,59 +36,6 @@ const shortName = (type: RaccoonType) => {
   const name = RACCOON_STYLES[type].label.replace(/^pixel\s+/i, '');
   return name.charAt(0).toUpperCase() + name.slice(1);
 };
-
-interface StageProps {
-  type: RaccoonType;
-  hat: Hat;
-  outfit: Outfit;
-  mode: PetMode;
-}
-
-/** Your pet, big, in what it's wearing, breathing and blinking (or asleep, in sleep mode). */
-function PetStage({ type, hat, outfit, mode }: StageProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const renderer = useMemo(() => RACCOON_STYLES[type].create(), [type]);
-  // Three screen pixels to each of its pixels, as on the screen: big, and still crisp.
-  const scale = 1;
-
-  useEffect(() => {
-    const host = ref.current;
-    if (!host) return;
-    renderer.setScale(scale);
-    const below = renderer.baseSize.height * scale * (1 - (renderer.anchor?.y ?? 1));
-    (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${10 - below}px`;
-    host.replaceChildren(renderer.element);
-    return () => host.replaceChildren();
-  }, [renderer]);
-
-  useEffect(() => {
-    renderer.dress?.({ hat, outfit });
-    const asleep = mode === 'sleep';
-    const start = performance.now();
-    const draw = (now: number) =>
-      renderer.draw({
-        animation: asleep ? 'sleep' : 'idle',
-        timeMs: now - start + 1000,
-        clockMs: now,
-        keystrokes: 0,
-        eyes: asleep ? 'closed' : 'open',
-        heading: 0.5,
-      });
-    draw(start);
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    let frame = requestAnimationFrame(function tick(now) {
-      draw(now);
-      frame = requestAnimationFrame(tick);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [renderer, hat, outfit, mode]);
-
-  return (
-    <div className={`pet-stage pet-stage-${mode}`} aria-hidden="true">
-      <div className="pet-stage-pet" ref={ref} />
-    </div>
-  );
-}
 
 /** A small still of the pet, drawn once. */
 function PetPreview({ type }: { type: RaccoonType }) {
@@ -135,48 +83,11 @@ function TypePicker({ value, onChange }: { value: RaccoonType; onChange: (value:
   );
 }
 
-/** The modes, each a button with a little picture and its name. */
-const MODES: Record<PetMode, { label: string; icon: ReactNode }> = {
-  play: {
-    label: 'Play',
-    icon: (
-      <>
-        <rect x="4" y="4" width="16" height="16" rx="3" />
-        <path d="M9 16.5 12 8l3 8.5M10.1 13.5h3.8" />
-      </>
-    ),
-  },
-  work: {
-    label: 'Work',
-    icon: (
-      <>
-        <rect x="3" y="4" width="18" height="12" rx="2" />
-        <path d="M12 16v4M8 20h8M7 8.5h5M7 11.5h7" />
-      </>
-    ),
-  },
-  sleep: {
-    label: 'Sleep',
-    icon: (
-      <>
-        <path d="M19 14.5A7.5 7.5 0 1 1 10 5a6 6 0 0 0 9 9.5z" />
-        <path d="M15 3h4l-4 4h4" />
-      </>
-    ),
-  },
-  hide: {
-    label: 'Hide',
-    icon: (
-      <>
-        <path d="M3 3l18 18" />
-        <path d="M10.6 6.1A9 9 0 0 1 12 6c5 0 9 6 9 6a16 16 0 0 1-2.7 3.2M6.6 7.6C4.4 9.1 3 12 3 12s4 6 9 6c1.5 0 2.9-.4 4.1-1" />
-        <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
-      </>
-    ),
-  },
-};
+const MODE_NAMES: Record<PetMode, string> = { play: 'Play', work: 'Work', sleep: 'Sleep', hide: 'Hide' };
 
-function ModePicker({ value, onChange }: { value: PetMode; onChange: (mode: PetMode) => void }) {
+/** The modes, each a card with a picture of your pet at it and its name. */
+function ModePicker({ settings, onChange }: { settings: Settings; onChange: (mode: PetMode) => void }) {
+  const { mode: value, raccoonType, hat, outfit } = settings;
   return (
     <div className="mode-options" role="group" aria-label="Mode">
       {PET_MODES.map((mode) => (
@@ -187,10 +98,8 @@ function ModePicker({ value, onChange }: { value: PetMode; onChange: (mode: PetM
           aria-pressed={mode === value}
           onClick={() => onChange(mode)}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true" className="mode-icon">
-            {MODES[mode].icon}
-          </svg>
-          <span>{MODES[mode].label}</span>
+          <ModeScene mode={mode} type={raccoonType} hat={hat} outfit={outfit} />
+          <span className="mode-name">{MODE_NAMES[mode]}</span>
         </button>
       ))}
     </div>
@@ -283,9 +192,9 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
     <section className="settings" aria-label="Racoon settings">
       {header}
 
-      <PetStage type={settings.raccoonType} hat={settings.hat} outfit={settings.outfit} mode={settings.mode} />
-
-      <ModePicker value={settings.mode} onChange={(mode) => update({ mode })} />
+      <Section title="Mode">
+        <ModePicker settings={settings} onChange={(mode) => update({ mode })} />
+      </Section>
 
       <Section title="Pet">
         <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
