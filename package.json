@@ -2,7 +2,7 @@
   "name": "racoon",
   "version": "0.1.0",
   "private": true,
-  "description": "A raccoon desktop pet that wanders your screen and reacts to your activity.",
+  "description": "My Pet: a pixel-art desktop pet that wanders your screen and reacts to your activity.",
   "author": "Nick Litvinov",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -38,7 +38,7 @@
   },
   "build": {
     "appId": "com.nicklitvin.racoon",
-    "productName": "Racoon",
+    "productName": "My Pet",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -73,13 +73,13 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "artifactName": "Racoon-Setup-${version}.${ext}"
+      "artifactName": "My-Pet-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "Racoon-Portable-${version}.${ext}"
+      "artifactName": "My-Pet-Portable-${version}.${ext}"
     },
     "dmg": {
-      "artifactName": "Racoon-${version}-mac-${arch}.${ext}"
+      "artifactName": "My-Pet-${version}-mac-${arch}.${ext}"
     },
     "mac": {
       "target": [

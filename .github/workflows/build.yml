@@ -2,15 +2,25 @@
 # can be downloaded from the repo's Releases page. macOS apps can only be built on a Mac,
 # so each is built on its own machine.
 #
-# Start it from the Actions tab ("Run workflow"), or push a tag like v0.2.0. A tag names
-# the release after itself; a manual run names it after the version in package.json and
-# the run number (v0.1.0-build.7).
+# It runs by itself whenever a push to main changes the app (not just the docs), and keeps
+# one release per version in package.json (v0.1.0): each run moves that tag to the new
+# commit and replaces the downloads. Bump the version for a new release. Pushing a tag like
+# v0.2.0, or "Run workflow" in the Actions tab, also works.
 name: Build desktop apps
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ['v*']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+# Pushes in quick succession only build the newest.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -20,12 +30,12 @@ jobs:
         include:
           - os: windows-latest
             script: dist:win
-            artifact: Racoon-Windows
+            artifact: My-Pet-Windows
             files: |
               release/*.exe
           - os: macos-latest
             script: dist:mac
-            artifact: Racoon-macOS
+            artifact: My-Pet-macOS
             files: |
               release/*.dmg
     runs-on: ${{ matrix.os }}
@@ -73,27 +83,35 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=v$(node -p "require('./package.json').version")-build.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+            tag="v$(node -p "require('./package.json').version")"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            # Point the version's tag at this commit. (A push made with the workflow's own
+            # token doesn't start another run.)
+            git tag -f "$tag" "$GITHUB_SHA"
+            git push -f origin "refs/tags/$tag"
           fi
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.name.outputs.tag }}
-          name: Racoon ${{ steps.name.outputs.tag }}
+          name: My Pet ${{ steps.name.outputs.tag }}
           target_commitish: ${{ github.sha }}
           make_latest: true
+          overwrite_files: true
           files: out/*
           body: |
+            Built from ${{ github.sha }}.
+
             ## Download
 
             **Windows**
-            - `Racoon-Setup-*.exe`: installs Racoon (no admin rights needed).
-            - `Racoon-Portable-*.exe`: runs without installing.
+            - `My-Pet-Setup-*.exe`: installs My Pet (no admin rights needed).
+            - `My-Pet-Portable-*.exe`: runs without installing.
 
             The app isn't code-signed, so Windows may say "Windows protected your PC": click **More info → Run anyway**.
 
             **macOS**
-            - `Racoon-*-mac-arm64.dmg`: Apple silicon (M1 and later).
-            - `Racoon-*-mac-x64.dmg`: Intel Macs.
+            - `My-Pet-*-mac-arm64.dmg`: Apple silicon (M1 and later).
+            - `My-Pet-*-mac-x64.dmg`: Intel Macs.
 
-            Open the `.dmg` and drag Racoon to Applications. It isn't notarized by Apple, so macOS blocks it at first (it may even say it's "damaged"). To let it run, open Terminal and run `xattr -cr /Applications/Racoon.app`, or try to open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
+            Open the `.dmg` and drag My Pet to Applications. It isn't notarized by Apple, so macOS blocks it at first (it may even say it's "damaged"). To let it run, open Terminal and run `xattr -cr "/Applications/My Pet.app"`, or try to open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.

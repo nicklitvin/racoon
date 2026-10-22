@@ -1,4 +1,4 @@
-# Racoon: development notes
+# My Pet: development notes
 
 How it's built, how it works inside, and how to package and test it. For downloading and using it, see the [README](../README.md).
 
@@ -151,7 +151,7 @@ How the code guarantees it:
 
 In the browser build, typing reactions are always on, since there's no system-wide hook: the page only counts key presses made while its tab is focused, and never reads which key.
 
-**macOS:** listening for key presses system-wide needs the Accessibility permission (macOS may also list Racoon under Input Monitoring). The system prompt is shown **at most once**, right after you switch the feature on. If access is denied, the settings panel explains what to do, with buttons to open System Settings and to check again. It never re-prompts by itself, and everything else keeps working.
+**macOS:** listening for key presses system-wide needs the Accessibility permission (macOS may also list My Pet under Input Monitoring). The system prompt is shown **at most once**, right after you switch the feature on. If access is denied, the settings panel explains what to do, with buttons to open System Settings and to check again. It never re-prompts by itself, and everything else keeps working.
 
 ## Adding or changing animations
 
@@ -225,7 +225,9 @@ The version is the date of the build, stamped in by `vite.config.mts` (`__BUILD_
 npm run dist:win
 ```
 
-This produces `release/Racoon-Setup-<version>.exe` (a one-click per-user installer) and `release/Racoon-Portable-<version>.exe` (no install). The keyboard hook (`uiohook-napi`) ships prebuilt N-API binaries, so packaging needs no C++ toolchain (`npmRebuild` is off). The builds are **unsigned**, so Windows SmartScreen will warn on first run until you sign them with a code-signing certificate (set `CSC_LINK` / `CSC_KEY_PASSWORD`).
+This produces `release/My-Pet-Setup-<version>.exe` (a one-click per-user installer) and `release/My-Pet-Portable-<version>.exe` (no install). The keyboard hook (`uiohook-napi`) ships prebuilt N-API binaries, so packaging needs no C++ toolchain (`npmRebuild` is off). The builds are **unsigned**, so Windows SmartScreen will warn on first run until you sign them with a code-signing certificate (set `CSC_LINK` / `CSC_KEY_PASSWORD`).
+
+The app was called Racoon before it was My Pet. Some things you never see keep the old name, so an existing install upgrades in place and keeps its settings: the app id (`com.nicklitvin.racoon`), the settings folder (`%APPDATA%\Racoon`, `~/Library/Application Support/Racoon`, set in `electron/main.ts`), the browser's `racoon.settings` key and the IPC channel names.
 
 "Start when I log in" uses Electron's login-item API and only takes effect in the installed app, not in `npm run dev`.
 
@@ -235,12 +237,12 @@ Build on a Mac (electron-builder can't build for macOS from Windows):
 
 ```bash
 npm install
-CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac   # release/Racoon-<version>-mac-arm64.dmg and -mac-x64.dmg
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac   # release/My-Pet-<version>-mac-arm64.dmg and -mac-x64.dmg
 ```
 
 ### Downloads on GitHub
 
-`.github/workflows/build.yml` builds both on GitHub's own Windows and Mac machines and publishes them as a **GitHub Release**, so anyone can download them from the repo's **Releases** page. On GitHub, open **Actions → Build desktop apps → Run workflow** (the release is named after the version in `package.json` and the run number, like `v0.1.0-build.3`), or push a tag (`git tag v0.2.0 && git push origin v0.2.0`, and the release is named after the tag). The release has the Windows installer and portable `.exe` and the two Mac `.dmg`s, with instructions for opening them. The Mac builds aren't signed with a Developer ID or notarized, so the first time, macOS needs `xattr -cr /Applications/Racoon.app` or **Open Anyway** in **System Settings → Privacy & Security**.
+`.github/workflows/build.yml` builds both on GitHub's own Windows and Mac machines and publishes them as a **GitHub Release**, so anyone can download them from the repo's **Releases** page. It runs by itself on every push to `main` that changes the app (pushes that only touch `*.md` or `docs/` are skipped, and a newer push cancels a build still running). There's one release per version in `package.json`: each run moves the `v<version>` tag to the new commit and replaces its downloads, so the release always has the latest build. Bump `version` for a new release; older ones stay as they were. Pushing a tag yourself (`git tag v0.2.0 && git push origin v0.2.0`) or **Actions → Build desktop apps → Run workflow** works too. The Mac builds aren't signed with a Developer ID or notarized, so the first time, macOS needs `xattr -cr "/Applications/My Pet.app"` or **Open Anyway** in **System Settings → Privacy & Security**.
 
 Already handled:
 

@@ -156,7 +156,7 @@ function openSettingsWindow() {
   settingsWindow = new BrowserWindow({
     width: 460,
     height: 780,
-    title: 'Racoon Settings',
+    title: 'My Pet Settings',
     icon: path.join(ASSETS, 'tray.png'),
     resizable: false,
     maximizable: false,
@@ -241,9 +241,9 @@ function onSettingsChanged(previous: Settings, next: Settings) {
 function rebuildTrayMenu() {
   tray?.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Racoon', enabled: false },
+      { label: 'My Pet', enabled: false },
       { type: 'separator' },
-      { label: 'Show raccoon', type: 'checkbox', checked: petVisible, click: (item) => setPetVisible(item.checked) },
+      { label: 'Show pet', type: 'checkbox', checked: petVisible, click: (item) => setPetVisible(item.checked) },
       { label: 'Settings…', click: openSettingsWindow },
       { type: 'separator' },
       { label: 'Quit', click: () => app.quit() },
@@ -254,7 +254,7 @@ function rebuildTrayMenu() {
 function createTray() {
   const icon = nativeImage.createFromPath(path.join(ASSETS, 'tray.png'));
   tray = new Tray(icon.resize({ width: 16, height: 16 }));
-  tray.setToolTip('Racoon');
+  tray.setToolTip('My Pet');
   tray.on('click', () => {
     if (platform.trayClickOpensSettings) openSettingsWindow();
   });
@@ -284,6 +284,9 @@ function registerIpc() {
 }
 
 // ---- Startup ---------------------------------------------------------------------------
+
+// The app used to be called Racoon: keep its settings (and single-instance lock) where they were.
+app.setPath('userData', path.join(app.getPath('appData'), 'Racoon'));
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();

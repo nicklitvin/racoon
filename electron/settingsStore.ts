@@ -70,7 +70,7 @@ export class SettingsStore {
       fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2));
       fs.renameSync(tmp, this.file);
     } catch (error) {
-      console.error('Racoon: could not save settings', error);
+      console.error('My Pet: could not save settings', error);
     }
   }
 }

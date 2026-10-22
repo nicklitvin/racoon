@@ -27,8 +27,8 @@ export const macPlatform: PlatformAdapter = {
     // Passing true shows the system prompt if access hasn't been granted yet.
     request: () => (systemPreferences.isTrustedAccessibilityClient(true) ? 'granted' : 'denied'),
     deniedMessage:
-      'macOS has not allowed Racoon to notice key presses. Open System Settings > Privacy & Security > ' +
-      'Accessibility (and Input Monitoring, if Racoon is listed there), switch Racoon on, then click "Check again". ' +
+      'macOS has not allowed My Pet to notice key presses. Open System Settings > Privacy & Security > ' +
+      'Accessibility (and Input Monitoring, if My Pet is listed there), switch My Pet on, then click "Check again". ' +
       'Everything else keeps working without it.',
     openSettings() {
       void shell.openExternal(PRIVACY_PANE);

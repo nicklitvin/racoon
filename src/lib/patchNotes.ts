@@ -10,6 +10,11 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-21',
+    title: 'Racoon is now My Pet',
+    changes: ['The app has a new name: My Pet, since your pet can be a cat or an otter too. Your settings come with it.'],
+  },
+  {
     date: '2026-10-17',
     title: 'A cleaner settings panel',
     changes: [

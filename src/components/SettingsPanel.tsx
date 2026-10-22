@@ -167,7 +167,7 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
 
   const header = (
     <header className="settings-header">
-      <h1>Racoon</h1>
+      <h1>My Pet</h1>
       <div className="settings-header-end">
         {!notes && <VersionChip onClick={() => setNotes(true)} />}
         {onClose && (
@@ -181,7 +181,7 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
 
   if (notes) {
     return (
-      <section className="settings" aria-label="Racoon settings">
+      <section className="settings" aria-label="My Pet settings">
         {header}
         <PatchNotes onBack={() => setNotes(false)} />
       </section>
@@ -189,7 +189,7 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
   }
 
   return (
-    <section className="settings" aria-label="Racoon settings">
+    <section className="settings" aria-label="My Pet settings">
       {header}
 
       <Section title="Mode">
@@ -225,7 +225,7 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
               <details className="privacy">
                 <summary>Counts key presses only, never which keys</summary>
                 <p>
-                  Racoon only notices <em>that</em> a key was pressed, and when, to work out your typing rate. It never
+                  My Pet only notices <em>that</em> a key was pressed, and when, to work out your typing rate. It never
                   reads which keys or characters you press, and never records, stores, logs or sends them anywhere.
                   Timestamps older than a few seconds are thrown away, and nothing leaves your computer. Counting stops
                   completely when this is off.

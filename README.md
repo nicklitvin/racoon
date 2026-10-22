@@ -1,4 +1,4 @@
-# Racoon
+# My Pet
 
 A little pixel-art pet that lives on your screen: a raccoon, a ginger cat or an otter. It wanders about, naps next to your mouse pointer, plays with its toy blocks, chases the cursor when you shake the mouse, and (if you let it) peeks up to watch you type.
 
@@ -8,16 +8,16 @@ A little pixel-art pet that lives on your screen: a raccoon, a ginger cat or an 
 
 | Your computer | Download |
 | --- | --- |
-| Windows | `Racoon-Setup-<version>.exe` installs it. `Racoon-Portable-<version>.exe` runs without installing. |
-| Mac with Apple silicon (M1 and later) | `Racoon-<version>-mac-arm64.dmg` |
-| Intel Mac | `Racoon-<version>-mac-x64.dmg` |
+| Windows | `My-Pet-Setup-<version>.exe` installs it. `My-Pet-Portable-<version>.exe` runs without installing. |
+| Mac with Apple silicon (M1 and later) | `My-Pet-<version>-mac-arm64.dmg` |
+| Intel Mac | `My-Pet-<version>-mac-x64.dmg` |
 
 The app isn't code-signed yet, so the first time you open it:
 
 - **Windows:** if you see "Windows protected your PC", click **More info → Run anyway**.
-- **Mac:** open the `.dmg` and drag Racoon to Applications. macOS blocks it at first (it may even say it's "damaged"). Run `xattr -cr /Applications/Racoon.app` in Terminal, or try to open it once, then click **Open Anyway** in **System Settings → Privacy & Security**.
+- **Mac:** open the `.dmg` and drag My Pet to Applications. macOS blocks it at first (it may even say it's "damaged"). Run `xattr -cr "/Applications/My Pet.app"` in Terminal, or try to open it once, then click **Open Anyway** in **System Settings → Privacy & Security**.
 
-Racoon has no taskbar or Dock icon: look for it in the system tray (Windows) or the menu bar (Mac).
+My Pet has no taskbar or Dock icon: look for it in the system tray (Windows) or the menu bar (Mac).
 
 ## Using it
 
@@ -40,7 +40,7 @@ It sits in a transparent layer above your windows, and clicks go straight throug
 
 ## Privacy
 
-"React to typing" is **off by default**. When it's on, Racoon only counts *that* a key was pressed, to work out how fast you're typing. It never reads which keys you press, and never records, stores or sends anything. Nothing leaves your computer. On a Mac this needs the Accessibility permission, which Racoon asks for once when you switch it on. The details, and how the code guarantees this, are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#privacy-how-the-keyboard-code-guarantees-it).
+"React to typing" is **off by default**. When it's on, My Pet only counts *that* a key was pressed, to work out how fast you're typing. It never reads which keys you press, and never records, stores or sends anything. Nothing leaves your computer. On a Mac this needs the Accessibility permission, which My Pet asks for once when you switch it on. The details, and how the code guarantees this, are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#privacy-how-the-keyboard-code-guarantees-it).
 
 ## Web version
 
@@ -58,6 +58,6 @@ npm test           # unit tests
 npm run dist:win   # Windows installer and portable .exe in release/
 ```
 
-To publish a new download, go to **Actions → Build desktop apps → Run workflow** on GitHub, or push a tag like `v0.2.0`. It builds the Windows and Mac apps on GitHub's machines and publishes them on the Releases page.
+Releases are automatic: every push to `main` that changes the app builds the Windows and Mac apps on GitHub's machines and updates the release for the version in `package.json` (`v0.1.0`). To start a new release, bump `version` in `package.json`.
 
 How it all works, the project layout, adding animations, packaging and the testing checklist: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
