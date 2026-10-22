@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, HATS, normalizeSettings, OUTFITS, PET_MODES, RACCOON_TYPES } from '../shared/settings';
+import { BETA_TYPES, DEFAULT_SETTINGS, HATS, normalizeSettings, OUTFITS, PET_MODES, RACCOON_TYPES } from '../shared/settings';
 
 describe('normalizeSettings', () => {
   it('falls back to defaults for missing or broken input', () => {
@@ -21,10 +21,23 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ mode: 'party' }).mode).toBe('play');
   });
 
-  it('offers the three pixel pets, defaulting to the raccoon', () => {
-    expect(RACCOON_TYPES).toEqual(['raccoon-pixel', 'cat-pixel', 'otter-pixel']);
+  it('offers the three pixel pets, and the puffball in beta, defaulting to the raccoon', () => {
+    expect(RACCOON_TYPES).toEqual(['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'blob-pixel']);
+    expect(BETA_TYPES).toEqual(['blob-pixel']);
     expect(DEFAULT_SETTINGS.raccoonType).toBe('raccoon-pixel');
-    for (const type of RACCOON_TYPES) expect(normalizeSettings({ raccoonType: type }).raccoonType).toBe(type);
+    for (const type of RACCOON_TYPES) expect(normalizeSettings({ raccoonType: type, beta: true }).raccoonType).toBe(type);
+  });
+
+  it('keeps beta off unless switched on, and only keeps a beta pet while it is', () => {
+    expect(DEFAULT_SETTINGS.beta).toBe(false);
+    expect(normalizeSettings({ beta: 'yes' }).beta).toBe(false);
+    expect(normalizeSettings({ raccoonType: 'blob-pixel' }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
+    expect(normalizeSettings({ raccoonType: 'blob-pixel', beta: true })).toMatchObject({ raccoonType: 'blob-pixel', beta: true });
+    // Switching beta off again takes the puffball away.
+    const on = normalizeSettings({ raccoonType: 'blob-pixel', beta: true });
+    expect(normalizeSettings({ ...on, beta: false }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
+    // The other pets don't care.
+    expect(normalizeSettings({ raccoonType: 'otter-pixel', beta: false }).raccoonType).toBe('otter-pixel');
   });
 
   it('moves anyone on a retired pet to the default', () => {

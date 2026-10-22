@@ -1,18 +1,22 @@
 // User settings, shared by the Electron main process (which stores them) and the renderer.
 
 /**
- * The pets to choose from: a raccoon, a cat and an otter in pixel art. The first one is the
- * default. Anyone on a retired pet gets the nearest one still here (see `RETIRED`).
+ * The pets to choose from: a raccoon, a cat, an otter and a floating puffball, in pixel art.
+ * The first one is the default. Anyone on a retired pet gets the nearest one still here
+ * (see `retired`).
  */
-export const RACCOON_TYPES = ['raccoon-pixel', 'cat-pixel', 'otter-pixel'] as const;
+export const RACCOON_TYPES = ['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'blob-pixel'] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
+/** Pets still being tried out: only offered (and only kept) with `beta` switched on. */
+export const BETA_TYPES: readonly RaccoonType[] = ['blob-pixel'];
+
 /** Hats to dress your pet up in. */
-export const HATS = ['none', 'party', 'beanie', 'tophat', 'crown', 'cap', 'bow', 'nightcap', 'headphones'] as const;
+export const HATS = ['none', 'party', 'beanie', 'tophat', 'crown', 'cap', 'bow', 'nightcap', 'headphones', 'wizard'] as const;
 export type Hat = (typeof HATS)[number];
 
-/** What to wear: clothes, or just something round the neck. */
-export const OUTFITS = ['none', 'suit', 'pajamas', 'sweater', 'cape', 'scarf', 'bowtie', 'bandana', 'collar'] as const;
+/** What to wear: a whole costume, clothes, or just something round the neck. */
+export const OUTFITS = ['none', 'dino', 'bee', 'astronaut', 'knight', 'robe', 'tutu', 'suit', 'pajamas', 'sweater', 'cape', 'scarf', 'bowtie', 'bandana', 'collar'] as const;
 export type Outfit = (typeof OUTFITS)[number];
 
 /**
@@ -33,6 +37,8 @@ export interface Settings {
   hat: Hat;
   outfit: Outfit;
   mode: PetMode;
+  /** Opt-in: try out the pets still in beta (switched on from the patch notes). */
+  beta: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -42,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hat: 'none',
   outfit: 'none',
   mode: 'play',
+  beta: false,
 };
 
 function isRaccoonType(value: unknown): value is RaccoonType {
@@ -63,16 +70,20 @@ function retired(type: string): RaccoonType | null {
 /** Turns anything (a parsed file, an IPC message) into valid settings, falling back to defaults. */
 export function normalizeSettings(raw: unknown): Settings {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const beta = r.beta === true;
+  const type = isRaccoonType(r.raccoonType)
+    ? r.raccoonType
+    : (typeof r.raccoonType === 'string' && retired(r.raccoonType)) || DEFAULT_SETTINGS.raccoonType;
   return {
-    raccoonType: isRaccoonType(r.raccoonType)
-      ? r.raccoonType
-      : ((typeof r.raccoonType === 'string' && retired(r.raccoonType)) || DEFAULT_SETTINGS.raccoonType),
+    // A beta pet goes back to the default when beta is switched off.
+    raccoonType: BETA_TYPES.includes(type) && !beta ? DEFAULT_SETTINGS.raccoonType : type,
     keyboardReactions: r.keyboardReactions === true,
     launchAtLogin: r.launchAtLogin === true,
     hat: (HATS as readonly unknown[]).includes(r.hat) ? (r.hat as Hat) : DEFAULT_SETTINGS.hat,
     outfit: (OUTFITS as readonly unknown[]).includes(r.outfit) ? (r.outfit as Outfit) : DEFAULT_SETTINGS.outfit,
     // Before there were modes, work mode was a switch of its own.
     mode: (PET_MODES as readonly unknown[]).includes(r.mode) ? (r.mode as PetMode) : r.workMode === true ? 'work' : 'play',
+    beta,
   };
 }
 

@@ -3,12 +3,34 @@ export interface PatchNote {
   date: string;
   title: string;
   changes: string[];
+  /**
+   * Brings in something still in beta: the note gets a Beta tag and a switch to try it
+   * (the `beta` setting), and it stays out of the settings until that's on.
+   */
+  beta?: boolean;
 }
 
 // Hand-written rather than generated from commits: a commit log says what changed in the
 // code, which is not the same as what changed for someone watching their pet. Add a new
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
+  {
+    date: '2026-10-22',
+    title: 'A floating puffball',
+    beta: true,
+    changes: [
+      'A new pet to try out: a round pink puffball. It doesn’t walk: it floats about a little off the floor, puffing itself up and flapping its little arms as it goes, and only comes down to sit, nap or work at its desk. It breathes in its blocks, too.',
+      'Switch on beta below and it joins the pets in the settings. Switch it off again and you’re back to the raccoon.',
+    ],
+  },
+  {
+    date: '2026-10-22',
+    title: 'Costumes',
+    changes: [
+      'Six whole costumes, not just something round the neck: a dino onesie with spikes down its back, a bee costume with wings and antennae, a space suit with a bubble helmet, knight’s armour with a plumed helmet, a wizard robe covered in stars, and a tutu.',
+      'And a wizard hat to go with the robe.',
+    ],
+  },
   {
     date: '2026-10-21',
     title: 'Racoon is now My Pet',

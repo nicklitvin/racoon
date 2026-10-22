@@ -121,6 +121,26 @@ export const PIXEL_COATS = {
     eye: '#140c09',
     nose: '#2b1a12',
   },
+  /** The puffball: pink all over, red feet, and tall eyes with a blue shine at the bottom (`inner`). */
+  puff: {
+    ...SHARED,
+    outline: '#5a1f3a',
+    fur: '#ffa3c9',
+    furLight: '#ffd0e4',
+    furDark: '#e9799f',
+    far: '#ec8cb3',
+    belly: '#ffc2db',
+    light: '#ffe1ee',
+    /** Its feet, and the far one, a shade darker. */
+    dark: '#e2385f',
+    band: '#b52348',
+    inner: '#3c62d6',
+    eye: '#1a1030',
+    nose: '#e2385f',
+    blush: '#ff5f8f',
+    mouth: '#8a1f3c',
+    tongue: '#ff7aa0',
+  },
 } satisfies Record<string, Palette>;
 
 export type PixelCoat = keyof typeof PIXEL_COATS;

@@ -1,6 +1,6 @@
 # My Pet
 
-A little pixel-art pet that lives on your screen: a raccoon, a ginger cat or an otter. It wanders about, naps next to your mouse pointer, plays with its toy blocks, chases the cursor when you shake the mouse, and (if you let it) peeks up to watch you type.
+A little pixel-art pet that lives on your screen: a raccoon, a ginger cat or an otter (or, in beta, a floating puffball: switch it on in the patch notes). It wanders about, naps next to your mouse pointer, plays with its toy blocks, chases the cursor when you shake the mouse, and (if you let it) peeks up to watch you type.
 
 ## Download
 
@@ -29,7 +29,7 @@ My Pet has no taskbar or Dock icon: look for it in the system tray (Windows) or 
 | Open settings | Double-click your pet, or use the tray menu |
 | Quit | Tray menu → Quit |
 
-In the settings you can pick your pet, give it a hat and an outfit, and choose a **mode**:
+In the settings you can pick your pet, give it a hat and an outfit (or a whole costume: a dino, a bee, an astronaut, a knight, a wizard or a ballerina), and choose a **mode**:
 
 - **Play:** it wanders, plays with its blocks, chases the pointer and watches you type.
 - **Work:** it sits at a little desk in the corner and works away (typing, browsing, the odd reel). Drag it off and it stomps straight back, cross.

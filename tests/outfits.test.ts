@@ -47,6 +47,18 @@ describe('outfits', () => {
     }
   });
 
+  it('gives every whole costume a hood or a picture of its own, and keeps hoods round the head', () => {
+    for (const [id, item] of Object.entries(OUTFIT_ITEMS)) {
+      if (item.body?.onesie) expect(item.hood?.length, id).toBeGreaterThan(0);
+      if (item.body) expect(item.icon?.length, id).toBeGreaterThan(0);
+      for (const s of item.hood ?? []) {
+        const ys = s.kind === 'poly' ? s.points.map(([, y]) => y) : [s.cy - s.ry, s.cy + s.ry];
+        // From a little above the head (antennae, a plume) to no lower than the chin.
+        for (const y of ys) expect(y, id).toBeGreaterThan(-1.2), expect(y, id).toBeLessThan(2.4);
+      }
+    }
+  });
+
   it('draws an item as SVG shapes in its own colours, and clears it for "none"', () => {
     const g = fakeElement('g');
     const doc = { createElementNS: (_ns: string, tag: string) => fakeElement(tag) } as unknown as Document;

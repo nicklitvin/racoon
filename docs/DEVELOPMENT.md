@@ -48,9 +48,9 @@ src/                      The page (React). Runs in Electron and in a browser
     index.ts              The pets the settings offer
     critter/              The lifelike raccoon, cat, fox and otter: rig, gaits, poses, motion, drawing
     chibi/                The flat 2D chibi pets: builds, poses and drawing
-    pixel/                The pixel-art pets: a little rasteriser, palettes and drawing
+    pixel/                The pixel-art pets: a little rasteriser, palettes and drawing (blob.ts: the puffball)
     toys.ts               The toy blocks' drawings, one for each art style
-    outfits.ts            Hats and neckwear, as shapes every art style draws its own way
+    outfits.ts            Hats, neckwear and costumes, as shapes every art style draws its own way
     desk.ts               The work-mode desk in pixel art, built to fit the pet, and what's on its screen
     typing.ts             The rhythm of a pet typing (bursts of taps, pauses to think)
     archive/              Retired pets (3D arena, cartoon, plush, classic, cartoon cat)
@@ -97,11 +97,11 @@ You can play too: `ToyLayer` (`src/runtime/toyLayer.ts`) puts a block in your ha
 
 ### Dressing up
 
-`src/sprites/outfits.ts` describes each hat and outfit as a few plain shapes (polygons and ellipses) with three colours. Hats are drawn in head units (the head's half-width is 1, the origin the crown of the head) and what's worn at the neck (a tie, a collar) in neck units, so one description fits every animal and every size. Clothes also say how they cover the body (`body`): the body and how far down the legs, stripes round it, a shirt front, buttons, or a cape over the back that flies out behind as he runs. Each renderer draws them its own way through `dress()`:
+`src/sprites/outfits.ts` describes each hat and outfit as a few plain shapes (polygons and ellipses) with three colours. Hats are drawn in head units (the head's half-width is 1, the origin the crown of the head) and what's worn at the neck (a tie, a collar) in neck units, so one description fits every animal and every size. Clothes also say how they cover the body (`body`): the body and how far down the legs, stripes round it, a shirt front, buttons, or a cape over the back that flies out behind as he runs. Whole costumes add more: a patch on the tummy, spikes down the back, buzzing wings, a pack, stars, a tutu or a robe, and a `hood` (shapes in hat units, drawn over the head under any hat: a dino's spikes, a bee's antennae, a space helmet's rim, a knight's helmet). Each renderer draws them its own way through `dress()`:
 
 - The lifelike pets put the hat on the crown of their 3D head and turn it with the head (`placeOutfit` in `critter/skin.ts`), and wrap the collar across the neck between body and head, so the head comes over its top.
 - The chibis draw the hat inside the head group and the neckwear just under the chin.
-- The pixel pets rasterise the same shapes, with the item's colours in palette slots of their own, and dress the body too. (Only they dress the body for now: the others wear just the neck part of clothes.)
+- The pixel pets rasterise the same shapes, with the item's colours in palette slots of their own, and dress the body and wear hoods too. (Only they do for now: the others wear just the neck part of clothes.) The puffball has no neck, so neckwear goes round its middle, clothes cover its bottom half, and a onesie (`onesie: true`) covers all of it but its face.
 
 The settings panel shows them as tiles, each a little picture drawn from the same shapes (`wearableIcon`), with the name in its tooltip and over the grid for the one picked. The modes are cards, each a little moving picture of your pet, dressed as it is, doing that mode (`ModeScene`): swatting its blocks, typing at its desk, asleep under the moon, running off the edge. They're drawn with the same renderer, desk and blocks as the screen.
 
@@ -209,6 +209,8 @@ To add an animation for them too, add a `case` to `walkerPose()` and `otterPose(
 - `palette.ts` holds each coat as a palette.
 - `index.ts` is the renderer. It draws a new picture 12 times a second, like an old game, and the page places it on whole screen pixels.
 
+**The puffball** (`pixel/blob.ts`, in beta) is drawn its own way: a round ball with a face, stubby arms and big feet, and no neck, tail or ears. It keeps the chibis' poses and motion (`BLOB` is a build for them that only sets its reach: blocks, desk, mouse), so it keeps time with everything else, but reads only what the face does, where a paw is reaching and how it's squashed. Where the ball goes is up to the drawing: it floats `HOVER` units off the floor, bobbing, except to sit, sleep, peek, be held or work (`GROUNDED`), rising and settling gently between the two; getting about it puffs up and flaps its arms. A block it tosses, it breathes in and holds in its mouth. `tests/blob.test.ts` checks it.
+
 `tests/pixel.test.ts` checks the outlines are closed, that every animation is drawn whole inside the canvas, facing left mirrors facing right, the marks show, and nothing of a swimming otter shows under the water.
 
 **Another art style:** behaviour code only ever names animations, and the page only talks to the `RaccoonRenderer` interface (`src/sprites/types.ts`). To swap the art, write another renderer and add it to `RACCOON_STYLES` in `src/sprites/index.ts`; nothing in `src/core` changes. The retired renderers in `src/sprites/archive/` still work: to bring one back, give it a type in `shared/settings.ts` and an entry in `RACCOON_STYLES`.
@@ -216,6 +218,8 @@ To add an animation for them too, add a `case` to `walkerPose()` and `otterPose(
 ## Version and patch notes
 
 The version is the date of the build, stamped in by `vite.config.mts` (`__BUILD_DATE__`), and shows at the top of the settings panel. Clicking it opens "What's new", the hand-written notes in `src/lib/patchNotes.ts`. When you ship something worth noticing, add an entry at the top, written for someone watching their pet rather than reading the code.
+
+**Beta pets.** A pet in `BETA_TYPES` (`shared/settings.ts`) is only offered once `beta` is switched on, and the switch is in the patch notes: a note with `beta: true` gets a Beta tag and a "Try beta pets" switch. Switching it off moves anyone on a beta pet back to the default (`normalizeSettings` sees to it). To take a pet out of beta, drop it from `BETA_TYPES`.
 
 ## Building and packaging
 

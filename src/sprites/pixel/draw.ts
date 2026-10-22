@@ -1,5 +1,5 @@
 import { DEG, clamp01 } from '../critter/kit';
-import { bodyFrame, headCentre, legRoot, WATER_Y, type ChibiPose, type LegName } from '../chibi/pose';
+import { bodyFrame, headCentre, legRoot, WATER_Y, type ChibiMark, type ChibiPose, type LegName } from '../chibi/pose';
 import { hatItem, NECK_WIDTH, outfitItem, UNDRESSED, type Dress, type Paint, type Wearable } from '../outfits';
 import { GLYPHS } from './glyphs';
 import { C } from './palette';
@@ -184,6 +184,10 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   const bc = T({ x: frame.cx, y: frame.cy });
   const sx = Math.abs(p.sx);
   const sy = Math.abs(p.sy);
+  const B = b.body;
+  // A costume's spikes and far wing, behind the body.
+  if (clothes?.spikes) drawSpikes(clothes.spikes);
+  if (clothes?.wings) drawWing(clothes.wings, true);
   const body = ellipse(bc.x, bc.y, b.body.rx * sx * K * squash, b.body.ry * sy * K, bodyAngle);
   r.shape(body.sd, body.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
   /** A marking on the body: an ellipse in the body's own frame, cut to the body. */
@@ -192,7 +196,6 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     const e = ellipse(at.x, at.y, rx * sx * K * squash, ry * sy * K, bodyAngle);
     r.shape(intersect(e.sd, body.sd), e.box, colour, null);
   };
-  const B = b.body;
   // From behind, his tummy and chest are out of sight.
   if (!behind) bodyMark(B.rx * 0.2, B.ry * 0.62, B.rx * 0.78, B.ry * 0.55, C.belly);
   if (species === 'raccoon' && !behind) bodyMark(B.rx * 0.82, B.ry * 0.25, B.rx * 0.38, B.ry * 0.8, C.light);
@@ -212,6 +215,12 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     if (covered) r.shape(e.sd, e.box, C.wearMain, C.outline, { light: C.wearLight, dark: C.wearDark });
     else r.shape(e.sd, e.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
   }
+  if (clothes?.skirt) drawSkirt(clothes.skirt);
+  if (clothes?.pack) {
+    const pack = polygon([{ x: -B.rx * 0.6, y: -B.ry * 1.18 }, { x: B.rx * 0.12, y: -B.ry * 1.22 }, { x: B.rx * 0.18, y: -B.ry * 0.5 }, { x: -B.rx * 0.55, y: -B.ry * 0.42 }].map((q) => T(frame.at(q))));
+    r.shape(pack.sd, pack.box, PAINT_SLOT.wear[clothes.pack], C.outline);
+  }
+  if (clothes?.wings) drawWing(clothes.wings, false);
   if (clothes?.cape) drawCape();
 
   /** Clothes over the body: the cloth, then stripes, a shirt front and buttons on it. */
@@ -231,12 +240,76 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
       const shirt = polygon([frame.at({ x: B.rx * 0.45, y: -B.ry * 1.1 }), frame.at({ x: B.rx * 1.2, y: -B.ry * 1.1 }), frame.at({ x: B.rx * 0.95, y: B.ry * 0.55 })].map(T));
       onBody(shirt.sd, shirt.box, C.wearTrim);
     }
+    if (clothes.patch && !behind) {
+      const at = T(frame.at({ x: B.rx * 0.3, y: B.ry * 0.45 }));
+      const e = ellipse(at.x, at.y, B.rx * 0.55 * sx * K * squash, B.ry * 0.42 * sy * K, bodyAngle);
+      onBody(e.sd, e.box, PAINT_SLOT.wear[clothes.patch]);
+    }
     if (clothes.buttons) {
       r.dots([0.15, 0.5, 0.85].map((k) => {
         const at = T(frame.at({ x: B.rx * (0.62 + 0.1 * k), y: -B.ry * 0.35 + B.ry * 0.9 * k }));
         return { x: Math.floor(at.x), y: Math.floor(at.y) };
       }), C.wearAccent);
     }
+    if (clothes.stars) sprinkle(PAINT_SLOT.wear[clothes.stars], [[-0.55, -0.35], [0.1, -0.55], [-0.15, 0.3]]);
+  }
+
+  /** Little + stars at these places on the body (in body radii). */
+  function sprinkle(colour: number, at: [number, number][]): void {
+    for (const [x, y] of at) {
+      const q = T(frame.at({ x: B.rx * x, y: B.ry * y }));
+      const c = { x: Math.floor(q.x), y: Math.floor(q.y) };
+      r.dots([c, { x: c.x - 1, y: c.y }, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y - 1 }, { x: c.x, y: c.y + 1 }], colour);
+    }
+  }
+
+  /** Spikes standing up along his back, from his hips to his shoulders. */
+  function drawSpikes({ paint, count }: { paint: Paint; count: number }): void {
+    for (let i = 0; i < count; i++) {
+      const x = -0.9 + (1.25 * (i + 0.5)) / count;
+      const edge = (u: number) => -Math.sqrt(Math.max(0, 1 - u * u)) * 0.92;
+      const w = 0.2;
+      const spike = polygon(
+        [
+          { x: B.rx * (x - w), y: B.ry * edge(x - w) },
+          { x: B.rx * (x - 0.08), y: B.ry * (edge(x) - 0.8) },
+          { x: B.rx * (x + w), y: B.ry * edge(x + w) },
+        ].map((q) => T(frame.at(q))),
+      );
+      r.shape(spike.sd, spike.box, PAINT_SLOT.wear[paint], C.outline);
+    }
+  }
+
+  /** A little wing on his back, buzzing as he goes (slowly as he stands). */
+  function drawWing(paint: Paint, far: boolean): void {
+    const beat = moving > 0.1 ? Math.sin(clock / 35) * 0.5 : Math.sin(clock / 400) * 0.15;
+    const root = T(frame.at({ x: -B.rx * (far ? 0.2 : 0.35), y: -B.ry * 1.0 }));
+    const a = bodyAngle - (far ? 1.2 : 0.8) + beat;
+    const len = B.rx * 0.75 * K;
+    const at = { x: root.x - Math.cos(a) * len, y: root.y - Math.sin(a) * len };
+    const wing = ellipse(at.x, at.y, len, B.rx * 0.38 * K, a);
+    r.shape(wing.sd, wing.box, PAINT_SLOT.wear[paint], C.outline);
+  }
+
+  /** A tutu sticking out round his middle, or a robe hanging down to the floor. */
+  function drawSkirt({ paint, style }: { paint: Paint; style: 'tutu' | 'robe' }): void {
+    const colour = PAINT_SLOT.wear[paint];
+    if (style === 'tutu') {
+      const at = T(frame.at({ x: B.rx * 0.05, y: B.ry * 0.38 }));
+      const e = ellipse(at.x, at.y, B.rx * 1.2 * sx * K * squash, B.ry * 0.42 * sy * K, bodyAngle);
+      r.shape(e.sd, e.box, (x, y) => ((Math.floor(x) + Math.floor(y)) % 3 === 0 ? C.wearAccent : colour), C.outline);
+      return;
+    }
+    // Down from his middle to just above his paws, a little wider at the hem.
+    const hem = Math.max(-2.5, frame.cy - p.lift + B.ry * 0.9 + 1);
+    const robe = polygon([
+      T(frame.at({ x: -B.rx * 0.95, y: B.ry * 0.05 })),
+      T(frame.at({ x: B.rx * 0.95, y: B.ry * 0.05 })),
+      T({ x: frame.cx + B.rx * 1.05, y: hem + p.lift }),
+      T({ x: frame.cx - B.rx * 1.1, y: hem + p.lift }),
+    ]);
+    r.shape(robe.sd, robe.box, colour, C.outline, { light: colour, dark: C.wearDark });
+    sprinkle(C.wearTrim, [[0.45, 0.9], [-0.5, 1.15]]);
   }
 
   /** A cape over his back, flying out behind him as he goes. */
@@ -436,8 +509,10 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     }
   }
 
-  // A hat, over the ears and the top of the head.
-  wear(hatItem(dress.hat), { x: -H.rx * 0.06, y: -H.ry * 0.9 }, H.rx, { main: C.hatMain, trim: C.hatTrim, accent: C.hatAccent });
+  // A costume's hood, then a hat, over the ears and the top of the head.
+  const hatAt = { x: -H.rx * 0.06, y: -H.ry * 0.9 };
+  wear(hoodOf(dress), hatAt, H.rx, PAINT_SLOT.wear);
+  wear(hatItem(dress.hat), hatAt, H.rx, PAINT_SLOT.hat);
 
   // --- Paws raised in front, and an otter's shell ---
   for (const leg of ['frontFar', 'frontNear'] as const) if (raised(leg)) drawLeg(leg);
@@ -487,9 +562,21 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   const box = r.bounds((c) => c === C.shadow);
 
   // --- Marks over the head, always the right way round ---
-  const top = { x: FX + hc.x * K * facing, y: FY + (hc.y - H.ry - 6) * K };
+  drawMarks(r, p.mark, { x: FX + hc.x * K * facing, y: FY + (hc.y - H.ry - 6) * K }, facing, clock);
+  return box ? joinBoxes(box) : null;
+}
+
+/** A costume's hood, as something to wear (in hat units), or null. */
+export function hoodOf(dress: Dress): Wearable | null {
+  const item = outfitItem(dress.outfit);
+  return item?.hood ? { ...item, shapes: item.hood } : null;
+}
+
+/** The marks that float over his head (z's asleep, hearts, a ! or a ?), from `top`, the right way round whichever way he faces. */
+export function drawMarks(r: Raster, mark: ChibiMark, top: Pt, facing: number, clock: number): void {
+  const K = PIXEL.k;
   const f = facing < 0 ? -1 : 1;
-  switch (p.mark) {
+  switch (mark) {
     case 'zzz':
       for (let i = 0; i < 3; i++) {
         const age = (clock / 2400 + i / 3) % 1;
@@ -517,5 +604,4 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
       break;
     }
   }
-  return box ? joinBoxes(box) : null;
 }

@@ -1,6 +1,6 @@
 import { WATER_Y, type ChibiPose } from '../chibi/pose';
-import { hatItem, NECK_WIDTH, outfitItem, type Dress, type Shape, type Wearable } from '../outfits';
-import { EARS, PAINT_SLOT, PIXEL, TAIL_BANDS } from './draw';
+import { hatItem, NECK_WIDTH, outfitItem, type Dress, type Paint, type Shape, type Wearable } from '../outfits';
+import { EARS, hoodOf, PAINT_SLOT, PIXEL, TAIL_BANDS } from './draw';
 import { C } from './palette';
 import { capsule, ellipse, intersect, joinBoxes, polygon, Raster, tube, union, type Box, type Pt } from './raster';
 import type { PixelBuild } from './species';
@@ -96,6 +96,18 @@ export function drawPixelFacing(r: Raster, b: PixelBuild, p: ChibiPose, view: Vi
   };
   if (clothes?.cape && front) drawCape(true);
 
+  // --- A costume's wings: from the front, behind him; from behind, over his back ---
+  const drawWings = (paint: Paint) => {
+    const beat = walk.moving > 0.1 ? Math.sin(clock / 35) * 0.4 : Math.sin(clock / 400) * 0.12;
+    for (const s of [-1, 1]) {
+      const a = s * (0.5 + beat);
+      const c = T(s * bodyR * 1.25, bodyY - bodyR * 0.75);
+      const wing = ellipse(c.x, c.y, bodyR * 0.8 * K, bodyR * 0.42 * K, a);
+      r.shape(wing.sd, wing.box, PAINT_SLOT.wear[paint], C.outline);
+    }
+  };
+  if (clothes?.wings && front) drawWings(clothes.wings);
+
   // --- Legs: the far pair behind, out to the sides, the near pair in front ---
   const leg = (x: number, raise: number, far: boolean) => {
     const root = T(x * 0.9, bodyY + bodyR * 0.2);
@@ -141,8 +153,39 @@ export function drawPixelFacing(r: Raster, b: PixelBuild, p: ChibiPose, view: Vi
         r.shape(intersect(band.sd, body.sd), band.box, PAINT_SLOT.wear[paint], null);
       }
     }
+    if (front && clothes.patch) {
+      const patch = ellipse(bodyC.x, bodyC.y + bodyR * 0.25 * K, bodyR * 0.5 * K, bodyR * 0.55 * K);
+      r.shape(intersect(patch.sd, body.sd), patch.box, PAINT_SLOT.wear[clothes.patch], null);
+    }
     if (front && clothes.buttons) r.dots([0.1, 0.4, 0.7].map((k) => ({ x: Math.floor(bodyC.x), y: Math.floor(bodyC.y + (k - 0.3) * bodyR * K) })), C.wearAccent);
+    if (clothes.stars) stars(PAINT_SLOT.wear[clothes.stars], [[-0.5, -0.35], [0.45, -0.1], [-0.1, 0.45]]);
   }
+  if (clothes?.skirt) {
+    const colour = PAINT_SLOT.wear[clothes.skirt.paint];
+    if (clothes.skirt.style === 'tutu') {
+      const c = T(0, bodyY + bodyR * 0.35);
+      const tutu = ellipse(c.x, c.y, bodyR * 1.35 * K, bodyR * 0.38 * K);
+      r.shape(tutu.sd, tutu.box, (x, y) => ((Math.floor(x) + Math.floor(y)) % 3 === 0 ? C.wearAccent : colour), C.outline);
+    } else {
+      const robe = polygon([T(-bodyR * 0.95, bodyY), T(bodyR * 0.95, bodyY), T(bodyR * 1.15, -2.5 - lift), T(-bodyR * 1.15, -2.5 - lift)]);
+      r.shape(robe.sd, robe.box, colour, C.outline, { light: colour, dark: C.wearDark });
+      stars(C.wearTrim, [[0.5, 0.8], [-0.45, 1.05]]);
+    }
+  }
+  if (clothes?.pack && !front) {
+    const pack = polygon([T(-bodyR * 0.5, bodyY - bodyR * 0.75), T(bodyR * 0.5, bodyY - bodyR * 0.75), T(bodyR * 0.5, bodyY + bodyR * 0.4), T(-bodyR * 0.5, bodyY + bodyR * 0.4)]);
+    r.shape(pack.sd, pack.box, PAINT_SLOT.wear[clothes.pack], C.outline);
+  }
+  // From behind, a row of spikes down the middle of his back.
+  if (clothes?.spikes && !front) {
+    const { count, paint } = clothes.spikes;
+    for (let i = 0; i < count; i++) {
+      const y = bodyY - bodyR * 0.9 + (bodyR * 1.5 * i) / count;
+      const spike = polygon([T(-bodyR * 0.24, y + bodyR * 0.3), T(0, y - bodyR * 0.15), T(bodyR * 0.24, y + bodyR * 0.3)]);
+      r.shape(spike.sd, spike.box, PAINT_SLOT.wear[paint], C.outline);
+    }
+  }
+  if (clothes?.wings && !front) drawWings(clothes.wings);
   if (clothes?.cape && !front) drawCape(false);
   // From behind, a raccoon's tail hangs down over its back legs; a cat's comes up after its head.
   if (!front && !swims && species !== 'cat') drawTail();
@@ -248,7 +291,8 @@ export function drawPixelFacing(r: Raster, b: PixelBuild, p: ChibiPose, view: Vi
     }
   }
 
-  // A hat on top.
+  // A costume's hood, then a hat on top.
+  wear(hoodOf(dress), { x: 0, y: -H.ry * 0.9 }, H.rx, PAINT_SLOT.wear, false);
   wear(hatItem(dress.hat), { x: -H.rx * 0.0, y: -H.ry * 0.9 }, H.rx, PAINT_SLOT.hat, false);
 
   if (!front && species === 'cat') drawTail();
@@ -278,6 +322,15 @@ export function drawPixelFacing(r: Raster, b: PixelBuild, p: ChibiPose, view: Vi
   const box = r.bounds((c) => c === C.shadow);
   return box ? joinBoxes(box) : null;
 
+  /** Little + stars at these places on the body (in body radii from its middle). */
+  function stars(colour: number, at: [number, number][]): void {
+    for (const [x, y] of at) {
+      const q = T(x * bodyR, bodyY + y * bodyR);
+      const c = { x: Math.floor(q.x), y: Math.floor(q.y) };
+      r.dots([c, { x: c.x - 1, y: c.y }, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y - 1 }, { x: c.x, y: c.y + 1 }], colour);
+    }
+  }
+
   /**
    * Something he's wearing, seen from the front or behind. Neckwear made for the side view
    * keeps its band across the neck; what hangs at its front (a tie, a bell) comes round to
@@ -302,7 +355,7 @@ export function drawPixelFacing(r: Raster, b: PixelBuild, p: ChibiPose, view: Vi
 }
 
 /** A piece of neckwear that hangs at the front (a tie, a bell, a bow), rather than going round. */
-function isFrontPiece(s: Shape): boolean {
+export function isFrontPiece(s: Shape): boolean {
   if (s.kind === 'ellipse') return s.cx > 0.2;
   const xs = s.points.map(([x]) => x);
   return Math.min(...xs) > 0;

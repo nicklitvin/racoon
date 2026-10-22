@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { HATS, OUTFITS, PET_MODES, RACCOON_TYPES, type Hat, type KeyboardStatus, type Outfit, type PetMode, type RaccoonType, type Settings } from '../../shared/settings';
+import { BETA_TYPES, HATS, OUTFITS, PET_MODES, RACCOON_TYPES, type Hat, type KeyboardStatus, type Outfit, type PetMode, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
 import { RACCOON_STYLES } from '../sprites';
 import { HAT_ITEMS, OUTFIT_ITEMS, wearableIcon } from '../sprites/outfits';
@@ -69,14 +69,17 @@ function Section({ title, aside, children }: { title: string; aside?: string; ch
   );
 }
 
-function TypePicker({ value, onChange }: { value: RaccoonType; onChange: (value: RaccoonType) => void }) {
+/** The pets, with those in beta only once it's switched on (from the patch notes). */
+function TypePicker({ value, beta, onChange }: { value: RaccoonType; beta: boolean; onChange: (value: RaccoonType) => void }) {
+  const types = RACCOON_TYPES.filter((type) => beta || !BETA_TYPES.includes(type));
   return (
-    <div className="type-grid" role="radiogroup" aria-label="Pet">
-      {RACCOON_TYPES.map((type) => (
+    <div className={types.length > 3 ? 'type-grid four' : 'type-grid'} role="radiogroup" aria-label="Pet">
+      {types.map((type) => (
         <label key={type} className={type === value ? 'tile type-option selected' : 'tile type-option'} title={RACCOON_STYLES[type].label}>
           <input type="radio" name="raccoonType" checked={type === value} onChange={() => onChange(type)} />
           <PetPreview type={type} />
           <span className="tile-name">{shortName(type)}</span>
+          {BETA_TYPES.includes(type) && <span className="beta-tag">Beta</span>}
         </label>
       ))}
     </div>
@@ -183,7 +186,7 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
     return (
       <section className="settings" aria-label="My Pet settings">
         {header}
-        <PatchNotes onBack={() => setNotes(false)} />
+        <PatchNotes onBack={() => setNotes(false)} beta={settings.beta} onBeta={(beta) => update({ beta })} />
       </section>
     );
   }
@@ -197,7 +200,7 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
       </Section>
 
       <Section title="Pet">
-        <TypePicker value={settings.raccoonType} onChange={(raccoonType) => update({ raccoonType })} />
+        <TypePicker value={settings.raccoonType} beta={settings.beta} onChange={(raccoonType) => update({ raccoonType })} />
       </Section>
 
       <WearGrid

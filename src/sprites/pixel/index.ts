@@ -6,7 +6,7 @@ import type { RaccoonRenderer } from '../types';
 import { drawPixelPet, PIXEL } from './draw';
 import { drawPixelFacing } from './facing';
 import { rgbaTable, shade, type Palette } from './palette';
-import { Raster } from './raster';
+import { Raster, type Box } from './raster';
 import type { PixelBuild } from './species';
 
 /** Screen px per art pixel at size 1. */
@@ -14,15 +14,14 @@ export const PIXEL_PX = 3;
 /** Edge of a pixel toy block, in art pixels: room for a 3 by 5 letter inside its lit and shaded edges. */
 export const PIXEL_TOY = 9;
 /** Pixel pets move on in steps, like an old game: this many new pictures a second. */
-const PIXEL_FPS = 12;
+export const PIXEL_FPS = 12;
 
 /**
- * A pet drawn in pixels: it moves like a chibi (the same poses and timing), but every
- * picture is rasterised into a small canvas and shown with each pixel blown up into a
- * crisp square, a whole number of screen pixels across, so it never blurs.
+ * The canvas a pixel pet is shown in, and what goes with it: the raster it's drawn into,
+ * its palette (with whatever he's wearing), and the box you grab him by.
  */
-export function createPixel(doc: Document, build: PixelBuild, palette: Palette, className: string, label: string): RaccoonRenderer {
-  const { width: W, height: H, feetX, feetY, k: K } = PIXEL;
+export function pixelCanvas(doc: Document, palette: Palette, className: string, label: string) {
+  const { width: W, height: H } = PIXEL;
   const root = doc.createElement('div');
   root.className = `raccoon pixel ${className}`;
   root.setAttribute('role', 'img');
@@ -40,58 +39,29 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
   const image = ctx?.createImageData(W, H) ?? null;
   const words = image ? new Uint32Array(image.data.buffer) : null;
   let colours = rgbaTable(palette);
-  let dressed: Dress = UNDRESSED;
   const raster = new Raster(W, H);
-  const motion = new ChibiMotion(build);
 
-  /** CSS px per art pixel: a whole number of device pixels. */
-  let cell = PIXEL_PX;
-  let scale = 1;
-  let scruff: Pt | null = null;
-  let toy: Pt | null = null;
-  let shownTick = NaN;
-  let shownFacing = 0;
-  let shownView = '';
-
-  const sizeTo = () => {
-    const dpr = doc.defaultView?.devicePixelRatio || 1;
-    cell = Math.max(1, Math.round(PIXEL_PX * scale * dpr)) / dpr;
-    for (const el of [root, canvas]) {
-      el.style.width = `${W * cell}px`;
-      el.style.height = `${H * cell}px`;
-    }
-    shownTick = NaN;
-  };
-  sizeTo();
-
-  const paint = () => {
-    if (!ctx || !image || !words) return;
-    const { data } = raster;
-    for (let i = 0; i < data.length; i++) words[i] = colours[data[i]!]!;
-    ctx.putImageData(image, 0, 0);
-  };
-
-  return {
-    element: root,
+  const view = {
+    root,
     figure,
-    baseSize: { width: W * PIXEL_PX, height: H * PIXEL_PX },
-    anchor: { x: feetX / W, y: feetY / H },
-    peekSink: build.peekSink * K * PIXEL_PX,
-    turnsItself: true,
-    pixelated: true,
-    animations: TIMING,
-    isSettling: () => motion.settling,
-    holdPoint: () => (scruff ? { x: scruff.x * motion.facing * K * cell, y: scruff.y * K * cell } : null),
-    toyReach: build.toyReach * K * PIXEL_PX,
-    toySize: PIXEL_TOY * PIXEL_PX,
-    toyLook: 'pixel',
-    carriesToys: build.species === 'raccoon',
-    deskReach: { x: build.desk.x * K * PIXEL_PX, y: build.desk.y * K * PIXEL_PX },
-    mouseReach: { x: build.mouse.x * K * PIXEL_PX, y: build.mouse.y * K * PIXEL_PX },
-    drawsMarks: true,
-    toyPoint: () => (toy ? { x: toy.x * motion.facing * K * cell, y: toy.y * K * cell } : null),
-    dress(d) {
-      dressed = d;
+    raster,
+    dressed: UNDRESSED as Dress,
+    /** CSS px per art pixel: a whole number of device pixels. */
+    cell: PIXEL_PX,
+    scale: 1,
+    /** Called when the picture must be drawn again even if nothing moved. */
+    onChange: () => {},
+    sizeTo() {
+      const dpr = doc.defaultView?.devicePixelRatio || 1;
+      view.cell = Math.max(1, Math.round(PIXEL_PX * view.scale * dpr)) / dpr;
+      for (const el of [root, canvas]) {
+        el.style.width = `${W * view.cell}px`;
+        el.style.height = `${H * view.cell}px`;
+      }
+      view.onChange();
+    },
+    dress(d: Dress) {
+      view.dressed = d;
       const hat = hatItem(d.hat)?.colours;
       const wear = outfitItem(d.outfit)?.colours;
       colours = rgbaTable({
@@ -99,37 +69,87 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
         ...(hat && { hatMain: hat.main, hatTrim: hat.trim, hatAccent: hat.accent }),
         ...(wear && { wearMain: wear.main, wearTrim: wear.trim, wearAccent: wear.accent, wearLight: shade(wear.main, 0.25), wearDark: shade(wear.main, -0.25) }),
       });
-      shownTick = NaN;
+      view.onChange();
     },
+    /** Shows what's in the raster, and fits the grab box to `box`. */
+    paint(box: Box | null) {
+      if (ctx && image && words) {
+        const { data } = raster;
+        for (let i = 0; i < data.length; i++) words[i] = colours[data[i]!]!;
+        ctx.putImageData(image, 0, 0);
+      }
+      if (box) {
+        figure.style.left = `${box.x0 * view.cell}px`;
+        figure.style.top = `${box.y0 * view.cell}px`;
+        figure.style.width = `${(box.x1 - box.x0) * view.cell}px`;
+        figure.style.height = `${(box.y1 - box.y0) * view.cell}px`;
+      }
+    },
+  };
+  return view;
+}
+
+/**
+ * A pet drawn in pixels: it moves like a chibi (the same poses and timing), but every
+ * picture is rasterised into a small canvas and shown with each pixel blown up into a
+ * crisp square, a whole number of screen pixels across, so it never blurs.
+ */
+export function createPixel(doc: Document, build: PixelBuild, palette: Palette, className: string, label: string): RaccoonRenderer {
+  const { width: W, height: H, feetX, feetY, k: K } = PIXEL;
+  const view = pixelCanvas(doc, palette, className, label);
+  const motion = new ChibiMotion(build);
+
+  let scruff: Pt | null = null;
+  let toy: Pt | null = null;
+  let shownTick = NaN;
+  let shownFacing = 0;
+  let shownView = '';
+  view.onChange = () => void (shownTick = NaN);
+  view.sizeTo();
+
+  return {
+    element: view.root,
+    figure: view.figure,
+    baseSize: { width: W * PIXEL_PX, height: H * PIXEL_PX },
+    anchor: { x: feetX / W, y: feetY / H },
+    peekSink: build.peekSink * K * PIXEL_PX,
+    turnsItself: true,
+    pixelated: true,
+    animations: TIMING,
+    isSettling: () => motion.settling,
+    holdPoint: () => (scruff ? { x: scruff.x * motion.facing * K * view.cell, y: scruff.y * K * view.cell } : null),
+    toyReach: build.toyReach * K * PIXEL_PX,
+    toySize: PIXEL_TOY * PIXEL_PX,
+    toyLook: 'pixel',
+    carriesToys: build.species === 'raccoon',
+    deskReach: { x: build.desk.x * K * PIXEL_PX, y: build.desk.y * K * PIXEL_PX },
+    mouseReach: { x: build.mouse.x * K * PIXEL_PX, y: build.mouse.y * K * PIXEL_PX },
+    drawsMarks: true,
+    toyPoint: () => (toy ? { x: toy.x * motion.facing * K * view.cell, y: toy.y * K * view.cell } : null),
+    dress: (d) => view.dress(d),
     setScale(next) {
-      scale = next;
-      sizeTo();
+      view.scale = next;
+      view.sizeTo();
     },
     draw(frame) {
-      const pose = motion.update(frame, 1 / (K * cell));
+      const pose = motion.update(frame, 1 / (K * view.cell));
       const clock = frame.clockMs ?? frame.timeMs;
       // A new picture only every so often, but at once when he turns round.
       const tick = Math.floor(clock / (1000 / PIXEL_FPS));
       const facing = motion.facing;
-      const view = motion.view;
-      if (tick === shownTick && facing === shownFacing && view === shownView) return;
+      const turned = motion.view;
+      if (tick === shownTick && facing === shownFacing && turned === shownView) return;
       shownTick = tick;
       shownFacing = facing;
-      shownView = view;
+      shownView = turned;
       scruff = scruffPoint(build, pose);
       toy = toyHoldPoint(build, pose);
-      const quarter = view === 'frontQuarter' ? 'front' : view === 'backQuarter' ? 'back' : null;
+      const quarter = turned === 'frontQuarter' ? 'front' : turned === 'backQuarter' ? 'back' : null;
       const box =
-        view !== 'front' && view !== 'back'
-          ? drawPixelPet(raster, build, pose, clock, facing, motion.moving, scruff, dressed, quarter)
-          : drawPixelFacing(raster, build, pose, view, { phase: motion.phase, moving: motion.moving, running: frame.animation !== 'walk', side: facing }, clock, dressed);
-      paint();
-      if (box) {
-        figure.style.left = `${box.x0 * cell}px`;
-        figure.style.top = `${box.y0 * cell}px`;
-        figure.style.width = `${(box.x1 - box.x0) * cell}px`;
-        figure.style.height = `${(box.y1 - box.y0) * cell}px`;
-      }
+        turned !== 'front' && turned !== 'back'
+          ? drawPixelPet(view.raster, build, pose, clock, facing, motion.moving, scruff, view.dressed, quarter)
+          : drawPixelFacing(view.raster, build, pose, turned, { phase: motion.phase, moving: motion.moving, running: frame.animation !== 'walk', side: facing }, clock, view.dressed);
+      view.paint(box);
     },
   };
 }

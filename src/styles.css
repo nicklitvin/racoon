@@ -1352,6 +1352,10 @@ html[data-view='settings'] .settings {
   gap: 8px;
 }
 
+.type-grid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .type-option {
   min-width: 0;
   overflow: hidden;
@@ -1565,6 +1569,36 @@ html[data-view='settings'] .settings {
 .patch-note h3 {
   margin: 3px 0 6px;
   font-size: 15px;
+}
+
+.beta-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+}
+
+.type-option .beta-tag {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  margin: 0;
+  padding: 0 5px;
+  font-size: 9px;
+}
+
+.beta-switch {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--well);
 }
 
 .patch-note ul {

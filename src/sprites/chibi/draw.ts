@@ -3,6 +3,7 @@ import { drawWearable, hatItem, NECK_WIDTH, outfitItem, type Dress } from '../ou
 import { n, svgWriter } from '../svg';
 import { bodyFrame, headCentre, LEGS, legRoot, WATER_Y, type ChibiPose, type LegName } from './pose';
 import type { ChibiBuild, Pt } from './species';
+import type { Species } from '../critter/build';
 
 /** The drawing's box, in units from his feet. */
 export const CHIBI_VIEW = { x: -64, y: -92, width: 128, height: 108 };
@@ -37,7 +38,7 @@ function earPath(kind: 'cat' | 'fox' | 'raccoon' | 'otter', k: number): string {
   return `M${fmt(l)}L${fmt(a)}Q${fmt(tip)} ${fmt(b)}L${fmt(r)}Z`;
 }
 
-const EAR_KIND: Record<ChibiBuild['species'], 'cat' | 'fox' | 'raccoon' | 'otter'> = {
+const EAR_KIND: Record<Species, 'cat' | 'fox' | 'raccoon' | 'otter'> = {
   cat: 'cat',
   fox: 'fox',
   raccoon: 'raccoon',
@@ -45,7 +46,7 @@ const EAR_KIND: Record<ChibiBuild['species'], 'cat' | 'fox' | 'raccoon' | 'otter
 };
 
 /** Where on the head each ear sits (degrees round it, 90 = top) and how big it is. */
-const EAR_AT: Record<ChibiBuild['species'], { near: number; far: number; size: number }> = {
+const EAR_AT: Record<Species, { near: number; far: number; size: number }> = {
   cat: { near: 58, far: 122, size: 1 },
   fox: { near: 62, far: 120, size: 1 },
   raccoon: { near: 56, far: 124, size: 1 },
@@ -55,7 +56,8 @@ const EAR_AT: Record<ChibiBuild['species'], { near: number; far: number; size: n
 export function createChibiSkin(doc: Document, build: ChibiBuild, className: string, label: string) {
   const { make, set } = svgWriter(doc);
   const id = `chibi-${++ids}`;
-  const species = build.species;
+  // There's no chibi puffball: it's only drawn in pixels.
+  const species = build.species as Species;
   const B = build.body;
   const H = build.head;
   const view = CHIBI_VIEW;

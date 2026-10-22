@@ -12,7 +12,7 @@ export interface Pt {
  * it's turned; everything else is from his feet.
  */
 export interface ChibiBuild {
-  species: Species;
+  species: Species | 'blob';
   /** Half the body's length and height, and where its middle is when he stands. */
   body: { rx: number; ry: number; at: Pt };
   /** Half the head's width and height, and where it sits from the body's middle. */

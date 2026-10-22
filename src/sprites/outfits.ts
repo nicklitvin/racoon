@@ -13,8 +13,10 @@ import { n, svgWriter } from './svg';
  * Neckwear is drawn in neck units: the neck's half-width is 1, the origin is the middle of
  * the collar, x points the way he faces and y down, away from the head.
  *
- * Clothes are neckwear (a tie, a collar) plus `body`: what covers the body and legs. Only
- * the pixel pets dress the body for now; the others wear just the neck part.
+ * Clothes are neckwear (a tie, a collar) plus `body`: what covers the body and legs. A
+ * costume can also have a `hood`, drawn over the head in hat units (a dino's spikes, a bee's
+ * antennae, a space helmet). Only the pixel pets dress the body and wear hoods for now; the
+ * others wear just the neck part.
  */
 
 /** Which of the item's colours a shape is painted in. */
@@ -30,6 +32,8 @@ export interface Wearable {
   /** Back to front. */
   shapes: Shape[];
   body?: BodyWear;
+  /** For a costume, what goes over the head, in hat units, under any hat. */
+  hood?: Shape[];
   /** Its picture in the settings, when the shapes alone (just the neck part of clothes) wouldn't say what it is. */
   icon?: Shape[];
 }
@@ -48,6 +52,23 @@ export interface BodyWear {
   buttons?: boolean;
   /** A cape over the back, flying out behind as he goes, in `main` lined with `accent`. */
   cape?: boolean;
+  /**
+   * An all-in-one, hood and all: on a pet with no neck to speak of (the puffball) it
+   * covers everything but the face, rather than just the bottom half.
+   */
+  onesie?: boolean;
+  /** A patch on the tummy or chest, in this paint (a dino's belly, a space suit's controls). */
+  patch?: Paint;
+  /** A row of spikes down the back. */
+  spikes?: { paint: Paint; count: number };
+  /** Little wings on the back, buzzing as he goes. */
+  wings?: Paint;
+  /** A pack on the back (an astronaut's air). */
+  pack?: Paint;
+  /** Little stars sprinkled over it. */
+  stars?: Paint;
+  /** A skirt: a tutu sticking out round the middle, or a robe down to the floor. */
+  skirt?: { paint: Paint; style: 'tutu' | 'robe' };
 }
 
 export interface Dress {
@@ -160,6 +181,17 @@ export const HAT_ITEMS: Record<Exclude<Hat, 'none'>, Wearable> = {
       ellipse('trim', 1.0, 0.68, 0.2, 0.28),
     ],
   },
+  wizard: {
+    label: 'Wizard hat',
+    colours: { main: '#4b3a9c', trim: '#ffd84a', accent: '#ffd84a' },
+    shapes: [
+      ellipse('main', 0, 0.2, 1.15, 0.2),
+      poly('main', [-0.62, 0.2], [0.6, 0.2], [0.28, -0.55], [-0.15, -1.05], [-0.7, -1.3], [-0.42, -0.62]),
+      poly('trim', [-0.6, 0.02], [0.58, 0.02], [0.5, -0.14], [-0.56, -0.14]),
+      ellipse('accent', 0.08, -0.42, 0.13),
+      ellipse('accent', -0.68, -1.28, 0.12),
+    ],
+  },
   bow: {
     label: 'Bow',
     colours: { main: '#ff7ab0', trim: '#d94f8a', accent: '#ffffff' },
@@ -175,7 +207,103 @@ export const HAT_ITEMS: Record<Exclude<Hat, 'none'>, Wearable> = {
 const SHIRT: [number, number][] = [[-0.35, -0.6], [-1.1, -0.25], [-0.85, 0.15], [-0.6, 0], [-0.6, 0.95], [0.6, 0.95], [0.6, 0], [0.85, 0.15], [1.1, -0.25], [0.35, -0.6], [0, -0.42]];
 const band = (paint: Paint, y0: number, y1: number, x0 = -0.6, x1 = 0.6) => poly(paint, [x0, y0], [x1, y0], [x1, y1], [x0, y1]);
 
+/** A collar band round the neck, `h` either side of its middle. */
+const neckband = (paint: Paint, h = 0.24): Shape => poly(paint, [-1.05, -h], [1.05, -h], [1.05, h], [-1.05, h]);
+
 export const OUTFIT_ITEMS: Record<Exclude<Outfit, 'none'>, Wearable> = {
+  dino: {
+    label: 'Dino onesie',
+    colours: { main: '#5fbf5a', trim: '#d4f0a6', accent: '#f59f3a' },
+    shapes: [neckband('main')],
+    body: { covered: true, sleeves: 1, onesie: true, patch: 'trim', spikes: { paint: 'accent', count: 4 } },
+    hood: [
+      poly('accent', [-0.62, 0.16], [-0.42, -0.3], [-0.2, 0.04]),
+      poly('accent', [-0.2, 0.02], [0.04, -0.44], [0.28, 0.02]),
+      poly('accent', [0.28, 0.06], [0.5, -0.3], [0.7, 0.18]),
+    ],
+    icon: [
+      poly('accent', [-0.6, -0.5], [-0.42, -0.95], [-0.22, -0.55]),
+      poly('accent', [-0.18, -0.55], [0.02, -1.0], [0.22, -0.55]),
+      poly('accent', [0.22, -0.55], [0.42, -0.95], [0.6, -0.5]),
+      poly('main', ...SHIRT),
+      ellipse('trim', 0, 0.35, 0.36, 0.48),
+    ],
+  },
+  bee: {
+    label: 'Bee costume',
+    colours: { main: '#ffd23f', trim: '#eaf6ff', accent: '#2b2630' },
+    shapes: [neckband('accent', 0.18)],
+    body: { covered: true, sleeves: 0.5, onesie: true, bands: { paint: 'accent', count: 3, width: 0.11 }, wings: 'trim' },
+    hood: [
+      poly('accent', [-0.26, 0.08], [-0.12, 0.08], [-0.38, -0.62], [-0.52, -0.56]),
+      ellipse('accent', -0.48, -0.66, 0.15),
+      poly('accent', [0.14, 0.08], [0.28, 0.08], [0.52, -0.56], [0.38, -0.62]),
+      ellipse('accent', 0.46, -0.66, 0.15),
+    ],
+    icon: [
+      ellipse('trim', -0.72, -0.45, 0.42, 0.3),
+      ellipse('trim', 0.72, -0.45, 0.42, 0.3),
+      poly('main', ...SHIRT),
+      band('accent', -0.1, 0.12),
+      band('accent', 0.42, 0.64),
+    ],
+  },
+  astronaut: {
+    label: 'Space suit',
+    colours: { main: '#f1f3f6', trim: '#9aa6b6', accent: '#e2435a' },
+    shapes: [neckband('trim', 0.3)],
+    body: { covered: true, sleeves: 1, onesie: true, patch: 'trim', buttons: true, pack: 'trim' },
+    // A glass bubble of a helmet: just its rim shows, and a glint on it.
+    hood: [poly('trim', ...arc(0, 0.85, 1.46, 1.38, -58, 238, 28)), ellipse('main', 0.7, -0.18, 0.1, 0.16), ellipse('main', 0.92, 0.0, 0.07)],
+    icon: [
+      poly('main', ...SHIRT),
+      band('trim', -0.1, 0.4, -0.32, 0.32),
+      ellipse('accent', -0.16, 0.15, 0.08),
+      ellipse('accent', 0.16, 0.15, 0.08),
+      band('trim', 0.62, 0.74),
+    ],
+  },
+  knight: {
+    label: 'Knight armour',
+    colours: { main: '#c3cad6', trim: '#7f8a9b', accent: '#d63a4a' },
+    shapes: [neckband('trim', 0.28)],
+    body: { covered: true, sleeves: 1, onesie: true, bands: { paint: 'trim', count: 3, width: 0.05 } },
+    hood: [
+      poly('accent', [-0.15, -0.2], [0.2, -0.6], [-0.4, -0.85], [-0.95, -0.55], [-0.5, -0.12]),
+      poly('main', ...dome(0, 0.5, 1.04, 0.76)),
+      poly('trim', [-1.0, 0.32], [1.04, 0.32], [1.04, 0.48], [-1.0, 0.48]),
+    ],
+    icon: [
+      poly('accent', [-0.1, -0.72], [0.3, -1.05], [-0.35, -1.25], [-0.85, -0.95], [-0.4, -0.65]),
+      poly('main', ...dome(0, 0.7, 0.95, 1.45)),
+      poly('trim', [-0.95, 0.12], [0.95, 0.12], [0.95, 0.3], [-0.95, 0.3]),
+      poly('trim', [-0.08, 0.3], [0.08, 0.3], [0.08, 0.7], [-0.08, 0.7]),
+    ],
+  },
+  robe: {
+    label: 'Wizard robe',
+    colours: { main: '#5a3ea8', trim: '#ffd84a', accent: '#ffd84a' },
+    shapes: [neckband('main', 0.22), ellipse('trim', 0.72, 0.06, 0.2)],
+    body: { covered: true, sleeves: 0.9, stars: 'trim', skirt: { paint: 'main', style: 'robe' } },
+    icon: [
+      poly('main', [-0.35, -0.75], [0.35, -0.75], [0.6, -0.3], [1.0, -0.05], [0.75, 0.15], [0.65, 0.05], [0.95, 1.0], [-0.95, 1.0], [-0.65, 0.05], [-0.75, 0.15], [-1.0, -0.05], [-0.6, -0.3]),
+      ellipse('trim', 0, -0.62, 0.13),
+      ellipse('trim', -0.3, 0.2, 0.09),
+      ellipse('trim', 0.32, 0.5, 0.09),
+      ellipse('trim', -0.1, 0.78, 0.07),
+    ],
+  },
+  tutu: {
+    label: 'Tutu',
+    colours: { main: '#ff8fc0', trim: '#ffd0e6', accent: '#ffffff' },
+    shapes: [poly('main', [-1.0, -0.14], [1.0, -0.14], [1.0, 0.14], [-1.0, 0.14])],
+    body: { covered: true, sleeves: 0, skirt: { paint: 'trim', style: 'tutu' } },
+    icon: [
+      poly('main', [-0.5, -0.8], [-0.3, -0.8], [-0.15, -0.55], [0.15, -0.55], [0.3, -0.8], [0.5, -0.8], [0.45, 0.2], [-0.45, 0.2]),
+      ellipse('trim', 0, 0.35, 1.05, 0.3),
+      ellipse('accent', 0, -0.2, 0.08),
+    ],
+  },
   suit: {
     label: 'Suit and tie',
     colours: { main: '#2f3440', trim: '#f7f5ef', accent: '#c8323e' },

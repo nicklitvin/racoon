@@ -11,8 +11,15 @@ function formatDate(iso: string): string {
   });
 }
 
-/** What's changed, newest first, inside the settings panel. */
-export function PatchNotes({ onBack }: { onBack: () => void }) {
+interface PatchNotesProps {
+  onBack: () => void;
+  /** Whether beta pets are switched on, and switching them. */
+  beta: boolean;
+  onBeta: (on: boolean) => void;
+}
+
+/** What's changed, newest first, inside the settings panel. Notes about beta pets have the switch to try them. */
+export function PatchNotes({ onBack, beta, onBeta }: PatchNotesProps) {
   return (
     <div className="patch-notes">
       <header className="patch-notes-header">
@@ -25,16 +32,25 @@ export function PatchNotes({ onBack }: { onBack: () => void }) {
 
       <ol className="patch-notes-list">
         {PATCH_NOTES.map((note) => (
-          <li key={`${note.date} ${note.title}`} className="patch-note">
+          <li key={`${note.date} ${note.title}`} className={note.beta ? 'patch-note beta' : 'patch-note'}>
             <time className="patch-note-date" dateTime={note.date}>
               {formatDate(note.date)}
             </time>
-            <h3>{note.title}</h3>
+            <h3>
+              {note.title}
+              {note.beta && <span className="beta-tag">Beta</span>}
+            </h3>
             <ul>
               {note.changes.map((change) => (
                 <li key={change}>{change}</li>
               ))}
             </ul>
+            {note.beta && (
+              <label className="switch beta-switch">
+                <span className="switch-label">Try beta pets</span>
+                <input type="checkbox" role="switch" checked={beta} onChange={(e) => onBeta(e.target.checked)} />
+              </label>
+            )}
           </li>
         ))}
       </ol>
