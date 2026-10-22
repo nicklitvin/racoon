@@ -25,7 +25,7 @@ export type PetMode = (typeof PET_MODES)[number];
 export interface Settings {
   /** Which drawing of the raccoon to use. */
   raccoonType: RaccoonType;
-  /** Opt-in: react to typing rhythm. Counts key presses only; see README "Privacy". Desktop only. */
+  /** Opt-in: react to typing rhythm. Counts key presses only; see "Privacy" in docs/DEVELOPMENT.md. Desktop only. */
   keyboardReactions: boolean;
   /** Start the desktop app when you log in. */
   launchAtLogin: boolean;
