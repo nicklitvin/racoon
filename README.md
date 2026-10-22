@@ -274,12 +274,14 @@ This produces `release/Racoon-Setup-<version>.exe` (a one-click per-user install
 
 ### macOS
 
-Build on a Mac (electron-builder can't produce a signed `.dmg` from Windows):
+Build on a Mac (electron-builder can't build for macOS from Windows):
 
 ```bash
 npm install
 npm run dist:mac   # release/Racoon-<version>-arm64.dmg and -x64.dmg
 ```
+
+No Mac? `.github/workflows/build.yml` builds both on GitHub's machines: push it, then on GitHub open **Actions → Build desktop apps → Run workflow** (or push a tag like `v0.1.0`). When it finishes, the run's **Artifacts** has `Racoon-Windows` (the installer and portable `.exe`) and `Racoon-macOS` (the two `.dmg`s). Those Mac builds aren't signed with a Developer ID, so the first time, right-click the app and choose **Open** (or run `xattr -cr /Applications/Racoon.app`).
 
 Already handled:
 

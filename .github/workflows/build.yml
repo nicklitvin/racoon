@@ -1,0 +1,50 @@
+# Builds the desktop app for Windows and macOS. macOS apps can only be built on a Mac,
+# so this runs each on its own machine. Start it from the Actions tab ("Run workflow"),
+# or push a tag like v0.1.0, and download the results from the run's Artifacts.
+name: Build desktop apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            artifact: Racoon-Windows
+            files: |
+              release/*.exe
+          - os: macos-latest
+            script: dist:mac
+            artifact: Racoon-macOS
+            files: |
+              release/*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      # No signing certificate: Windows builds go out unsigned, and macOS builds are
+      # signed ad hoc only (they open after right-click > Open the first time).
+      - run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
