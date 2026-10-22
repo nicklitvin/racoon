@@ -1,6 +1,10 @@
-# Builds the desktop app for Windows and macOS. macOS apps can only be built on a Mac,
-# so this runs each on its own machine. Start it from the Actions tab ("Run workflow"),
-# or push a tag like v0.1.0, and download the results from the run's Artifacts.
+# Builds the desktop app for Windows and macOS and publishes it as a GitHub Release, so it
+# can be downloaded from the repo's Releases page. macOS apps can only be built on a Mac,
+# so each is built on its own machine.
+#
+# Start it from the Actions tab ("Run workflow"), or push a tag like v0.2.0. A tag names
+# the release after itself; a manual run names it after the version in package.json and
+# the run number (v0.1.0-build.7).
 name: Build desktop apps
 
 on:
@@ -48,3 +52,48 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.files }}
           if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Name the release
+        id: name
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$(node -p "require('./package.json').version")-build.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.name.outputs.tag }}
+          name: Racoon ${{ steps.name.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: out/*
+          body: |
+            ## Download
+
+            **Windows**
+            - `Racoon-Setup-*.exe`: installs Racoon (no admin rights needed).
+            - `Racoon-Portable-*.exe`: runs without installing.
+
+            The app isn't code-signed, so Windows may say "Windows protected your PC": click **More info → Run anyway**.
+
+            **macOS**
+            - `Racoon-*-mac-arm64.dmg`: Apple silicon (M1 and later).
+            - `Racoon-*-mac-x64.dmg`: Intel Macs.
+
+            Open the `.dmg` and drag Racoon to Applications. It isn't notarized by Apple, so macOS blocks it at first (it may even say it's "damaged"). To let it run, open Terminal and run `xattr -cr /Applications/Racoon.app`, or try to open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.

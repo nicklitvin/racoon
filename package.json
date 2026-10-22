@@ -78,6 +78,9 @@
     "portable": {
       "artifactName": "Racoon-Portable-${version}.${ext}"
     },
+    "dmg": {
+      "artifactName": "Racoon-${version}-mac-${arch}.${ext}"
+    },
     "mac": {
       "target": [
         {

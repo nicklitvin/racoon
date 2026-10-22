@@ -278,10 +278,12 @@ Build on a Mac (electron-builder can't build for macOS from Windows):
 
 ```bash
 npm install
-npm run dist:mac   # release/Racoon-<version>-arm64.dmg and -x64.dmg
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac   # release/Racoon-<version>-mac-arm64.dmg and -mac-x64.dmg
 ```
 
-No Mac? `.github/workflows/build.yml` builds both on GitHub's machines: push it, then on GitHub open **Actions → Build desktop apps → Run workflow** (or push a tag like `v0.1.0`). When it finishes, the run's **Artifacts** has `Racoon-Windows` (the installer and portable `.exe`) and `Racoon-macOS` (the two `.dmg`s). Those Mac builds aren't signed with a Developer ID, so the first time, right-click the app and choose **Open** (or run `xattr -cr /Applications/Racoon.app`).
+### Downloads on GitHub
+
+`.github/workflows/build.yml` builds both on GitHub's own Windows and Mac machines and publishes them as a **GitHub Release**, so anyone can download them from the repo's **Releases** page. On GitHub, open **Actions → Build desktop apps → Run workflow** (the release is named after the version in `package.json` and the run number, like `v0.1.0-build.3`), or push a tag (`git tag v0.2.0 && git push origin v0.2.0`, and the release is named after the tag). The release has the Windows installer and portable `.exe` and the two Mac `.dmg`s, with instructions for opening them. The Mac builds aren't signed with a Developer ID or notarized, so the first time, macOS needs `xattr -cr /Applications/Racoon.app` or **Open Anyway** in **System Settings → Privacy & Security**.
 
 Already handled:
 
