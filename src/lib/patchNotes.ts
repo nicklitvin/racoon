@@ -20,7 +20,7 @@ export const PATCH_NOTES: PatchNote[] = [
     beta: true,
     changes: [
       'A new pet to try out: a round pink puffball. It doesn’t walk: it floats about a little off the floor, puffing itself up and flapping its little arms as it goes, and only comes down to sit, nap or work at its desk. It breathes in its blocks, too.',
-      'Switch on beta below and it joins the pets in the settings. Switch it off again and you’re back to the raccoon.',
+      'Switch on beta pets at the top and it joins the pets in the settings. Switch it off again and you’re back to the raccoon.',
     ],
   },
   {

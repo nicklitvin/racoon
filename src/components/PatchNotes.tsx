@@ -18,7 +18,7 @@ interface PatchNotesProps {
   onBeta: (on: boolean) => void;
 }
 
-/** What's changed, newest first, inside the settings panel. Notes about beta pets have the switch to try them. */
+/** What's changed, newest first, inside the settings panel, under the switch to try beta pets. */
 export function PatchNotes({ onBack, beta, onBeta }: PatchNotesProps) {
   return (
     <div className="patch-notes">
@@ -29,6 +29,13 @@ export function PatchNotes({ onBack, beta, onBeta }: PatchNotesProps) {
         <h2>What&rsquo;s new</h2>
         <p className="hint">Running v{BUILD_DATE}</p>
       </header>
+
+      <label className="switch beta-switch">
+        <span className="switch-label">
+          Try beta pets<span className="beta-tag">Beta</span>
+        </span>
+        <input type="checkbox" role="switch" checked={beta} onChange={(e) => onBeta(e.target.checked)} />
+      </label>
 
       <ol className="patch-notes-list">
         {PATCH_NOTES.map((note) => (
@@ -45,12 +52,6 @@ export function PatchNotes({ onBack, beta, onBeta }: PatchNotesProps) {
                 <li key={change}>{change}</li>
               ))}
             </ul>
-            {note.beta && (
-              <label className="switch beta-switch">
-                <span className="switch-label">Try beta pets</span>
-                <input type="checkbox" role="switch" checked={beta} onChange={(e) => onBeta(e.target.checked)} />
-              </label>
-            )}
           </li>
         ))}
       </ol>

@@ -219,7 +219,7 @@ To add an animation for them too, add a `case` to `walkerPose()` and `otterPose(
 
 The version is the date of the build, stamped in by `vite.config.mts` (`__BUILD_DATE__`), and shows at the top of the settings panel. Clicking it opens "What's new", the hand-written notes in `src/lib/patchNotes.ts`. When you ship something worth noticing, add an entry at the top, written for someone watching their pet rather than reading the code.
 
-**Beta pets.** A pet in `BETA_TYPES` (`shared/settings.ts`) is only offered once `beta` is switched on, and the switch is in the patch notes: a note with `beta: true` gets a Beta tag and a "Try beta pets" switch. Switching it off moves anyone on a beta pet back to the default (`normalizeSettings` sees to it). To take a pet out of beta, drop it from `BETA_TYPES`.
+**Beta pets.** A pet in `BETA_TYPES` (`shared/settings.ts`) is only offered once `beta` is switched on, and the switch for it, "Try beta pets", is at the top of the patch notes; a note with `beta: true` gets a Beta tag. Switching it off moves anyone on a beta pet back to the default (`normalizeSettings` sees to it). To take a pet out of beta, drop it from `BETA_TYPES`.
 
 ## Building and packaging
 

@@ -1595,7 +1595,7 @@ html[data-view='settings'] .settings {
 }
 
 .beta-switch {
-  margin-top: 10px;
+  margin-top: 14px;
   padding: 8px 10px;
   border-radius: 10px;
   background: var(--well);
