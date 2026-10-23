@@ -16,6 +16,9 @@ export const TIMING: Partial<Record<AnimationName, Partial<AnimationSpec>>> = {
   peek: { fps: 12 },
 };
 
+/** Animations he walks along in, at a walking stride. */
+const STROLLS: ReadonlySet<AnimationName> = new Set(['walk', 'carry', 'stalk', 'nudge', 'fetch']);
+
 /** Which way you see him: side on, three-quarters towards you or away, or straight on. */
 export type ChibiView = 'side' | 'frontQuarter' | 'backQuarter' | 'front' | 'back';
 
@@ -44,6 +47,16 @@ const BLEND_MS = 240;
 const FLIP_MS = 90;
 
 /**
+ * Long ears hang on a spring: how stiff it is (a swing or two a second), how quickly a
+ * swing dies away, and how hard the head's going up or down throws them about.
+ */
+const EAR_SPRING = 200;
+const EAR_DAMPING = 5;
+const EAR_THROW = 7;
+/** Running, they're blown back this far (degrees) at full tilt. */
+const EAR_WIND = 14;
+
+/**
  * Where a chibi is between frames: how far round its stride it is (kept in step with the
  * ground, so paws don't slide), which way it faces, and the pose it's blending from.
  */
@@ -60,6 +73,11 @@ export class ChibiMotion {
    */
   view: ChibiView = 'side';
   private clock = -1;
+  /** Long ears swinging on their spring: how far, and how fast; and the head's height and speed last frame. */
+  private flap = 0;
+  private flapSpeed = 0;
+  private headY: number | null = null;
+  private headSpeed = 0;
   private animation: AnimationName | null = null;
   private from: ChibiPose | null = null;
   private changedAt = 0;
@@ -91,8 +109,9 @@ export class ChibiMotion {
     const v = frame.velocity ?? { x: 0, y: 0 };
     const speed = Math.hypot(v.x, v.y) * unitsPerPx;
     const { stride } = this.build;
-    const cycle = frame.animation === 'walk' || frame.animation === 'carry' ? stride.walkCycle : stride.runCycle;
-    const locomotion = frame.animation === 'walk' || frame.animation === 'carry' || frame.animation === 'run' || frame.animation === 'chase' || frame.animation === 'leap';
+    const strolling = STROLLS.has(frame.animation);
+    const cycle = strolling ? stride.walkCycle : stride.runCycle;
+    const locomotion = strolling || frame.animation === 'run' || frame.animation === 'chase' || frame.animation === 'leap';
     if (locomotion) this.phase = (this.phase + (Math.max(speed, cycle * 1.2) * dt) / cycle) % 1;
     this.moving += ((locomotion ? Math.min(1.5, speed / 60) : 0) - this.moving) * Math.min(1, dt * 6);
 
@@ -115,8 +134,34 @@ export class ChibiMotion {
     const k = (clock - this.changedAt) / BLEND_MS;
     const pose = this.from && k < 1 ? blendPose(this.from, target, k * k * (3 - 2 * k)) : target;
     if (k >= 1 || poseDistance(pose, target) < 0.01) this.from = null;
+    pose.earFlap = this.swingEars(pose, dt);
     this.pose = pose;
     return pose;
+  }
+
+  /**
+   * Swings long ears on their spring: left behind as the head springs up, flopping on as it
+   * comes down and lands, and blown back as he runs.
+   */
+  private swingEars(pose: ChibiPose, dt: number): number {
+    const y = pose.lift + pose.by + pose.hy;
+    if (this.headY === null || dt <= 0) {
+      this.headY = y;
+      return this.flap + this.moving * EAR_WIND;
+    }
+    const speed = (y - this.headY) / dt;
+    const accel = Math.max(-3000, Math.min(3000, (speed - this.headSpeed) / dt));
+    this.headY = y;
+    this.headSpeed = speed;
+    // In small steps, so a slow frame can't set it flying.
+    const steps = Math.ceil(dt / (1 / 120));
+    const h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      this.flapSpeed += (-EAR_SPRING * this.flap - EAR_DAMPING * this.flapSpeed - accel * EAR_THROW) * h;
+      this.flap += this.flapSpeed * h;
+    }
+    this.flap = Math.max(-45, Math.min(70, this.flap));
+    return this.flap + this.moving * EAR_WIND;
   }
 }
 

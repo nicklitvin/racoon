@@ -63,6 +63,14 @@ function runUntil(brain: Brain, predicate: (s: PetSnapshot) => boolean, maxMs = 
 
 const moved = (toy: Toy, from: { x: number; y: number }) => Math.hypot(toy.x - from.x, toy.y - from.y);
 
+/** Picks him up and puts him down somewhere. */
+function place(brain: Brain, feet: { x: number; y: number }) {
+  brain.grab();
+  brain.dragTo(feet);
+  brain.update(100, world());
+  brain.release();
+}
+
 describe('Toybox', () => {
   it('throws a block in an arc: up, down, a bounce or two, and it settles flat on a face', () => {
     const box = toybox({ x: 400, y: 800 });
@@ -318,3 +326,151 @@ describe('Brain: playing with toys', () => {
   });
 });
 
+
+describe('Brain: different ways to play', () => {
+  it('plays in all sorts of ways, not the same thing every time', () => {
+    const box = toybox({ x: 500, y: 700 }, { x: 1100, y: 650 }, { x: 800, y: 820 });
+    const brain = makeBrain(box, {}, 3);
+    const seen = new Set(run(brain, 400_000).map((s) => s.animation));
+    for (const animation of ['bat', 'toss', 'sniff', 'nudge', 'fetch', 'stalk', 'jump'] as const) expect(seen, animation).toContain(animation);
+  });
+
+  it('heads straight for a block once it is close, rather than running round and round it', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const box = toybox({ x: 800, y: 700 });
+      const toy = box.toys[0]!;
+      const brain = makeBrain(box, { play: { pounceChance: 0, chargeChance: 0 } }, seed);
+      place(brain, { x: 800, y: 300 });
+      brain.toyThrown(toy.id);
+      // From the moment he's within 150px of the block until he gets there.
+      let path = 0;
+      let start: PetSnapshot | null = null;
+      let last: PetSnapshot | null = null;
+      runUntil(brain, (s) => {
+        const near = Math.hypot(s.position.x - toy.x, s.position.y - toy.y) < 150;
+        if (near && !start) start = s;
+        if (start && last) path += Math.hypot(s.position.x - last.position.x, s.position.y - last.position.y);
+        last = s;
+        return s.phase !== 'go';
+      });
+      const straight = Math.hypot(last!.position.x - start!.position.x, last!.position.y - start!.position.y);
+      expect(path, `seed ${seed}`).toBeLessThan(straight * 1.3 + 20);
+    }
+  });
+
+  it('noses a block along the floor a few pushes at a time', () => {
+    const box = toybox({ x: 800, y: 700 });
+    const toy = box.toys[0]!;
+    const brain = makeBrain(box, { play: { tossChance: 0, pounceChance: 0, chargeChance: 0, moves: { bat: 0, sniff: 0, nudge: 1, fetch: 0 } } });
+    runUntil(brain, (s) => s.phase === 'nudge');
+    const from = { x: toy.x, y: toy.y };
+    const snaps = run(brain, 6000);
+    expect(snaps.some((s) => s.animation === 'nudge')).toBe(true);
+    expect(moved(toy, from)).toBeGreaterThan(50);
+    // Little pushes, not swats: it never flies.
+    expect(toy.thrownBy).toBe('pet');
+  });
+
+  it('trots off with a block in its mouth and drops it somewhere else', () => {
+    const box = toybox({ x: 800, y: 700 });
+    const toy = box.toys[0]!;
+    const brain = makeBrain(box, { play: { tossChance: 0, pounceChance: 0, chargeChance: 0, moves: { bat: 0, sniff: 0, nudge: 0, fetch: 1 } } });
+    const from = runUntil(brain, () => toy.holder === 'pet').position;
+    const carrying = runUntil(brain, (s) => s.animation === 'fetch');
+    expect(carrying.reaction).toBe('play');
+    // (Here nothing carries the block along with him: the page does that.)
+    const to = runUntil(brain, () => toy.holder === null, 10_000).position;
+    expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeGreaterThan(80);
+  });
+
+  it('creeps up on a block low to the ground before it pounces', () => {
+    const box = toybox({ x: 800, y: 700 });
+    const brain = makeBrain(box, { play: { pounceChance: 1, stalkChance: 1, chargeChance: 0 } });
+    place(brain, { x: 560, y: 700 });
+    const snaps: PetSnapshot[] = [];
+    runUntil(brain, (s) => (snaps.push(s), s.animation === 'jump'));
+    const creeping = snaps.filter((s) => s.animation === 'stalk');
+    expect(creeping.length).toBeGreaterThan(20);
+    expect(Math.max(...creeping.map((s) => Math.hypot(s.velocity.x, s.velocity.y)))).toBeLessThan(DEFAULT_CONFIG.motion.walkSpeed * 0.6);
+  });
+
+  it('sometimes charges straight through a block from a long way off, sending it flying', () => {
+    const box = toybox({ x: 1200, y: 700 });
+    const toy = box.toys[0]!;
+    const brain = makeBrain(box, { play: { chargeChance: 1, pounceChance: 0 } });
+    place(brain, { x: 300, y: 700 });
+    runUntil(brain, (s) => s.phase === 'charge');
+    run(brain, 2500);
+    expect(toy.thrownBy).toBe('pet');
+    expect(Math.abs(toy.x - 1200)).toBeGreaterThan(60);
+  });
+});
+
+describe('The trash can', () => {
+  const BIN = { at: { x: 400, y: 760 }, halfWidth: 45, rim: 66 };
+  const spot = { x: 400, y: 760, halfWidth: 38, depth: 22, rim: 66 };
+  const withBin = (box: Toybox) => {
+    box.bin = spot;
+    box.stash = 2;
+    return world({ carries: true, bin: BIN });
+  };
+
+  it('takes a block that drops in over the rim, and the block is gone', () => {
+    const box = toybox({ x: 250, y: 760 });
+    box.bin = spot;
+    const toy = box.toys[0]!;
+    box.hold(toy.id, 'pet');
+    box.moveHeld(toy.id, { x: 330, y: 760 }, 90);
+    box.release(toy.id, 'pet', { x: 160, y: 0, z: 200 });
+    stepBox(box, 2000);
+    expect(box.toys.length).toBe(0);
+    expect(box.stash).toBe(1);
+  });
+
+  it('a block sliding along the floor bounces off the side of it', () => {
+    const box = toybox({ x: 250, y: 760 });
+    box.bin = spot;
+    const toy = box.toys[0]!;
+    box.hit(toy.id, { x: 600, y: 0, z: 0 }, 0);
+    stepBox(box, 2000);
+    expect(box.toys.length).toBe(1);
+    expect(toy.x).toBeLessThan(400 - 38);
+  });
+
+  it('a raccoon climbs in, digs about, pops up with a block, throws it out and goes after it', () => {
+    const box = toybox();
+    const input = withBin(box);
+    const brain = makeBrain(box, { play: { binChance: 1 } });
+    const snaps: PetSnapshot[] = [];
+    runUntil(brain, (s) => (snaps.push(s), s.reaction === 'play'), 60_000, input);
+    const order = [...new Set(snaps.filter((s) => s.reaction === 'rummage').map((s) => s.phase))];
+    expect(order).toEqual(['go', 'in', 'dig', 'up', 'throw', 'out']);
+    // Down in it, he's behind the front of the can, right in the middle of it.
+    const digging = snaps.filter((s) => s.phase === 'dig');
+    expect(digging.every((s) => s.inBin && s.animation === 'rummage')).toBe(true);
+    expect(digging.every((s) => Math.abs(s.position.x - BIN.at.x) < 1)).toBe(true);
+    expect(snaps.some((s) => s.phase === 'up' && s.say !== null)).toBe(true);
+    // One fewer in the can, one more out, and he's after it.
+    expect(box.stash).toBe(1);
+    expect(box.toys.length).toBe(1);
+    expect(snaps.at(-1)!.inBin).toBe(false);
+  });
+
+  it('with lots of blocks about, a raccoon puts one away in the can', () => {
+    const spots = Array.from({ length: 6 }, (_, i) => ({ x: 700 + i * 120, y: 700 }));
+    const box = toybox(...spots);
+    const input = withBin(box);
+    const brain = makeBrain(box, { play: { binChance: 1, tidyFrom: 6 } });
+    runUntil(brain, () => box.toys.length < 6, 60_000, input);
+    expect(box.stash).toBe(3);
+  });
+
+  it('only a raccoon has a go in the can', () => {
+    const box = toybox({ x: 1100, y: 700 });
+    box.bin = spot;
+    box.stash = 2;
+    const brain = makeBrain(box, { play: { binChance: 1 } });
+    const snaps = run(brain, 60_000, world({ bin: BIN }));
+    expect(snaps.some((s) => s.reaction === 'rummage')).toBe(false);
+  });
+});

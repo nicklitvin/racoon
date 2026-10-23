@@ -5,7 +5,7 @@ import { drawPixelPet, PIXEL } from '../src/sprites/pixel/draw';
 import { drawPixelFacing } from '../src/sprites/pixel/facing';
 import { C } from '../src/sprites/pixel/palette';
 import { Raster } from '../src/sprites/pixel/raster';
-import { PIXEL_BUNNY, PIXEL_FOX, PIXEL_FROG, PIXEL_HEDGEHOG, PIXEL_OTTER, PIXEL_RACCOON, type PixelBuild } from '../src/sprites/pixel/species';
+import { PIXEL_BUNNY, PIXEL_HEDGEHOG, PIXEL_OTTER, type PixelBuild } from '../src/sprites/pixel/species';
 import type { AnimationName } from '../src/sprites/types';
 
 /** Drives a pet's motion at 60 fps, the wall clock starting at `clock`, and returns every pose. */
@@ -28,11 +28,9 @@ const count = (r: Raster, c: number) => r.data.filter((v) => v === c).length;
 /** The rows (top first) that pixels of colour `c` are on. */
 const rows = (r: Raster, c: number) => Array.from(r.data).flatMap((v, i) => (v === c ? [Math.floor(i / PIXEL.width)] : []));
 
-describe('the bunny and the frog', () => {
-  it.each([
-    ['bunny', PIXEL_BUNNY],
-    ['frog', PIXEL_FROG],
-  ] as const)('%s hops along: all four feet off the ground together, then down again', (_name, build) => {
+describe('the bunny', () => {
+  it('hops along: all four feet off the ground together, then down again', () => {
+    const build = PIXEL_BUNNY;
     for (const animation of ['walk', 'run'] as const) {
       const poses = run(build, animation, 2000).slice(20);
       const airborne = poses.filter((p) => p.lift < -3);
@@ -57,24 +55,34 @@ describe('the bunny and the frog', () => {
     expect(Math.abs(down.rot)).toBeLessThan(10);
   });
 
-  it('the frog shoots its tongue out after a fly', () => {
-    const snap = run(PIXEL_FROG, 'idle', 120, 6000 * 3 + 5000).at(-1)!;
-    expect(snap.snap).toBeGreaterThan(0.5);
-    const out = picture(PIXEL_FROG, snap);
-    const rest = picture(PIXEL_FROG, run(PIXEL_FROG, 'idle', 120, 6000 * 3 + 1000).at(-1)!);
-    expect(count(out.r, C.tongue)).toBeGreaterThan(8);
-    expect(count(rest.r, C.tongue)).toBe(0);
-    // It reaches well out in front.
-    expect(out.box!.x1).toBeGreaterThan(rest.box!.x1 + 4);
+
+});
+
+describe("the bunny's ears", () => {
+  it('flap about as it hops, and settle again once it stops', () => {
+    const hopping = run(PIXEL_BUNNY, 'walk', 2000).slice(30).map((p) => p.earFlap);
+    expect(Math.max(...hopping) - Math.min(...hopping)).toBeGreaterThan(20);
+    const still = run(PIXEL_BUNNY, 'idle', 5000).slice(-30).map((p) => Math.abs(p.earFlap));
+    expect(Math.max(...still)).toBeLessThan(3);
   });
 
-  it('the frog has its eyes up on top of its head', () => {
-    const { r } = picture(PIXEL_FROG, run(PIXEL_FROG, 'idle', 400).at(-1)!);
-    expect(Math.min(...rows(r, C.eye)) - Math.min(...rows(r, C.fur))).toBeLessThan(5);
+  it('are long: they stand up well above its head', () => {
+    const { r } = picture(PIXEL_BUNNY, run(PIXEL_BUNNY, 'idle', 3000).at(-1)!);
+    expect(Math.min(...rows(r, C.eye)) - Math.min(...rows(r, C.inner))).toBeGreaterThan(9);
   });
 });
 
 describe('the hedgehog', () => {
+  it('has spines over the top of its head, and a black nose on the end of its snout', () => {
+    const { r } = picture(PIXEL_HEDGEHOG, run(PIXEL_HEDGEHOG, 'idle', 400).at(-1)!);
+    const eye = Math.min(...rows(r, C.eye));
+    expect(Math.min(...rows(r, C.dark))).toBeLessThan(eye - 4);
+    expect(count(r, C.dark) + count(r, C.band)).toBeGreaterThan(80);
+    // The nose is the furthest forward thing on it.
+    const across = (c: number) => Array.from(r.data).flatMap((v, i) => (v === c ? [i % PIXEL.width] : []));
+    expect(Math.max(...across(C.nose))).toBeGreaterThanOrEqual(Math.max(...across(C.dark), ...across(C.fur)));
+  });
+
   it('rolls up into a ball to run, to sleep, when startled and when picked up, and not to walk', () => {
     for (const animation of ['run', 'chase', 'sleep', 'surprised', 'dangle'] as const) expect(run(PIXEL_HEDGEHOG, animation, 600).at(-1)!.ball, animation).toBe(1);
     for (const animation of ['walk', 'idle', 'sit', 'work'] as const) expect(run(PIXEL_HEDGEHOG, animation, 600).at(-1)!.ball, animation).toBe(0);
@@ -117,21 +125,6 @@ describe('the hedgehog', () => {
   });
 });
 
-describe('the fox', () => {
-  it('pounces higher than the others, coming down nose first', () => {
-    const pounce = run(PIXEL_FOX, 'jump', 400);
-    const plain = run(PIXEL_RACCOON, 'jump', 400);
-    expect(Math.min(...pounce.map((p) => p.lift))).toBeLessThan(Math.min(...plain.map((p) => p.lift)) - 4);
-    // On the way down, its nose is tipped well down.
-    expect(pounce[Math.round(pounce.length * 0.8)]!.rot).toBeLessThan(-12);
-  });
-
-  it('wears black socks and has a white tip to its tail', () => {
-    const { r } = picture(PIXEL_FOX, run(PIXEL_FOX, 'idle', 400).at(-1)!);
-    expect(count(r, C.dark)).toBeGreaterThan(10);
-    expect(count(r, C.band)).toBeGreaterThan(6);
-  });
-});
 
 describe('the otter', () => {
   // A dive starts 5 s into each 9 s of the wall clock.

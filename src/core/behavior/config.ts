@@ -82,6 +82,25 @@ export interface PlayConfig {
   kickSpeed: number;
   /** Waiting for you to throw a block you've picked up, he gives up after this long. */
   waitMs: number;
+  /**
+   * Of the turns that aren't throws, how likely each other thing is: a swat, a good sniff
+   * at it first, nosing it along the floor, or trotting off with it in his mouth (a raccoon
+   * walks off with it in his hands instead).
+   */
+  moves: { bat: number; sniff: number; nudge: number; fetch: number };
+  /** Chance that a pounce starts with creeping up on the block, low to the ground. */
+  stalkChance: number;
+  /** A long way from a block, the chance of charging straight through it and kicking it on. */
+  chargeChance: number;
+  /** How many pushes he gives a block he's nosing along, and how far he trots off with one. */
+  nudges: Range;
+  fetchDistance: Range;
+  /**
+   * For animals with a trash can (raccoons): the chance that a game is at the can instead,
+   * digging a block out of it, or putting one away in it once there are `tidyFrom` out.
+   */
+  binChance: number;
+  tidyFrom: number;
 }
 
 /** What he can be doing at his computer. */
@@ -155,6 +174,13 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     carryDistance: { min: 110, max: 280 },
     kickSpeed: 260,
     waitMs: 9000,
+    moves: { bat: 0.4, sniff: 0.2, nudge: 0.2, fetch: 0.2 },
+    stalkChance: 0.5,
+    chargeChance: 0.3,
+    nudges: { min: 3, max: 5 },
+    fetchDistance: { min: 120, max: 300 },
+    binChance: 0.4,
+    tidyFrom: 6,
   },
   work: {
     tasks: {

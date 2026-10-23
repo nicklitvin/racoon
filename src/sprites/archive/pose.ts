@@ -1,5 +1,6 @@
 import { PEEK_SINK } from '../../core/behavior/brain';
 import { plantedLeg, RIG, type Leg, type Pose } from './rig';
+import { classic } from '../animations';
 import type { AnimationName } from '../types';
 
 /**
@@ -80,7 +81,7 @@ function gallop(t: number, periodMs: number): Pose {
 }
 
 export function poseFor(animation: AnimationName, t: number, keystrokes = 0): Pose {
-  switch (animation) {
+  switch (classic(animation)) {
     case 'idle': {
       const pose = standing();
       pose.breathe = 1 + 0.025 * wave(t, 2600);

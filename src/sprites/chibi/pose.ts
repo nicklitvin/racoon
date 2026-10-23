@@ -1,4 +1,5 @@
 import { PLAY } from '../animations';
+import { BIN } from '../bin';
 import { bump, clamp, clamp01, DEG, easeOut, keyed, lerp, noise1, smooth, span, wave } from '../critter/kit';
 import type { AnimationName, EyeStyle } from '../types';
 import { CHIBI_TOY, type ChibiBuild, type Pt } from './species';
@@ -71,8 +72,11 @@ export interface ChibiPose {
   /** Rolled up in a ball (a hedgehog), and how far round it has rolled, in degrees. */
   ball: number;
   roll: number;
-  /** A frog's tongue, shot out after a fly: 0 in, 1 all the way out. */
-  snap: number;
+  /**
+   * How far long ears (a bunny's) have swung back from where they'd be, in degrees: they're
+   * left behind as he springs up and flop on as he lands. Set by the motion, not the pose.
+   */
+  earFlap: number;
 }
 
 /** The water's surface for a swimmer, from its feet. */
@@ -123,7 +127,6 @@ const NUMBERS = [
   'bubbles',
   'ball',
   'roll',
-  'snap',
 ] as const satisfies readonly (keyof ChibiPose)[];
 
 /** Where the body's middle is and how it's turned, and a way to place points on it. */
@@ -215,7 +218,7 @@ function stand(b: ChibiBuild): ChibiPose {
     bubbles: 0,
     ball: 0,
     roll: 0,
-    snap: 0,
+    earFlap: 0,
   };
   plant(b, p);
   return p;
@@ -243,6 +246,29 @@ function sit(b: ChibiBuild): ChibiPose {
   p.tailA = 205;
   p.tailCurl = -150;
   p.tailFront = 1;
+  return p;
+}
+
+/**
+ * Settled down for a rest: a bunny hunkers down into a loaf, front paws tucked under and
+ * its ears laid back; a hedgehog lies low on its tummy, nose down; anyone else sits up.
+ */
+function rest(b: ChibiBuild): ChibiPose {
+  if (b.species !== 'bunny' && b.species !== 'hedgehog') return sit(b);
+  const p = stand(b);
+  const bunny = b.species === 'bunny';
+  p.by = bunny ? 3 : 2;
+  p.sx = 1.04;
+  p.sy = 0.94;
+  p.hy = bunny ? 2 : 2.5;
+  p.hrot = bunny ? -3 : -8;
+  for (const leg of LEGS) {
+    const root = legRoot(b, p, leg);
+    const front = leg.startsWith('front');
+    p.paws[leg] = { x: root.x + (front ? 2.5 : 1.5), y: Math.min(0, root.y + 2) };
+  }
+  p.haunch = bunny ? 1 : 0;
+  p.ears = bunny ? -0.5 : 0;
   return p;
 }
 
@@ -844,6 +870,134 @@ function angry(b: ChibiBuild, input: ChibiInput): ChibiPose {
   return p;
 }
 
+/** Creeping up on a block: low to the ground, eyes fixed on it, tail tip twitching, bottom wiggling. */
+function stalk(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { phase, clock } = input;
+  const p = stand(b);
+  walk(b, p, phase, 0.55);
+  // Down low over its paws (they stay where they are, so the legs fold).
+  p.by += 3.2 + 0.5 * Math.sin(clock / 45);
+  p.rot -= 2;
+  p.hx += 2;
+  p.hy += 2.5;
+  p.hrot -= 6;
+  p.ears = 0.9;
+  p.lookX = 1;
+  p.lookY = 0.5;
+  p.tailA = lerp(p.tailA, 175, 0.7);
+  p.tailCurl = 25 * Math.sin(clock / 120);
+  p.eyes = 'wide';
+  return p;
+}
+
+/** Nose down to a block, sniffing at it: little quick dips of the head. */
+function sniff(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t, clock } = input;
+  const p = stand(b);
+  p.rot -= 5;
+  p.by += 1;
+  p.hx += 3;
+  p.hy += 5.5;
+  p.hrot -= 22 + 4 * Math.max(0, Math.sin(t / 85));
+  p.ears = 0.6 + 0.2 * Math.sin(t / 300);
+  p.lookX = 0.8;
+  p.lookY = 1;
+  p.tailA += 10 * Math.sin(clock / 400);
+  p.eyes = eyesFrom(input);
+  return p;
+}
+
+/** Walking along with its head down, nosing a block along in front of it. */
+function noseAlong(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const p = stand(b);
+  if (b.gait === 'hop') hop(b, p, input.phase, 3);
+  else walk(b, p, input.phase, 0.8);
+  p.hx += 3;
+  p.hy += 4.5;
+  p.hrot -= 18;
+  p.ears = 0.4;
+  p.lookX = 1;
+  p.lookY = 1;
+  p.eyes = eyesFrom(input);
+  return p;
+}
+
+/** Trotting off with a block in its mouth: head up, tail up, very pleased with itself. */
+function trot(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const p = stand(b);
+  if (b.gait === 'hop') hop(b, p, input.phase, 5);
+  else walk(b, p, input.phase);
+  p.hrot += 10;
+  p.hy -= 1;
+  p.tailA = lerp(p.tailA, 110, 0.5);
+  p.ears = 0.7;
+  p.blush = 0.8;
+  p.eyes = eyesFrom(input);
+  return p;
+}
+
+/**
+ * Head first in his trash can, digging about for something: only his bottom, his hind legs
+ * kicking and his tail waving stick up out of the top. He's stood at the middle of the
+ * can's base, and its rim is `BIN.rim` up.
+ */
+function rummage(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { clock } = input;
+  const p = stand(b);
+  const dig = Math.sin(clock / 110);
+  p.rot = -95 + 6 * dig;
+  // The middle of him just under the rim, so his bottom sticks up out of it.
+  p.bx = -b.body.at.x;
+  p.by = -BIN.rim - 5 - b.body.at.y + 1.5 * Math.abs(dig);
+  // His head straight down under him, in the can.
+  const f = bodyFrame(b, p);
+  const h = headCentre(b, p);
+  p.hx = f.cx + 1 - h.x;
+  p.hy = f.cy + b.body.rx * 0.9 + b.head.ry * 1.1 - h.y;
+  // Nose down, so the top of his head (and any hat) is down in there too.
+  p.hrot = -90;
+  for (const leg of LEGS) {
+    const root = legRoot(b, p, leg);
+    if (leg.startsWith('front')) {
+      // Digging, down in the can.
+      p.paws[leg] = { x: root.x + 2 * Math.sin(clock / 90 + (leg === 'frontFar' ? 2 : 0)), y: root.y + 8 };
+    } else {
+      // Kicking in the air.
+      const kick = Math.sin(clock / 150 + (leg === 'backFar' ? Math.PI : 0));
+      p.paws[leg] = { x: root.x - 3 + 3 * kick, y: root.y - 5 - 2 * Math.max(0, kick) };
+    }
+  }
+  // The tail straight up, waving.
+  p.tailA = 185 + 22 * Math.sin(clock / 260);
+  p.tailCurl = 20 * Math.sin(clock / 330);
+  p.ears = -0.5;
+  p.eyes = 'closed';
+  return p;
+}
+
+/**
+ * Popping up out of his trash can on his hind legs (the behaviour lifts him up out of it),
+ * holding a block he's found up over his head in both paws.
+ */
+function emerge(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t } = input;
+  const p = upright(b);
+  p.rot = 72;
+  p.hrot = 8;
+  p.pawUp = 0;
+  // Arms straight up and out in front, as high as they reach, waving it about.
+  const shoulder = legRoot(b, p, 'frontNear');
+  const wave = Math.sin(t / 90) * span(t, 250, 400);
+  p.paws.frontNear = { x: shoulder.x + 9 + wave, y: shoulder.y - 17 };
+  p.paws.frontFar = { x: shoulder.x + 6.5 + wave, y: shoulder.y - 16 };
+  p.ears = 0.8;
+  p.mouth = 0.35;
+  p.blush = 1;
+  p.lookY = -0.6;
+  p.eyes = t > 250 ? 'happy' : 'wide';
+  return p;
+}
+
 /** The pose for a land animal at this moment. */
 function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
   const { t, clock, phase } = input;
@@ -860,8 +1014,6 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
         const k = clock % 9000;
         p = mix(p, lookout(b), span(k, 6000, 6400) * (1 - span(k, 8200, 8600)));
       }
-      // A frog shoots its tongue out after a fly.
-      if (b.species === 'frog') p.snap = keyed(clock % 6000, [[5000, 0], [5080, 1], [5200, 1], [5320, 0]]);
       look(b, p, input.gaze);
       p.eyes = eyesFrom(input);
       return p;
@@ -898,7 +1050,7 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return p;
     }
     case 'sit': {
-      const p = sit(b);
+      const p = rest(b);
       alive(p, clock, 0.8);
       p.hrot += noise1(clock / 3600, 4) * 6;
       look(b, p, input.gaze);
@@ -906,7 +1058,7 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return p;
     }
     case 'groom': {
-      const p = sit(b);
+      const p = rest(b);
       const lick = (t % 1000) / 1000;
       const stroke = Math.sin(lick * Math.PI * 2);
       p.pawUp = 1;
@@ -922,7 +1074,7 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return p;
     }
     case 'yawn': {
-      const p = sit(b);
+      const p = rest(b);
       const open = span(t, 200, 800) * (1 - span(t, 1500, 2000));
       p.mouth = open;
       p.tongue = open * 0.6;
@@ -963,7 +1115,7 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return p;
     }
     case 'confused': {
-      const p = sit(b);
+      const p = rest(b);
       // Head tilted one way, then the other.
       const side = Math.sin((t / 1800) * Math.PI * 2) > 0 ? 1 : -1;
       p.hrot = 14 * side;
@@ -997,6 +1149,25 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return attention(b, input);
     case 'angry':
       return angry(b, input);
+    case 'stalk':
+      return stalk(b, input);
+    case 'sniff':
+      return sniff(b, input);
+    case 'nudge':
+      return noseAlong(b, input);
+    case 'fetch':
+      return trot(b, input);
+    case 'climb': {
+      // A big spring up over the rim, or out over it.
+      const p = stand(b);
+      spring(b, p, clamp01(t / PLAY.climbMs), 38, 0.3);
+      p.eyes = 'wide';
+      return p;
+    }
+    case 'rummage':
+      return rummage(b, input);
+    case 'emerge':
+      return emerge(b, input);
     case 'happy': {
       const p = stand(b);
       const hop = Math.abs(Math.sin((t / 600) * Math.PI * 2));
@@ -1308,7 +1479,38 @@ function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
     case 'throw':
       return otterToss(b, input);
     case 'carry':
+    case 'fetch':
       return otterPose(b, { ...input, animation: 'walk' });
+    case 'stalk': {
+      // Gliding in slowly, low in the water, eyes just over the surface.
+      const p = swim(b, phase, 0.3);
+      p.by += 2;
+      p.hy += 1.5;
+      p.ears = -0.6;
+      p.lookX = 1;
+      p.eyes = 'wide';
+      return p;
+    }
+    case 'sniff':
+    case 'nudge': {
+      // Nosing at it along the surface.
+      const p = swim(b, input.animation === 'nudge' ? phase : 0, input.animation === 'nudge' ? 0.5 : 0);
+      p.hx += 2.5;
+      p.hy += 1.5;
+      p.hrot -= 10 + (input.animation === 'sniff' ? 4 * Math.max(0, Math.sin(t / 85)) : 0);
+      p.lookX = 0.9;
+      p.lookY = 0.6;
+      p.eyes = eyesFrom(input);
+      return p;
+    }
+    case 'climb':
+    case 'rummage':
+    case 'emerge': {
+      // There's no trash can in a pond: it just treads water.
+      const p = tread(b, clock);
+      p.eyes = eyesFrom(input);
+      return p;
+    }
     case 'angry': {
       // Slapping the water, ears back.
       const p = tread(b, clock);

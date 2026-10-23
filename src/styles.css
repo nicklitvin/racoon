@@ -148,6 +148,18 @@ html[data-host='web'][data-theme='dark'] {
   line-height: 0;
 }
 
+/* ---- Play mode: the raccoon's trash can --------------------------------------------------- */
+
+/* Its back always behind him; its front behind him too, or (3) in front while he's in it or behind it. */
+.bin-art {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
 /* ---- Work mode: the desk, and his speech bubble ---------------------------------------- */
 
 .desk {

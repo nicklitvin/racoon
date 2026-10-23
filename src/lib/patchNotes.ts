@@ -16,6 +16,18 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     date: '2026-10-22',
+    title: 'A trash can, new games and more hats',
+    changes: [
+      'The raccoon has a trash can in play mode. Now and then he climbs in, digs about with just his bottom and tail sticking out, pops up with a block he’s found and throws it out. With lots of blocks lying about, he tidies one away in it. Blocks you throw in go in too.',
+      'More ways to play with the blocks: a sniff first (and sometimes they lose interest), nosing a block along the floor, trotting off with it in their mouth, creeping up low before a pounce, or charging straight through it. They head straight for a block now instead of running round it first.',
+      'Typing away (with keyboard reactions on), your pet comes down to the middle of the bottom of the screen and asks you to play instead.',
+      'Ten new hats: cowboy, chef, pirate, viking, Santa, propeller cap, graduation cap, flower crown, sombrero and beret.',
+      'The bunny and the hedgehog look like themselves: the bunny has long floppy ears that flap as it hops, big hind feet and a round bottom; the hedgehog is a low dome of spines with a pointed snout and a shiny black nose.',
+      'The puffball is gone. If it was your pet, you have the raccoon now.',
+    ],
+  },
+  {
+    date: '2026-10-22',
     title: 'My Pet is a window now',
     changes: [
       'My Pet opens as a window in your taskbar or Dock, and you can find it in the Start menu. Your pet is out while it’s open: minimise it and the pet stays, close it and the pet goes too.',

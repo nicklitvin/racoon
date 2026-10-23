@@ -48,7 +48,8 @@ src/                      The page (React). Runs in Electron and in a browser
     index.ts              The pets the settings offer
     critter/              The lifelike raccoon, cat, fox and otter: rig, gaits, poses, motion, drawing
     chibi/                The flat 2D chibi pets: builds, poses and drawing
-    pixel/                The pixel-art pets: a little rasteriser, palettes and drawing (blob.ts: the puffball)
+    pixel/                The pixel-art pets: a little rasteriser, palettes and drawing (the raccoon, tabby and otter; the bunny and hedgehog in beta)
+    bin.ts                The raccoon's trash can in pixel art, in two layers (behind him and in front of him)
     toys.ts               The toy blocks' drawings, one for each art style
     outfits.ts            Hats, neckwear and costumes, as shapes every art style draws its own way
     desk.ts               The work-mode desk in pixel art, built to fit the pet, and what's on its screen
@@ -57,6 +58,7 @@ src/                      The page (React). Runs in Electron and in a browser
   runtime/petRuntime.ts   Connects core logic to the DOM; runs the animation loop
   runtime/toyLayer.ts     Puts the toy blocks on the page; picking them up and throwing them
   runtime/deskLayer.ts    Puts the work-mode desk in the corner; taps on it
+  runtime/binLayer.ts     Puts the raccoon's trash can out in play mode, in front of him or behind him
   host/                   "Where am I running?": Electron bridge or browser fallback
   components/             React: the pet page, the settings panel and its "What's new" notes
   lib/                    The version (the build date) and the patch notes
@@ -95,13 +97,17 @@ A raccoon can also take it for a walk. Drawings that can hold a block in their h
 
 You can play too: `ToyLayer` (`src/runtime/toyLayer.ts`) puts a block in your hand when you press on it, and throws it with the pointer's speed when you let go (flung up the screen it goes up into the air). The brain hears about it (`toyThrown`) and chases after it, to where it will land. Holding a block, you have the pet's attention: it waits, watching it, until you throw it. Tuning is in `DEFAULT_CONFIG.play`.
 
+What happens when he gets to a block varies (`pickMove` in `brain.ts`, weights in `DEFAULT_CONFIG.play.moves`): a swat, a throw, a good sniff first (after which he might lose interest), nosing it along the floor a few pushes at a time (`nudge`), or trotting off with it in his mouth and dropping it (`grab`, `fetch`). From a little way off he might pounce, creeping up on it low to the ground first (`stalk`, `stalkChance`), and from a long way off he might charge straight through it and kick it on (`charge`, `chargeChance`). Within `CURVE_FROM` of a block he heads straight for it rather than running round in a curve, and he plays with it from whichever side he's on, so he never circles it. A block stuck against the edge of the screen, out of his reach, gets hooked out with a paw.
+
+**The trash can.** In play mode a raccoon has a trash can (`BinLayer`, `src/sprites/bin.ts`). Its back is drawn behind him and its front in front of him while he's in it or behind it. The brain is told where it is (`WorldInput.bin`) and, now and then (`play.binChance`), goes to it: the **rummage** reaction hops in (`climb`), digs about with just his bottom, legs and tail out of the top (`rummage`, the can rattling), pops up with a block he's found (`emerge`), throws it out and hops out after it. The toybox keeps count of the blocks in the can (`Toybox.stash`, two to start with): any block that drops in over the rim goes in, and blocks sliding along the floor bounce off its sides. With `play.tidyFrom` blocks out, he carries one over and drops it in instead. `PetSnapshot.inBin` says when the can goes in front of him.
+
 ### Dressing up
 
 `src/sprites/outfits.ts` describes each hat and outfit as a few plain shapes (polygons and ellipses) with three colours. Hats are drawn in head units (the head's half-width is 1, the origin the crown of the head) and what's worn at the neck (a tie, a collar) in neck units, so one description fits every animal and every size. Clothes also say how they cover the body (`body`): the body and how far down the legs, stripes round it, a shirt front, buttons, or a cape over the back that flies out behind as he runs. Whole costumes add more: a patch on the tummy, spikes down the back, buzzing wings, a pack, stars, a tutu or a robe, and a `hood` (shapes in hat units, drawn over the head under any hat: a dino's spikes, a bee's antennae, a space helmet's rim, a knight's helmet). Each renderer draws them its own way through `dress()`:
 
 - The lifelike pets put the hat on the crown of their 3D head and turn it with the head (`placeOutfit` in `critter/skin.ts`), and wrap the collar across the neck between body and head, so the head comes over its top.
 - The chibis draw the hat inside the head group and the neckwear just under the chin.
-- The pixel pets rasterise the same shapes, with the item's colours in palette slots of their own, and dress the body and wear hoods too. (Only they do for now: the others wear just the neck part of clothes.) The puffball has no neck, so neckwear goes round its middle, clothes cover its bottom half, and a onesie (`onesie: true`) covers all of it but its face.
+- The pixel pets rasterise the same shapes, with the item's colours in palette slots of their own, and dress the body and wear hoods too. (Only they do for now: the others wear just the neck part of clothes.)
 
 The settings panel shows them as tiles, each a little picture drawn from the same shapes (`wearableIcon`), with the name in its tooltip and over the grid for the one picked. The modes are cards, each a little moving picture of your pet, dressed as it is, doing that mode (`ModeScene`): swatting its blocks, typing at its desk, asleep under the moon, running off the edge. They're drawn with the same renderer, desk and blocks as the screen.
 
@@ -126,7 +132,7 @@ The desk (`src/sprites/desk.ts`) is pixel art on a small canvas. Its monitor fac
 
 ### Reactions to typing (opt-in)
 
-When typing has been steady for a few seconds, the raccoon goes to the bottom edge and peeks up over it. Its eyes move with each key press. About 5 seconds after you stop, it climbs back out and carries on. See **Privacy** below for exactly what is measured.
+When typing has been steady for a few seconds, the pet comes down to the middle of the bottom of the screen and waves, asking you to play instead (`BEG_LINES` in `brain.ts`). Then it sinks down and peeks up over the edge, its eyes moving with each key press, and every 15 to 20 seconds of typing it comes up to ask again. About 5 seconds after you stop, it climbs back out, pleased it's play time. See **Privacy** below for exactly what is measured.
 
 ### Performance
 
@@ -209,7 +215,6 @@ To add an animation for them too, add a `case` to `walkerPose()` and `otterPose(
 - `palette.ts` holds each coat as a palette.
 - `index.ts` is the renderer. It draws a new picture 12 times a second, like an old game, and the page places it on whole screen pixels.
 
-**The puffball** (`pixel/blob.ts`, in beta) is drawn its own way: a round ball with a face, stubby arms and big feet, and no neck, tail or ears. It keeps the chibis' poses and motion (`BLOB` is a build for them that only sets its reach: blocks, desk, mouse), so it keeps time with everything else, but reads only what the face does, where a paw is reaching and how it's squashed. Where the ball goes is up to the drawing: it floats `HOVER` units off the floor, bobbing, except to sit, sleep, peek, be held or work (`GROUNDED`), rising and settling gently between the two; getting about it puffs up and flaps its arms. A block it tosses, it breathes in and holds in its mouth. `tests/blob.test.ts` checks it.
 
 `tests/pixel.test.ts` checks the outlines are closed, that every animation is drawn whole inside the canvas, facing left mirrors facing right, the marks show, and nothing of a swimming otter shows under the water.
 

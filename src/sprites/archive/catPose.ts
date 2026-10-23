@@ -1,5 +1,6 @@
 import type { Point } from '../../core/geometry';
 import type { LegName } from './rig';
+import { classic } from '../animations';
 import type { AnimationName } from '../types';
 
 /**
@@ -221,7 +222,7 @@ function sitting(t: number): CatPose {
 }
 
 export function catPoseFor(animation: AnimationName, t: number, keystrokes = 0): CatPose {
-  switch (animation) {
+  switch (classic(animation)) {
     case 'idle': {
       const pose = standing();
       const breath = wave(t, 2600);

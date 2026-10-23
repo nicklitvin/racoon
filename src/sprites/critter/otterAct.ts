@@ -1,4 +1,4 @@
-import { PLAY } from '../animations';
+import { classic, PLAY } from '../animations';
 import { OTTER_BUILD as B } from './build';
 import { LEAP_MS, lookAt, noFlags, type Act, type ActInput } from './act';
 import { bump, clamp01, easeOut, keyed, lerp, noise1, smooth, span, wave } from './kit';
@@ -235,7 +235,7 @@ export function otterAct(input: ActInput): Act {
   const { animation, t, clock } = input;
   const flags = noFlags();
 
-  switch (animation) {
+  switch (classic(animation)) {
     case 'idle': {
       // Treads water to look about, then lies back and floats.
       const lie = span(t, 2400, 3300);

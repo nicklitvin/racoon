@@ -6,7 +6,7 @@ import { drawPixelPet, PIXEL } from '../src/sprites/pixel/draw';
 import { drawPixelFacing } from '../src/sprites/pixel/facing';
 import { C, PIXEL_COATS, rgbaTable, SLOTS } from '../src/sprites/pixel/palette';
 import { ellipse, Raster } from '../src/sprites/pixel/raster';
-import { PIXEL_BUNNY, PIXEL_CAT, PIXEL_FOX, PIXEL_FROG, PIXEL_HEDGEHOG, PIXEL_OTTER, PIXEL_RACCOON, type PixelBuild } from '../src/sprites/pixel/species';
+import { PIXEL_BUNNY, PIXEL_CAT, PIXEL_HEDGEHOG, PIXEL_OTTER, PIXEL_RACCOON, type PixelBuild } from '../src/sprites/pixel/species';
 import { ANIMATION_NAMES, type AnimationName } from '../src/sprites/types';
 
 const BUILDS = [
@@ -15,8 +15,6 @@ const BUILDS = [
   ['otter', PIXEL_OTTER],
   ['bunny', PIXEL_BUNNY],
   ['hedgehog', PIXEL_HEDGEHOG],
-  ['fox', PIXEL_FOX],
-  ['frog', PIXEL_FROG],
 ] as const;
 
 /** A settled pose for an animation, `ms` in. */

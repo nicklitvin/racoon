@@ -21,9 +21,9 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ mode: 'party' }).mode).toBe('play');
   });
 
-  it('offers the three pixel pets, and the puffball, bunny, hedgehog, fox and frog in beta, defaulting to the raccoon', () => {
-    expect(RACCOON_TYPES).toEqual(['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'blob-pixel', 'bunny-pixel', 'hedgehog-pixel', 'fox-pixel', 'frog-pixel']);
-    expect(BETA_TYPES).toEqual(['blob-pixel', 'bunny-pixel', 'hedgehog-pixel', 'fox-pixel', 'frog-pixel']);
+  it('offers the three pixel pets, and the bunny and hedgehog in beta, defaulting to the raccoon', () => {
+    expect(RACCOON_TYPES).toEqual(['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'bunny-pixel', 'hedgehog-pixel']);
+    expect(BETA_TYPES).toEqual(['bunny-pixel', 'hedgehog-pixel']);
     expect(DEFAULT_SETTINGS.raccoonType).toBe('raccoon-pixel');
     for (const type of RACCOON_TYPES) expect(normalizeSettings({ raccoonType: type, beta: true }).raccoonType).toBe(type);
   });
@@ -31,18 +31,19 @@ describe('normalizeSettings', () => {
   it('keeps beta off unless switched on, and only keeps a beta pet while it is', () => {
     expect(DEFAULT_SETTINGS.beta).toBe(false);
     expect(normalizeSettings({ beta: 'yes' }).beta).toBe(false);
-    expect(normalizeSettings({ raccoonType: 'blob-pixel' }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
-    expect(normalizeSettings({ raccoonType: 'blob-pixel', beta: true })).toMatchObject({ raccoonType: 'blob-pixel', beta: true });
-    // Switching beta off again takes the puffball away.
-    const on = normalizeSettings({ raccoonType: 'blob-pixel', beta: true });
+    expect(normalizeSettings({ raccoonType: 'bunny-pixel' }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
+    expect(normalizeSettings({ raccoonType: 'bunny-pixel', beta: true })).toMatchObject({ raccoonType: 'bunny-pixel', beta: true });
+    // Switching beta off again takes the bunny away.
+    const on = normalizeSettings({ raccoonType: 'bunny-pixel', beta: true });
     expect(normalizeSettings({ ...on, beta: false }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
-    for (const type of ['bunny-pixel', 'hedgehog-pixel', 'frog-pixel']) expect(normalizeSettings({ raccoonType: type }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
+    expect(normalizeSettings({ raccoonType: 'hedgehog-pixel' }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
     // The other pets don't care.
     expect(normalizeSettings({ raccoonType: 'otter-pixel', beta: false }).raccoonType).toBe('otter-pixel');
   });
 
   it('moves anyone on a retired pet to the default', () => {
-    for (const retired of ['arena', 'cartoon', 'plush', 'classic', 'cat']) {
+    for (const retired of ['arena', 'cartoon', 'plush', 'classic', 'cat', 'blob-pixel', 'frog-pixel']) {
+      expect(normalizeSettings({ raccoonType: retired, beta: true }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
       expect(normalizeSettings({ raccoonType: retired }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
     }
   });
@@ -55,10 +56,10 @@ describe('normalizeSettings', () => {
       expect(normalizeSettings({ raccoonType: old }).raccoonType, old).toBe('cat-pixel');
     }
     for (const old of ['otter-storybook', 'otter-sketch', 'otter-chibi']) expect(normalizeSettings({ raccoonType: old }).raccoonType, old).toBe('otter-pixel');
-    // The pixel fox is in beta: with beta off, the cat is the nearest thing.
+    // A fox gets the cat, the nearest thing to one.
     for (const old of ['fox-storybook', 'fox-arctic', 'fox-chibi', 'fox-pixel']) {
       expect(normalizeSettings({ raccoonType: old }).raccoonType, old).toBe('cat-pixel');
-      expect(normalizeSettings({ raccoonType: old, beta: true }).raccoonType, old).toBe('fox-pixel');
+      expect(normalizeSettings({ raccoonType: old, beta: true }).raccoonType, old).toBe('cat-pixel');
     }
     // Not fooled by names that only look like one.
     expect(normalizeSettings({ raccoonType: 'constructor' }).raccoonType).toBe(DEFAULT_SETTINGS.raccoonType);
@@ -69,7 +70,7 @@ describe('normalizeSettings', () => {
     expect(DEFAULT_SETTINGS.outfit).toBe('none');
     for (const hat of HATS) expect(normalizeSettings({ hat }).hat).toBe(hat);
     for (const outfit of OUTFITS) expect(normalizeSettings({ outfit }).outfit).toBe(outfit);
-    expect(normalizeSettings({ hat: 'sombrero', outfit: 42 })).toMatchObject({ hat: 'none', outfit: 'none' });
+    expect(normalizeSettings({ hat: 'fedora', outfit: 42 })).toMatchObject({ hat: 'none', outfit: 'none' });
   });
 
   it('carries over the old work mode switch as work mode', () => {

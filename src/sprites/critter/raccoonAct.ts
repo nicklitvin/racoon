@@ -1,4 +1,4 @@
-import { PLAY } from '../animations';
+import { classic, PLAY } from '../animations';
 import { CRITTER_TOY, RACCOON_BUILD as B } from './build';
 import { gaitFor, leap, leapKind, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
 import { step, strideAt, type Gait } from './gait';
@@ -122,7 +122,7 @@ export function raccoonAct(input: ActInput): Act {
   const { animation, t, clock, life } = input;
   const flags = noFlags();
 
-  switch (animation) {
+  switch (classic(animation)) {
     case 'idle': {
       const p = stand();
       p.px += life.sway * 0.7;

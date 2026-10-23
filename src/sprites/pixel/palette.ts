@@ -121,26 +121,6 @@ export const PIXEL_COATS = {
     eye: '#140c09',
     nose: '#2b1a12',
   },
-  /** The puffball: pink all over, red feet, and tall eyes with a blue shine at the bottom (`inner`). */
-  puff: {
-    ...SHARED,
-    outline: '#5a1f3a',
-    fur: '#ffa3c9',
-    furLight: '#ffd0e4',
-    furDark: '#e9799f',
-    far: '#ec8cb3',
-    belly: '#ffc2db',
-    light: '#ffe1ee',
-    /** Its feet, and the far one, a shade darker. */
-    dark: '#e2385f',
-    band: '#b52348',
-    inner: '#3c62d6',
-    eye: '#1a1030',
-    nose: '#e2385f',
-    blush: '#ff5f8f',
-    mouth: '#8a1f3c',
-    tongue: '#ff7aa0',
-  },
   /** A sandy bunny with a white tail (`band`) and pink inside its ears. */
   bunny: {
     ...SHARED,
@@ -172,40 +152,6 @@ export const PIXEL_COATS = {
     inner: '#8a6a50',
     eye: '#140c09',
     nose: '#2b1a12',
-  },
-  /** A red fox: white muzzle, chest and tail tip (`band`), and black socks and ear tips (`dark`). */
-  fox: {
-    ...SHARED,
-    outline: '#43200f',
-    fur: '#ef7f2e',
-    furLight: '#ffa65a',
-    furDark: '#c75f1c',
-    far: '#cf6a24',
-    belly: '#fff3e3',
-    light: '#fff6ea',
-    dark: '#3a2318',
-    band: '#fff6ea',
-    inner: '#ffe9d2',
-    eye: '#1a0f0a',
-    nose: '#1a0f0a',
-  },
-  /** A green frog: a pale yellow throat and tummy, darker spots (`dark`), and white round its eyes (`inner`). */
-  frog: {
-    ...SHARED,
-    outline: '#1f3a1c',
-    fur: '#6cc24a',
-    furLight: '#9be06f',
-    furDark: '#4d9a34',
-    far: '#55a338',
-    belly: '#e8f2b0',
-    light: '#e1f2a8',
-    dark: '#3f7a2a',
-    band: '#3f7a2a',
-    inner: '#f6faea',
-    eye: '#101a0c',
-    nose: '#2b4a22',
-    mouth: '#2b4a22',
-    tongue: '#ff7a95',
   },
 } satisfies Record<string, Palette>;
 

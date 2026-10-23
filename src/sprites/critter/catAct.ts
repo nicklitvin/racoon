@@ -1,4 +1,4 @@
-import { PLAY } from '../animations';
+import { classic, PLAY } from '../animations';
 import { CAT_BUILD as B, CRITTER_TOY } from './build';
 import { gaitFor, leap, leapKind, lookAt, noFlags, walkBob, walkLegs, type Act, type ActInput } from './act';
 import { bump, clamp01, easeOut, frac, keyed, lerp, noise1, smoother, span, wave } from './kit';
@@ -121,7 +121,7 @@ export function catAct(input: ActInput): Act {
   const { animation, t, clock, life } = input;
   const flags = noFlags();
 
-  switch (animation) {
+  switch (classic(animation)) {
     case 'idle': {
       const p = stand();
       // Weight drifts from paw to paw; the head floats with it.

@@ -36,8 +36,20 @@ export interface Velocity3 {
   z: number;
 }
 
+/**
+ * A trash can standing on the floor: the middle of its base, half its width, how far its
+ * base reaches back from the front (seen from a little above), and how high its rim is, px.
+ */
+export interface BinSpot {
+  x: number;
+  y: number;
+  halfWidth: number;
+  depth: number;
+  rim: number;
+}
+
 /** px/s². */
-const GRAVITY = 2100;
+export const GRAVITY = 2100;
 /** How much of its fall a block bounces back up with. */
 const BOUNCE = 0.36;
 /** Bouncing lower than this, it stays down. */
@@ -57,6 +69,12 @@ export class Toybox {
   bounds: Rect = { x: 0, y: 0, width: 0, height: 0 };
   /** Edge of a block, px. */
   size = 18;
+  /**
+   * A trash can on the floor, if there is one: blocks bounce off its sides, and one that
+   * drops in over the rim goes in it, adding to the `stash` of blocks in there.
+   */
+  bin: BinSpot | null = null;
+  stash = 0;
   private nextId = 1;
 
   add(face: number, at: Point): Toy {
@@ -68,6 +86,16 @@ export class Toybox {
 
   clear(): void {
     this.toys.length = 0;
+  }
+
+  /** Takes a block out of the can (if there are any in it) into the pet's paws, at `at`, `z` up. */
+  takeFromBin(face: number, at: Point, z: number): Toy | null {
+    if (this.stash <= 0) return null;
+    this.stash--;
+    const toy = this.add(face, at);
+    toy.z = Math.max(0, z);
+    toy.holder = 'pet';
+    return toy;
   }
 
   /** A new floor (the screen changed): blocks off the edge of it come back on. */
@@ -139,6 +167,12 @@ export class Toybox {
 
   step(dt: number): void {
     for (const toy of this.toys) if (!toy.holder) this.move(toy, dt);
+    // Any that have dropped into the can are in it now.
+    for (let i = this.toys.length - 1; i >= 0; i--) {
+      if (!this.inBin(this.toys[i]!)) continue;
+      this.toys.splice(i, 1);
+      this.stash++;
+    }
     this.separate();
   }
 
@@ -148,11 +182,23 @@ export class Toybox {
     if (!toy) return null;
     if (toy.holder) return { x: toy.x, y: toy.y };
     const ghost = { ...toy };
-    for (let i = 0; i < 400 && !this.isResting(ghost); i++) this.move(ghost, 1 / 60);
+    for (let i = 0; i < 400 && !this.isResting(ghost) && !this.inBin(ghost); i++) this.move(ghost, 1 / 60);
     return { x: ghost.x, y: ghost.y };
   }
 
+  /** Over the can's base and below its rim: it's in the can. */
+  private inBin(toy: Toy): boolean {
+    const bin = this.bin;
+    return bin !== null && !toy.holder && toy.z < bin.rim && this.overBin(toy.x, toy.y);
+  }
+
+  private overBin(x: number, y: number): boolean {
+    const bin = this.bin;
+    return bin !== null && Math.abs(x - bin.x) < bin.halfWidth && y < bin.y + 2 && y > bin.y - bin.depth;
+  }
+
   private move(toy: Toy, dt: number): void {
+    const was = { x: toy.x, y: toy.y, z: toy.z };
     if (toy.z > 0 || toy.vz > 0) {
       toy.vz -= GRAVITY * dt;
       toy.z += toy.vz * dt;
@@ -191,6 +237,15 @@ export class Toybox {
       toy.angle += toy.spin * dt;
     }
     this.keepIn(toy);
+    // Low down, it bounces off the side of the can rather than going through it.
+    const bin = this.bin;
+    if (bin && toy.z < bin.rim && this.overBin(toy.x, toy.y) && !this.overBin(was.x, was.y) && was.z < bin.rim) {
+      const fromSide = Math.abs(was.x - bin.x) >= bin.halfWidth;
+      toy.x = was.x;
+      toy.y = was.y;
+      if (fromSide) toy.vx = -toy.vx * WALL;
+      else toy.vy = -toy.vy * WALL;
+    }
   }
 
   /** Keeps a block on the floor: it bounces off the sides, and stops at the top and bottom. */

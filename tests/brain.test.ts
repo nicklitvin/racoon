@@ -330,12 +330,28 @@ describe('Brain: typing reactions', () => {
     expect(back.position.y).toBeCloseTo(bottom - 60, 0);
   });
 
-  it('walks down to the bottom edge from anywhere on screen to watch', () => {
+  it('walks down to the middle of the bottom of the screen from anywhere, and asks you to play', () => {
     const brain = makeBrain(11);
     place(brain, { x: 400, y: 300 });
-    const { snap } = runUntil(brain, (s) => s.phase === 'watch', world({ typingActive: true }));
-    expect(snap.position.x).toBeCloseTo(400, 0);
+    const snaps: PetSnapshot[] = [];
+    const { snap } = runUntil(brain, (s) => (snaps.push(s), s.phase === 'watch'), world({ typingActive: true }));
+    expect(Math.abs(snap.position.x - (bounds.x + bounds.width / 2))).toBeLessThan(4);
     expect(snap.position.y).toBeGreaterThan(bottom);
+    // On the way down into his peek, he waves and says something.
+    const begging = snaps.filter((s) => s.phase === 'beg');
+    expect(begging.length).toBeGreaterThan(10);
+    expect(begging.every((s) => s.animation === 'attention')).toBe(true);
+    expect(begging[0]!.say).toMatch(/play/i);
+  });
+
+  it('asks again now and then while you keep typing, and is pleased when you stop', () => {
+    const brain = makeBrain(11);
+    const typing = world({ typingActive: true });
+    runUntil(brain, (s) => s.phase === 'watch', typing);
+    const { snap: again } = runUntil(brain, (s) => s.phase === 'beg', typing, 30_000);
+    expect(again.say).not.toBe(null);
+    const { snap: done } = runUntil(brain, (s) => s.mode !== 'react', world());
+    expect(done.say).toMatch(/play time/i);
   });
 
   it('lets cursor excitement interrupt typing-watch', () => {

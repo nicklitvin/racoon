@@ -43,6 +43,20 @@ export const ANIMATION_NAMES = [
   'attention',
   /** Cross: stamping a foot, ears back, a scowl. */
   'angry',
+  /** Creeping up on a toy, low to the ground, bottom wiggling, before a pounce. */
+  'stalk',
+  /** Nose down to a toy, having a good sniff at it. */
+  'sniff',
+  /** Walking along with the head down, nosing a toy along in front. */
+  'nudge',
+  /** Trotting along, head up and proud, with a toy in the mouth. */
+  'fetch',
+  /** A big hop up into (or out of) the trash can. */
+  'climb',
+  /** Head first in the trash can, digging about: only the bottom, hind legs and tail stick out. */
+  'rummage',
+  /** Popping up out of the trash can with a toy found in it, held up in both paws. */
+  'emerge',
 ] as const;
 
 export type AnimationName = (typeof ANIMATION_NAMES)[number];
