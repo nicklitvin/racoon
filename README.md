@@ -8,9 +8,8 @@ A little pixel-art pet that lives on your screen: a raccoon, a ginger cat or an 
 
 | Your computer | Download |
 | --- | --- |
-| Windows | `My-Pet-Setup-<version>.exe` installs it. `My-Pet-Portable-<version>.exe` runs without installing. |
-| Mac with Apple silicon (M1 and later) | `My-Pet-<version>-mac-arm64.dmg` |
-| Intel Mac | `My-Pet-<version>-mac-x64.dmg` |
+| Windows | `My-Pet-Windows.exe`: open it and your pet appears. |
+| Mac (Apple silicon, M1 and later) | `My-Pet-Mac.dmg` |
 
 The app isn't code-signed yet, so the first time you open it:
 
@@ -55,7 +54,7 @@ npm install
 npm run dev        # desktop app, with hot reload
 npm run dev:web    # browser version at http://localhost:5173
 npm test           # unit tests
-npm run dist:win   # Windows installer and portable .exe in release/
+npm run dist:win   # My-Pet-Windows.exe in release/
 ```
 
 Releases are automatic: every push to `main` that changes the app builds the Windows and Mac apps on GitHub's machines and updates the release for the version in `package.json` (`v0.1.0`). To start a new release, bump `version` in `package.json`.

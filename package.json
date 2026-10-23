@@ -60,12 +60,6 @@
           "arch": [
             "x64"
           ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
         }
       ],
       "icon": "build/icon.png"
@@ -73,21 +67,18 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "artifactName": "My-Pet-Setup-${version}.${ext}"
-    },
-    "portable": {
-      "artifactName": "My-Pet-Portable-${version}.${ext}"
+      "runAfterFinish": true,
+      "artifactName": "My-Pet-Windows.${ext}"
     },
     "dmg": {
-      "artifactName": "My-Pet-${version}-mac-${arch}.${ext}"
+      "artifactName": "My-Pet-Mac.${ext}"
     },
     "mac": {
       "target": [
         {
           "target": "dmg",
           "arch": [
-            "arm64",
-            "x64"
+            "arm64"
           ]
         }
       ],

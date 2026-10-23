@@ -11,7 +11,7 @@ How it's built, how it works inside, and how to package and test it. For downloa
 | `npm run build` | Web bundle (`dist/`) + Electron main/preload (`dist-electron/`). |
 | `npm start` | Production build, run in Electron. |
 | `npm run build:web` | Web bundle only. This is what Vercel runs. |
-| `npm run dist:win` | Windows installer and portable `.exe` in `release/`. |
+| `npm run dist:win` | `My-Pet-Windows.exe` in `release/`. |
 | `npm run dist:mac` | macOS `.dmg` (must run on a Mac; see below). |
 | `npm run typecheck` | Type-checks the renderer and the Electron code. |
 | `npm test` | Vitest unit tests (state machine, activity tracking, sprites, settings, click-through). |
@@ -229,7 +229,7 @@ The version is the date of the build, stamped in by `vite.config.mts` (`__BUILD_
 npm run dist:win
 ```
 
-This produces `release/My-Pet-Setup-<version>.exe` (a one-click per-user installer) and `release/My-Pet-Portable-<version>.exe` (no install). The keyboard hook (`uiohook-napi`) ships prebuilt N-API binaries, so packaging needs no C++ toolchain (`npmRebuild` is off). The builds are **unsigned**, so Windows SmartScreen will warn on first run until you sign them with a code-signing certificate (set `CSC_LINK` / `CSC_KEY_PASSWORD`).
+This produces `release/My-Pet-Windows.exe`: a one-click per-user installer that installs My Pet and starts it straight away, so it's the only download Windows needs. (Not a portable `.exe`: those unpack themselves on every launch, which is slow and doesn't suit "Start at login".) The keyboard hook (`uiohook-napi`) ships prebuilt N-API binaries, so packaging needs no C++ toolchain (`npmRebuild` is off). The builds are **unsigned**, so Windows SmartScreen will warn on first run until you sign them with a code-signing certificate (set `CSC_LINK` / `CSC_KEY_PASSWORD`).
 
 The app was called Racoon before it was My Pet. Some things you never see keep the old name, so an existing install upgrades in place and keeps its settings: the app id (`com.nicklitvin.racoon`), the settings folder (`%APPDATA%\Racoon`, `~/Library/Application Support/Racoon`, set in `electron/main.ts`), the browser's `racoon.settings` key and the IPC channel names.
 
@@ -241,18 +241,18 @@ Build on a Mac (electron-builder can't build for macOS from Windows):
 
 ```bash
 npm install
-CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac   # release/My-Pet-<version>-mac-arm64.dmg and -mac-x64.dmg
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac   # release/My-Pet-Mac.dmg (Apple silicon only)
 ```
 
 ### Downloads on GitHub
 
-`.github/workflows/build.yml` builds both on GitHub's own Windows and Mac machines and publishes them as a **GitHub Release**, so anyone can download them from the repo's **Releases** page. It runs by itself on every push to `main` that changes the app (pushes that only touch `*.md` or `docs/` are skipped, and a newer push cancels a build still running). There's one release per version in `package.json`: each run moves the `v<version>` tag to the new commit and replaces its downloads, so the release always has the latest build. Bump `version` for a new release; older ones stay as they were. Pushing a tag yourself (`git tag v0.2.0 && git push origin v0.2.0`) or **Actions → Build desktop apps → Run workflow** works too. The Mac builds aren't signed with a Developer ID or notarized, so the first time, macOS needs `xattr -cr "/Applications/My Pet.app"` or **Open Anyway** in **System Settings → Privacy & Security**.
+`.github/workflows/build.yml` builds the two downloads (`My-Pet-Windows.exe` and `My-Pet-Mac.dmg`) on GitHub's own Windows and Mac machines and publishes them as a **GitHub Release**, so anyone can download them from the repo's **Releases** page. It runs by itself on every push to `main` that changes the app (pushes that only touch `*.md` or `docs/` are skipped, and a newer push cancels a build still running). There's one release per version in `package.json`: each run moves the `v<version>` tag to the new commit and replaces its downloads (deleting any others), so the release always has the latest build. Bump `version` for a new release; older ones stay as they were. Pushing a tag yourself (`git tag v0.2.0 && git push origin v0.2.0`) or **Actions → Build desktop apps → Run workflow** works too. The Mac builds aren't signed with a Developer ID or notarized, so the first time, macOS needs `xattr -cr "/Applications/My Pet.app"` or **Open Anyway** in **System Settings → Privacy & Security**.
 
 Already handled:
 
 - `LSUIElement` keeps the app out of the Dock and the app switcher; the window shows on all Spaces and over full-screen apps.
 - The keyboard permission flow is in `electron/platform/mac.ts` (see **Privacy** above).
-- Prebuilt `uiohook-napi` binaries for arm64 and x64 are included.
+- Prebuilt `uiohook-napi` binaries for arm64 are included. Intel Macs aren't built: add `x64` to the mac target's `arch` in `package.json` to build them too.
 
 To distribute to others:
 
