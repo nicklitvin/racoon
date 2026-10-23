@@ -1,5 +1,5 @@
 import type { Point, Rect } from '../../shared/ipc';
-import type { BinSpot, Toybox } from '../core/toys/toybox';
+import type { Toybox } from '../core/toys/toybox';
 import { createToyDrawing, TOY_BOX, type ToyDrawing } from '../sprites/toys';
 import type { ToyLook } from '../sprites/types';
 
@@ -44,8 +44,6 @@ export interface ToyLayerHooks {
  */
 export class ToyLayer {
   private readonly items = new Map<number, Item>();
-  /** The trash can's base on the floor, if there is one. */
-  private bin: BinSpot | null = null;
   private look: ToyLook = 'paint';
   private size = 0;
   private origin: Point = { x: 0, y: 0 };
@@ -71,12 +69,6 @@ export class ToyLayer {
     this.origin = origin;
   }
 
-  /** Where the trash can stands, if there is one: blocks behind it go behind it. */
-  setBin(bin: BinSpot | null): void {
-    this.bin = bin;
-    for (const item of this.items.values()) item.last = '';
-  }
-
   get dragging(): boolean {
     return this.drag !== null;
   }
@@ -84,16 +76,13 @@ export class ToyLayer {
   /** Places every block, given where the pet's feet are. */
   render(petFeet: Point): void {
     for (const id of this.items.keys()) if (!this.toys.get(id)) this.remove(id);
-    const bin = this.bin;
     for (const toy of this.toys.toys) {
       const item = this.items.get(toy.id) ?? this.add(toy.id, toy.face);
       const x = toy.x - this.origin.x;
       const y = toy.y - this.origin.y;
       // Nearer you than the pet, it's in front of him; in his mouth or your hand, always.
-      // Lying behind his trash can, it's behind that too.
       const front = toy.holder !== null || toy.y >= petFeet.y - 2;
-      const hidden = bin !== null && !toy.holder && toy.y < bin.y && Math.abs(toy.x - bin.x) < bin.halfWidth * 1.4 + this.size;
-      const z = toy.holder === 'user' ? 4 : hidden ? 0 : front ? 3 : 1;
+      const z = toy.holder === 'user' ? 4 : front ? 3 : 1;
       const air = Math.min(1, toy.z / 160);
       const key = `${x.toFixed(1)}|${y.toFixed(1)}|${toy.z.toFixed(1)}|${toy.angle.toFixed(1)}|${z}`;
       if (key === item.last) continue;
@@ -102,9 +91,7 @@ export class ToyLayer {
       item.wrap.style.zIndex = String(z);
       item.block.style.transform = `translate(-50%, -50%) translateY(${(-toy.z - this.size / 2).toFixed(1)}px)`;
       item.shadow.style.transform = `translate(-50%, -50%) scale(${(1 - air * 0.55).toFixed(3)})`;
-      // Over the can (in his paws in it, or dropping in), its shadow is inside the can.
-      const overBin = bin !== null && Math.abs(toy.x - bin.x) < bin.halfWidth && toy.y < bin.y + 2 && toy.y > bin.y - bin.depth;
-      item.shadow.style.opacity = overBin ? '0' : (1 - air * 0.6).toFixed(2);
+      item.shadow.style.opacity = (1 - air * 0.6).toFixed(2);
       item.drawing.draw(toy.angle);
     }
   }

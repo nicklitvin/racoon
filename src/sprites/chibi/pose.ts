@@ -1,5 +1,4 @@
 import { PLAY } from '../animations';
-import { BIN } from '../bin';
 import { bump, clamp, clamp01, DEG, easeOut, keyed, lerp, noise1, smooth, span, wave } from '../critter/kit';
 import type { AnimationName, EyeStyle } from '../types';
 import { CHIBI_TOY, type ChibiBuild, type Pt } from './species';
@@ -936,68 +935,6 @@ function trot(b: ChibiBuild, input: ChibiInput): ChibiPose {
   return p;
 }
 
-/**
- * Head first in his trash can, digging about for something: only his bottom, his hind legs
- * kicking and his tail waving stick up out of the top. He's stood at the middle of the
- * can's base, and its rim is `BIN.rim` up.
- */
-function rummage(b: ChibiBuild, input: ChibiInput): ChibiPose {
-  const { clock } = input;
-  const p = stand(b);
-  const dig = Math.sin(clock / 110);
-  p.rot = -95 + 6 * dig;
-  // The middle of him just under the rim, so his bottom sticks up out of it.
-  p.bx = -b.body.at.x;
-  p.by = -BIN.rim - 5 - b.body.at.y + 1.5 * Math.abs(dig);
-  // His head straight down under him, in the can.
-  const f = bodyFrame(b, p);
-  const h = headCentre(b, p);
-  p.hx = f.cx + 1 - h.x;
-  p.hy = f.cy + b.body.rx * 0.9 + b.head.ry * 1.1 - h.y;
-  // Nose down, so the top of his head (and any hat) is down in there too.
-  p.hrot = -90;
-  for (const leg of LEGS) {
-    const root = legRoot(b, p, leg);
-    if (leg.startsWith('front')) {
-      // Digging, down in the can.
-      p.paws[leg] = { x: root.x + 2 * Math.sin(clock / 90 + (leg === 'frontFar' ? 2 : 0)), y: root.y + 8 };
-    } else {
-      // Kicking in the air.
-      const kick = Math.sin(clock / 150 + (leg === 'backFar' ? Math.PI : 0));
-      p.paws[leg] = { x: root.x - 3 + 3 * kick, y: root.y - 5 - 2 * Math.max(0, kick) };
-    }
-  }
-  // The tail straight up, waving.
-  p.tailA = 185 + 22 * Math.sin(clock / 260);
-  p.tailCurl = 20 * Math.sin(clock / 330);
-  p.ears = -0.5;
-  p.eyes = 'closed';
-  return p;
-}
-
-/**
- * Popping up out of his trash can on his hind legs (the behaviour lifts him up out of it),
- * holding a block he's found up over his head in both paws.
- */
-function emerge(b: ChibiBuild, input: ChibiInput): ChibiPose {
-  const { t } = input;
-  const p = upright(b);
-  p.rot = 72;
-  p.hrot = 8;
-  p.pawUp = 0;
-  // Arms straight up and out in front, as high as they reach, waving it about.
-  const shoulder = legRoot(b, p, 'frontNear');
-  const wave = Math.sin(t / 90) * span(t, 250, 400);
-  p.paws.frontNear = { x: shoulder.x + 9 + wave, y: shoulder.y - 17 };
-  p.paws.frontFar = { x: shoulder.x + 6.5 + wave, y: shoulder.y - 16 };
-  p.ears = 0.8;
-  p.mouth = 0.35;
-  p.blush = 1;
-  p.lookY = -0.6;
-  p.eyes = t > 250 ? 'happy' : 'wide';
-  return p;
-}
-
 /** The pose for a land animal at this moment. */
 function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
   const { t, clock, phase } = input;
@@ -1157,17 +1094,6 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return noseAlong(b, input);
     case 'fetch':
       return trot(b, input);
-    case 'climb': {
-      // A big spring up over the rim, or out over it.
-      const p = stand(b);
-      spring(b, p, clamp01(t / PLAY.climbMs), 38, 0.3);
-      p.eyes = 'wide';
-      return p;
-    }
-    case 'rummage':
-      return rummage(b, input);
-    case 'emerge':
-      return emerge(b, input);
     case 'happy': {
       const p = stand(b);
       const hop = Math.abs(Math.sin((t / 600) * Math.PI * 2));
@@ -1500,14 +1426,6 @@ function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       p.hrot -= 10 + (input.animation === 'sniff' ? 4 * Math.max(0, Math.sin(t / 85)) : 0);
       p.lookX = 0.9;
       p.lookY = 0.6;
-      p.eyes = eyesFrom(input);
-      return p;
-    }
-    case 'climb':
-    case 'rummage':
-    case 'emerge': {
-      // There's no trash can in a pond: it just treads water.
-      const p = tread(b, clock);
       p.eyes = eyesFrom(input);
       return p;
     }

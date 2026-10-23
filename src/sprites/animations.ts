@@ -3,8 +3,7 @@ import type { AnimationName, AnimationSpec } from './types';
 /**
  * Moments in the toy animations that the behaviour and the drawings must agree on, ms
  * from the start: when a swat's paw meets the toy, when a toss picks it up and lets go,
- * when a lift picks it up (to carry it off), when a throw from carrying lets go, how long
- * a hop into or out of the trash can takes, and popping up out of it.
+ * when a lift picks it up (to carry it off), and when a throw from carrying lets go.
  */
 export const PLAY = {
   batMs: 650,
@@ -16,8 +15,6 @@ export const PLAY = {
   liftGrabMs: 380,
   throwMs: 950,
   throwReleaseMs: 450,
-  climbMs: 560,
-  emergeMs: 650,
 };
 
 /**
@@ -54,22 +51,16 @@ export const ANIMATIONS: Record<AnimationName, AnimationSpec> = {
   sniff: { fps: 20, durationMs: 1200, loop: true, eyes: 'open' },
   nudge: { fps: 60, durationMs: 600, loop: true, eyes: 'open' },
   fetch: { fps: 60, durationMs: 600, loop: true, eyes: 'open' },
-  climb: { fps: 60, durationMs: PLAY.climbMs, loop: false, eyes: 'wide' },
-  rummage: { fps: 30, durationMs: 1200, loop: true, eyes: 'closed' },
-  emerge: { fps: 60, durationMs: PLAY.emergeMs, loop: false, eyes: 'open' },
 };
 
-/** The animations there were before the toy games and the trash can. */
-export type ClassicAnimation = Exclude<AnimationName, 'stalk' | 'sniff' | 'nudge' | 'fetch' | 'climb' | 'rummage' | 'emerge'>;
+/** The animations there were before the toy games. */
+export type ClassicAnimation = Exclude<AnimationName, 'stalk' | 'sniff' | 'nudge' | 'fetch'>;
 
 const NEAREST_CLASSIC: Record<Exclude<AnimationName, ClassicAnimation>, ClassicAnimation> = {
   stalk: 'walk',
   sniff: 'idle',
   nudge: 'walk',
   fetch: 'walk',
-  climb: 'jump',
-  rummage: 'idle',
-  emerge: 'idle',
 };
 
 /** For drawings made before the newer animations (the lifelike and retired pets): the nearest one they have. */

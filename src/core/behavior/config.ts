@@ -95,12 +95,6 @@ export interface PlayConfig {
   /** How many pushes he gives a block he's nosing along, and how far he trots off with one. */
   nudges: Range;
   fetchDistance: Range;
-  /**
-   * For animals with a trash can (raccoons): the chance that a game is at the can instead,
-   * digging a block out of it, or putting one away in it once there are `tidyFrom` out.
-   */
-  binChance: number;
-  tidyFrom: number;
 }
 
 /** What he can be doing at his computer. */
@@ -179,8 +173,6 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     chargeChance: 0.3,
     nudges: { min: 3, max: 5 },
     fetchDistance: { min: 120, max: 300 },
-    binChance: 0.4,
-    tidyFrom: 6,
   },
   work: {
     tasks: {

@@ -404,73 +404,37 @@ describe('Brain: different ways to play', () => {
     expect(toy.thrownBy).toBe('pet');
     expect(Math.abs(toy.x - 1200)).toBeGreaterThan(60);
   });
-});
 
-describe('The trash can', () => {
-  const BIN = { at: { x: 400, y: 760 }, halfWidth: 45, rim: 66 };
-  const spot = { x: 400, y: 760, halfWidth: 38, depth: 22, rim: 66 };
-  const withBin = (box: Toybox) => {
-    box.bin = spot;
-    box.stash = 2;
-    return world({ carries: true, bin: BIN });
-  };
-
-  it('takes a block that drops in over the rim, and the block is gone', () => {
-    const box = toybox({ x: 250, y: 760 });
-    box.bin = spot;
-    const toy = box.toys[0]!;
-    box.hold(toy.id, 'pet');
-    box.moveHeld(toy.id, { x: 330, y: 760 }, 90);
-    box.release(toy.id, 'pet', { x: 160, y: 0, z: 200 });
-    stepBox(box, 2000);
-    expect(box.toys.length).toBe(0);
-    expect(box.stash).toBe(1);
+  it('over a long time playing, never slides about standing still or goes backwards', () => {
+    for (const carries of [false, true]) {
+      const box = toybox({ x: 300, y: 700 }, { x: 800, y: 760 }, { x: 1300, y: 820 });
+      const input = world({ carries });
+      const brain = new Brain(input, seededRandom(7), withConfig({ ...PLAYFUL, wander: { ...PLAYFUL.wander, playChance: 0.7 } }), box);
+      const still = new Set(['idle', 'bat', 'toss', 'lift', 'throw', 'sniff', 'sit', 'groom']);
+      let sliding = 0;
+      let backwards = 0;
+      run(brain, 180_000, input, (s) => {
+        const speed = Math.hypot(s.velocity.x, s.velocity.y);
+        if (s.reaction === 'play' && still.has(s.animation) && speed > 40) sliding += STEP;
+        if (s.reaction === 'play' && speed > 40 && Math.abs(s.velocity.x) > 30 && Math.sign(s.velocity.x) !== s.facing) backwards += STEP;
+      });
+      expect(sliding, carries ? 'raccoon' : 'cat').toBeLessThan(200);
+      expect(backwards, carries ? 'raccoon' : 'cat').toBeLessThan(200);
+    }
   });
 
-  it('a block sliding along the floor bounces off the side of it', () => {
-    const box = toybox({ x: 250, y: 760 });
-    box.bin = spot;
-    const toy = box.toys[0]!;
-    box.hit(toy.id, { x: 600, y: 0, z: 0 }, 0);
-    stepBox(box, 2000);
-    expect(box.toys.length).toBe(1);
-    expect(toy.x).toBeLessThan(400 - 38);
-  });
-
-  it('a raccoon climbs in, digs about, pops up with a block, throws it out and goes after it', () => {
-    const box = toybox();
-    const input = withBin(box);
-    const brain = makeBrain(box, { play: { binChance: 1 } });
+  it('pounces forwards and lands by the block, not past it', () => {
+    const box = toybox({ x: 800, y: 700 });
+    const brain = makeBrain(box, { play: { pounceChance: 1, stalkChance: 0, chargeChance: 0 } });
+    place(brain, { x: 620, y: 700 });
+    runUntil(brain, (s) => s.phase === 'pounce');
     const snaps: PetSnapshot[] = [];
-    runUntil(brain, (s) => (snaps.push(s), s.reaction === 'play'), 60_000, input);
-    const order = [...new Set(snaps.filter((s) => s.reaction === 'rummage').map((s) => s.phase))];
-    expect(order).toEqual(['go', 'in', 'dig', 'up', 'throw', 'out']);
-    // Down in it, he's behind the front of the can, right in the middle of it.
-    const digging = snaps.filter((s) => s.phase === 'dig');
-    expect(digging.every((s) => s.inBin && s.animation === 'rummage')).toBe(true);
-    expect(digging.every((s) => Math.abs(s.position.x - BIN.at.x) < 1)).toBe(true);
-    expect(snaps.some((s) => s.phase === 'up' && s.say !== null)).toBe(true);
-    // One fewer in the can, one more out, and he's after it.
-    expect(box.stash).toBe(1);
-    expect(box.toys.length).toBe(1);
-    expect(snaps.at(-1)!.inBin).toBe(false);
-  });
-
-  it('with lots of blocks about, a raccoon puts one away in the can', () => {
-    const spots = Array.from({ length: 6 }, (_, i) => ({ x: 700 + i * 120, y: 700 }));
-    const box = toybox(...spots);
-    const input = withBin(box);
-    const brain = makeBrain(box, { play: { binChance: 1, tidyFrom: 6 } });
-    runUntil(brain, () => box.toys.length < 6, 60_000, input);
-    expect(box.stash).toBe(3);
-  });
-
-  it('only a raccoon has a go in the can', () => {
-    const box = toybox({ x: 1100, y: 700 });
-    box.bin = spot;
-    box.stash = 2;
-    const brain = makeBrain(box, { play: { binChance: 1 } });
-    const snaps = run(brain, 60_000, world({ bin: BIN }));
-    expect(snaps.some((s) => s.reaction === 'rummage')).toBe(false);
+    runUntil(brain, (s) => {
+      snaps.push(s);
+      return s.phase !== 'pounce';
+    });
+    // Only ever towards it, and never past where he swats it from.
+    expect(snaps.every((s) => s.velocity.x >= -1)).toBe(true);
+    expect(Math.max(...snaps.map((s) => s.position.x))).toBeLessThanOrEqual(800 - REACH + 1);
   });
 });

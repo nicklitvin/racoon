@@ -3,7 +3,7 @@ import type { RaccoonType, Settings } from '../../shared/settings';
 import { CursorActivityTracker } from '../core/activity/cursor';
 import { TypingActivityTracker } from '../core/activity/typing';
 import { Animator } from '../core/animator';
-import { Brain, type Bin, type Desk, type PetSnapshot, type WorldInput } from '../core/behavior/brain';
+import { Brain, type Desk, type PetSnapshot, type WorldInput } from '../core/behavior/brain';
 import { DEFAULT_CONFIG } from '../core/behavior/config';
 import { ClickThroughController } from '../core/clickThrough';
 import { isTurning, targetHeading, turnTowards } from '../core/heading';
@@ -12,7 +12,6 @@ import type { Host } from '../host';
 import { ANIMATIONS, RACCOON_STYLES, type AnimationName, type RaccoonRenderer } from '../sprites';
 import { PIXEL_PX } from '../sprites/pixel';
 import type { AnimationSpec } from '../sprites/types';
-import { BinLayer } from './binLayer';
 import { DeskLayer } from './deskLayer';
 import { ToyLayer } from './toyLayer';
 
@@ -47,8 +46,6 @@ const GAZE_RADIUS_PX = 420;
 const SMALL_SCREEN_SCALE = 0.8;
 /** How many toy blocks lie about. */
 const TOY_COUNT = 3;
-/** How many more are in the raccoon's trash can to start with. */
-const BIN_STASH = 2;
 /** Toy block size for drawings that don't say. */
 const TOY_SIZE = 16;
 
@@ -92,9 +89,6 @@ export class PetRuntime {
   private readonly deskLayer: DeskLayer;
   /** His desk, in work mode. */
   private desk: Desk | null = null;
-  private readonly binLayer: BinLayer;
-  /** His trash can, in play mode, if he has one (a raccoon). */
-  private bin: Bin | null = null;
   private lastSaid: string | null = null;
   private lastHidden = false;
 
@@ -140,7 +134,6 @@ export class PetRuntime {
       this.brain.deskTapped();
       this.wake();
     });
-    this.binLayer = new BinLayer(document, els.stage);
     this.applySettings();
     this.applyLayout();
     this.brain = new Brain(this.worldInput(performance.now()), Math.random, DEFAULT_CONFIG, this.toybox);
@@ -187,7 +180,6 @@ export class PetRuntime {
     this.cleanups.splice(0).forEach((off) => off());
     this.toyLayer.destroy();
     this.deskLayer.destroy();
-    this.binLayer.destroy();
     this.host.setInteractive(false);
   }
 
@@ -202,7 +194,6 @@ export class PetRuntime {
     this.applySettings();
     this.syncToys();
     this.syncDesk();
-    this.syncBin();
     this.syncKeyboardSubscription();
     this.wake();
   }
@@ -385,7 +376,6 @@ export class PetRuntime {
       toyReach: this.renderer.toyReach === undefined ? undefined : this.renderer.toyReach * this.scale,
       carries: this.renderer.carriesToys === true,
       desk: this.desk,
-      bin: this.bin,
       mode: this.settings.mode,
     };
   }
@@ -428,7 +418,6 @@ export class PetRuntime {
       this.lastFacing = facing;
     }
     this.deskLayer.show(snap.screen ?? 'idle', now);
-    this.binLayer.update(snap.position, snap.inBin, snap.reaction === 'rummage' && snap.phase === 'dig', now);
     // Gone into hiding: nothing of him on the page at all, so nothing to catch the mouse.
     if (snap.hidden !== this.lastHidden) {
       pet.style.visibility = snap.hidden ? 'hidden' : '';
@@ -507,20 +496,6 @@ export class PetRuntime {
     this.toyLayer.setOrigin({ x: wa.x, y: wa.y });
     this.syncToys();
     this.syncDesk();
-    this.syncBin();
-  }
-
-  /** Puts a raccoon's trash can out in play mode, with a couple of blocks in it, or puts it away. */
-  private syncBin(): void {
-    if (!this.binLayer) return;
-    const wanted = this.settings.mode === 'play' && this.renderer.carriesToys === true;
-    const had = this.bin !== null;
-    const wa = this.display.workArea;
-    this.bin = this.binLayer.fit(wanted ? { bounds: wa, floor: wa.y + wa.height - this.belowFeet, pixel: PIXEL_PX * this.scale } : null);
-    this.toybox.bin = this.binLayer.spot();
-    this.toyLayer.setBin(this.toybox.bin);
-    if (this.bin && !had) this.toybox.stash = BIN_STASH;
-    if (!this.bin) this.toybox.stash = 0;
   }
 
   /** Puts his desk out in work mode, built to fit him, or puts it away. */
@@ -577,12 +552,8 @@ export class PetRuntime {
     this.lastFacing = 0;
     this.lastTransform = '';
     this.applyScale();
-    // A new pet needs a desk its size, and only a raccoon has a trash can (not before the
-    // first layout, which builds them).
-    if (this.deskLayer) {
-      this.syncDesk();
-      this.syncBin();
-    }
+    // A new pet needs a desk its size (not before the first layout, which builds it).
+    if (this.deskLayer) this.syncDesk();
   }
 
   /** The visible part of the raccoon: the drawn figure clipped to the stage. */

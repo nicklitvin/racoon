@@ -15,6 +15,15 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-23',
+    title: 'Smoother play',
+    changes: [
+      'Playing with a block, your pet no longer slides about or spins round: it pulls up where it means to instead of overshooting and skidding back, pounces only forwards, and goes to the near side of a block rather than round it.',
+      'Turning right round, your pet no longer flickers back and forth between the two ways round.',
+      'The raccoon’s trash can is gone.',
+    ],
+  },
+  {
     date: '2026-10-22',
     title: 'A trash can, new games and more hats',
     changes: [

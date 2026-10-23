@@ -7,6 +7,16 @@ export function approach(value: number, target: number, maxDelta: number): numbe
   return value + Math.sign(delta) * maxDelta;
 }
 
+/**
+ * The fastest he can be going this far from where he's stopping and still stop there,
+ * braking with `accel` (with a little to spare), so he never overshoots and slides back.
+ */
+export function stoppingSpeed(distance: number, accel: number): number {
+  return Math.sqrt(2 * accel * BRAKING * distance);
+}
+/** Of his acceleration, how much he brakes with when arriving somewhere. */
+const BRAKING = 0.8;
+
 /** Two-dimensional arrive steering. */
 export function steer2d(
   position: Point,
@@ -20,7 +30,7 @@ export function steer2d(
   const dx = target.x - position.x;
   const dy = target.y - position.y;
   const distance = Math.hypot(dx, dy);
-  const desiredSpeed = maxSpeed * Math.min(1, distance / slowRadius);
+  const desiredSpeed = Math.min(maxSpeed * Math.min(1, distance / slowRadius), stoppingSpeed(distance, accel));
   const desired = distance > 0 ? { x: (dx / distance) * desiredSpeed, y: (dy / distance) * desiredSpeed } : { x: 0, y: 0 };
   const change = { x: desired.x - velocity.x, y: desired.y - velocity.y };
   const changeLength = Math.hypot(change.x, change.y);
@@ -58,7 +68,7 @@ export function steerArc(
   const rate = Math.min(MAX_TURN_RATE, (accel * CORNER_GRIP) / speed);
   const turned = heading + Math.max(-rate * dt, Math.min(rate * dt, off));
   const facing = (1 + Math.cos(off)) / 2;
-  const desired = maxSpeed * Math.min(1, distance / slowRadius) * (0.2 + 0.8 * facing ** 1.5);
+  const desired = Math.min(maxSpeed * Math.min(1, distance / slowRadius) * (0.2 + 0.8 * facing ** 1.5), stoppingSpeed(distance, accel));
   const next = approach(speed, desired, accel * dt);
   return { x: Math.cos(turned) * next, y: Math.sin(turned) * next };
 }

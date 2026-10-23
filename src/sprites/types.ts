@@ -51,12 +51,6 @@ export const ANIMATION_NAMES = [
   'nudge',
   /** Trotting along, head up and proud, with a toy in the mouth. */
   'fetch',
-  /** A big hop up into (or out of) the trash can. */
-  'climb',
-  /** Head first in the trash can, digging about: only the bottom, hind legs and tail stick out. */
-  'rummage',
-  /** Popping up out of the trash can with a toy found in it, held up in both paws. */
-  'emerge',
 ] as const;
 
 export type AnimationName = (typeof ANIMATION_NAMES)[number];

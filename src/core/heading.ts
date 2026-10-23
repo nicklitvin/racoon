@@ -44,13 +44,23 @@ export function targetHeading(current: number, { velocity, facing, animation, ai
 
 /**
  * Turns smoothly from `current` towards `target` the short way round. Turning right round,
- * he turns through facing you (down the screen) rather than turning his back.
+ * he turns through facing you (down the screen) rather than turning his back: whichever
+ * way round doesn't pass his back. That stays the same way all through the turn, so he
+ * never wavers between the two.
  */
 export function turnTowards(current: number, target: number, dtMs: number): number {
   let diff = wrapAngle(target - current);
-  if (Math.abs(diff) > Math.PI - 0.3 && Math.sin(current + diff / 2) < 0) diff -= Math.sign(diff) * Math.PI * 2;
+  if (Math.abs(diff) > Math.PI - 0.3 && passesBack(current, diff)) diff -= Math.sign(diff) * Math.PI * 2;
   if (Math.abs(diff) < SETTLED_RAD) return wrapAngle(target);
   return wrapAngle(current + diff * (1 - Math.exp((-TURN_RATE * dtMs) / 1000)));
+}
+
+/** Turning `diff` from `current`, he'd pass the way that has his back to you (straight up the screen). */
+function passesBack(current: number, diff: number): boolean {
+  const turn = Math.PI * 2;
+  const toBack = diff > 0 ? -Math.PI / 2 - current : current + Math.PI / 2;
+  const along = ((toBack % turn) + turn) % turn;
+  return along > 0 && along < Math.abs(diff);
 }
 
 export function isTurning(current: number, target: number): boolean {

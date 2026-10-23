@@ -1,6 +1,6 @@
 # My Pet
 
-A little pixel-art pet that lives on your screen: a raccoon, a ginger cat or an otter (or, in beta, a bunny or a hedgehog: switch them on in the patch notes). It wanders about, naps next to your mouse pointer, plays with its toy blocks (the raccoon digs more out of his trash can), chases the cursor when you shake the mouse, and (if you let it) comes down to ask you to play while you type.
+A little pixel-art pet that lives on your screen: a raccoon, a ginger cat or an otter (or, in beta, a bunny or a hedgehog: switch them on in the patch notes). It wanders about, naps next to your mouse pointer, plays with its toy blocks, chases the cursor when you shake the mouse, and (if you let it) comes down to ask you to play while you type.
 
 ## Download
 

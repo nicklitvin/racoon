@@ -38,4 +38,24 @@ describe('heading', () => {
     expect(isTurning(h, target)).toBe(false);
     expect(h).toBeCloseTo(target);
   });
+
+  it('turning right round, goes one way through facing you and never wavers back and forth', () => {
+    // Facing you, a little to the left, turning to have his back to you: the turn that
+    // flickered him left and right every frame.
+    for (const start of [1.82, 1.36, 1.6, 1.7]) {
+      const target = -1.56;
+      let h = start;
+      let dir = 0;
+      for (let i = 0; i < 300 && isTurning(h, target); i++) {
+        const next = turnTowards(h, target, 16);
+        const step = Math.sign(wrapAngle(next - h));
+        if (dir !== 0) expect(step, `from ${start}, step ${i}`).toBe(dir);
+        dir = step;
+        // Never past his back on the way.
+        expect(Math.sin(next)).toBeGreaterThanOrEqual(Math.sin(target) - 1e-9);
+        h = next;
+      }
+      expect(isTurning(h, target)).toBe(false);
+    }
+  });
 });
