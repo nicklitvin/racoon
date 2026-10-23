@@ -44,6 +44,9 @@
       "buildResources": "build"
     },
     "npmRebuild": false,
+    "electronLanguages": [
+      "en-US"
+    ],
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
@@ -67,6 +70,9 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
+      "createStartMenuShortcut": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "My Pet",
       "runAfterFinish": true,
       "artifactName": "My-Pet-Windows.${ext}"
     },
@@ -83,10 +89,7 @@
         }
       ],
       "category": "public.app-category.entertainment",
-      "icon": "build/icon.png",
-      "extendInfo": {
-        "LSUIElement": true
-      }
+      "icon": "build/icon.png"
     },
     "linux": {
       "target": [

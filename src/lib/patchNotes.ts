@@ -16,6 +16,14 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     date: '2026-10-22',
+    title: 'My Pet is a window now',
+    changes: [
+      'My Pet opens as a window in your taskbar or Dock, and you can find it in the Start menu. Your pet is out while it’s open: minimise it and the pet stays, close it and the pet goes too.',
+      'One download each for Windows and Mac, and a smaller one.',
+    ],
+  },
+  {
+    date: '2026-10-22',
     title: 'A floating puffball',
     beta: true,
     changes: [

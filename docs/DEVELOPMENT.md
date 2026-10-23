@@ -20,14 +20,14 @@ How it's built, how it works inside, and how to package and test it. For downloa
 
 ```
 electron/                 Electron main process (Node side)
-  main.ts                 Pet overlay window, click-through, settings window, tray, IPC, startup
+  main.ts                 Pet overlay window, click-through, main (settings) window, IPC, startup
   preload.ts              Exposes a small, typed API to the page as window.racoonHost
   cursorMonitor.ts        Polls screen.getCursorScreenPoint() at 40 Hz, sends only changes
   keyboardMonitor.ts      Opt-in key-press counter (uiohook-napi). Never reads which key.
   settingsStore.ts        Settings as JSON in the app's user-data folder
   platform/               Everything OS-specific, behind one PlatformAdapter interface
-    windows.ts            App id, z-order level, tray behaviour
-    mac.ts                Hidden Dock icon, all Spaces, Accessibility/Input Monitoring permission
+    windows.ts            App id, z-order level
+    mac.ts                All Spaces, Accessibility/Input Monitoring permission
 shared/                   Used by both the main process and the page
   ipc.ts                  IPC channel names and the HostBridge API type
   settings.ts             Settings type, defaults, ranges and validation
@@ -62,7 +62,7 @@ src/                      The page (React). Runs in Electron and in a browser
   lib/                    The version (the build date) and the patch notes
 tests/                    Vitest unit tests
 scripts/                  Dev runner and esbuild bundling for electron/
-assets/                   Tray icon (used at runtime)
+assets/                   Window icon in development
 build/                    App icon (used by the packager)
 ```
 
@@ -229,11 +229,13 @@ The version is the date of the build, stamped in by `vite.config.mts` (`__BUILD_
 npm run dist:win
 ```
 
-This produces `release/My-Pet-Windows.exe`: a one-click per-user installer that installs My Pet and starts it straight away, so it's the only download Windows needs. (Not a portable `.exe`: those unpack themselves on every launch, which is slow and doesn't suit "Start at login".) The keyboard hook (`uiohook-napi`) ships prebuilt N-API binaries, so packaging needs no C++ toolchain (`npmRebuild` is off). The builds are **unsigned**, so Windows SmartScreen will warn on first run until you sign them with a code-signing certificate (set `CSC_LINK` / `CSC_KEY_PASSWORD`).
+This produces `release/My-Pet-Windows.exe`: a one-click per-user installer that installs My Pet and starts it straight away, so it's the only download Windows needs. (Not a portable `.exe`: those unpack themselves on every launch, which is slow and doesn't suit "Start at login".) It's about 100 MB, nearly all of it Electron's own copy of Chromium (the app itself is under 2 MB); `electronLanguages` keeps only Chromium's English strings, which saves about 10 MB. The keyboard hook (`uiohook-napi`) ships prebuilt N-API binaries, so packaging needs no C++ toolchain (`npmRebuild` is off). The builds are **unsigned**, so Windows SmartScreen will warn on first run until you sign them with a code-signing certificate (set `CSC_LINK` / `CSC_KEY_PASSWORD`).
 
 The app was called Racoon before it was My Pet. Some things you never see keep the old name, so an existing install upgrades in place and keeps its settings: the app id (`com.nicklitvin.racoon`), the settings folder (`%APPDATA%\Racoon`, `~/Library/Application Support/Racoon`, set in `electron/main.ts`), the browser's `racoon.settings` key and the IPC channel names.
 
-"Start when I log in" uses Electron's login-item API and only takes effect in the installed app, not in `npm run dev`.
+**The main window is the app.** The settings open as an ordinary window, in the taskbar or Dock, when the app starts, and the pet is out for as long as it's open: closing it quits (on macOS too), and opening the app again while it's running brings the window back. There's no tray icon. The installer adds "My Pet" to the Start menu and the desktop.
+
+"Start at login" uses Electron's login-item API and only takes effect in the installed app, not in `npm run dev`. A launch at login starts with the window minimised (Windows passes `--at-login`; macOS reports `wasOpenedAtLogin`).
 
 ### macOS
 
@@ -250,7 +252,7 @@ CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac   # release/My-Pet-Mac.dmg (A
 
 Already handled:
 
-- `LSUIElement` keeps the app out of the Dock and the app switcher; the window shows on all Spaces and over full-screen apps.
+- The main window is in the Dock and the app switcher; the pet's window shows on all Spaces and over full-screen apps.
 - The keyboard permission flow is in `electron/platform/mac.ts` (see **Privacy** above).
 - Prebuilt `uiohook-napi` binaries for arm64 are included. Intel Macs aren't built: add `x64` to the mac target's `arch` in `package.json` to build them too.
 
@@ -273,8 +275,8 @@ In the browser, the page is the raccoon's whole world. Wandering, chasing, pounc
 3. Shake the mouse hard for a couple of seconds: "!", then it chases the cursor. Stop: it pounces, then sits with "?".
 4. Move the cursor slowly onto it: it often runs away; near a screen edge it hides behind the edge and peeks back out.
 5. Drag it and let go: it dangles while held and stays where you drop it. Click it: it startles.
-6. Settings (double-click it): turn on "React to typing" and type steadily for a few seconds: it peeks over the bottom edge and its eyes follow your typing. Stop typing: it comes back out after about 5 seconds.
+6. In the My Pet window, turn on "React to typing" and type steadily for a few seconds: it peeks over the bottom edge and its eyes follow your typing. Stop typing: it comes back out after about 5 seconds.
 7. Change display scaling or resolution: it stays on screen.
 8. Settings: pick a hat and an outfit: your pet wears them straight away. Pick **Work**: "Work time!", a desk appears in the bottom right corner and it goes and works at it, switching between the terminal, the web and reels every minute or so. Tap the desk: "Shh! Working." Drag it off: it's cross and goes back. Pick **Sleep**: it curls up and sleeps, whatever the mouse does. Pick **Hide**: it runs off the screen, and clicks go straight through where it was. Pick **Play**: it runs back on, and the blocks are back.
 9. Toy blocks: wait a while and it goes over to a block, swats it or throws it, and goes after it. A raccoon sometimes picks it up and walks off with it on his hind legs, then throws it. Pick a block up: it watches it. Throw it: it chases after it. Click a block: it flips over. Clicks next to a block still go through to the window behind.
-10. Quit from the tray icon.
+10. Minimise the My Pet window: the pet stays. Close it: the pet goes, and the app quits.

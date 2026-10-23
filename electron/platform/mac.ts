@@ -4,19 +4,14 @@ import type { PlatformAdapter } from './types';
 const PRIVACY_PANE = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
 
 export const macPlatform: PlatformAdapter = {
-  configureApp(app) {
-    // No Dock icon; the app is controlled from the menu bar icon.
-    app.dock?.hide();
-  },
+  configureApp() {},
   configureWindow(win) {
     win.setAlwaysOnTop(true, 'floating');
     // Follow the user across Spaces and stay visible over full-screen apps.
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   },
-  trayClickOpensSettings: false,
   presentWindow(app, win) {
     win.show();
-    // A Dock-less app has to explicitly take focus for its window to come forward.
     app.focus({ steal: true });
     win.focus();
   },

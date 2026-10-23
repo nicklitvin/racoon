@@ -16,7 +16,7 @@ The app isn't code-signed yet, so the first time you open it:
 - **Windows:** if you see "Windows protected your PC", click **More info → Run anyway**.
 - **Mac:** open the `.dmg` and drag My Pet to Applications. macOS blocks it at first (it may even say it's "damaged"). Run `xattr -cr "/Applications/My Pet.app"` in Terminal, or try to open it once, then click **Open Anyway** in **System Settings → Privacy & Security**.
 
-My Pet has no taskbar or Dock icon: look for it in the system tray (Windows) or the menu bar (Mac).
+My Pet opens as a small window in your taskbar (Windows) or Dock (Mac), and you can find it in the Start menu or Applications like any other app. Your pet is out for as long as that window is open: minimise it and the pet stays, close it and the pet goes too.
 
 ## Using it
 
@@ -25,8 +25,8 @@ My Pet has no taskbar or Dock icon: look for it in the system tray (Windows) or 
 | Move your pet | Drag it |
 | Pet it | Click it, then stroke it with the pointer |
 | Play | Pick up a toy block and throw it: your pet chases after it |
-| Open settings | Double-click your pet, or use the tray menu |
-| Quit | Tray menu → Quit |
+| Change settings | The My Pet window |
+| Put your pet away | Close the My Pet window |
 
 In the settings you can pick your pet, give it a hat and an outfit (or a whole costume: a dino, a bee, an astronaut, a knight, a wizard or a ballerina), and choose a **mode**:
 

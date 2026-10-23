@@ -2,14 +2,13 @@ import type { PlatformAdapter } from './types';
 
 export const windowsPlatform: PlatformAdapter = {
   configureApp(app) {
-    // Groups notifications and the tray entry under a stable identity.
+    // Groups the taskbar button and notifications under a stable identity (the installer's shortcuts use it too).
     app.setAppUserModelId('com.nicklitvin.racoon');
   },
   configureWindow(win) {
     // 'screen-saver' keeps the pet above normal always-on-top windows such as the taskbar.
     win.setAlwaysOnTop(true, 'screen-saver');
   },
-  trayClickOpensSettings: true,
   presentWindow(_app, win) {
     win.show();
     win.focus();

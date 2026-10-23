@@ -7,7 +7,6 @@ const genericPlatform: PlatformAdapter = {
   configureWindow(win) {
     win.setAlwaysOnTop(true);
   },
-  trayClickOpensSettings: false,
   presentWindow(_app, win) {
     win.show();
     win.focus();

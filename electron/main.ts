@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, screen, Tray, type WebContents } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, type WebContents } from 'electron';
 import path from 'node:path';
 import { IPC, type DisplayInfo } from '../shared/ipc';
 import type { KeyboardStatus, Settings } from '../shared/settings';
@@ -10,12 +10,12 @@ import { SettingsStore } from './settingsStore';
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PRELOAD = path.join(__dirname, 'preload.js');
 const ASSETS = path.join(__dirname, '../assets');
+/** Passed when Windows starts the app at login, so it starts minimised. */
+const AT_LOGIN = '--at-login';
 
 let petWindow: BrowserWindow | null = null;
-let settingsWindow: BrowserWindow | null = null;
-let tray: Tray | null = null;
+let mainWindow: BrowserWindow | null = null;
 let interactive = false;
-let petVisible = true;
 
 let store: SettingsStore;
 let cursorMonitor: CursorMonitor;
@@ -130,37 +130,26 @@ function createPetWindow() {
   loadRenderer(petWindow, 'pet');
 }
 
-function setPetVisible(visible: boolean) {
-  petVisible = visible;
-  if (!petWindow) return;
-  if (visible) {
-    petWindow.showInactive();
-    cursorMonitor.start();
-    syncKeyboard({ prompt: false });
-  } else {
-    petWindow.hide();
-    cursorMonitor.stop();
-    // Nothing to react with while hidden, so don't listen either.
-    keyboardMonitor.stop();
-  }
-  rebuildTrayMenu();
+// ---- Main window ------------------------------------------------------------------------
+
+/** Whether this launch is the one at login, which starts minimised instead of in your face. */
+function launchedAtLogin() {
+  return process.argv.includes(AT_LOGIN) || (process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin);
 }
 
-// ---- Settings window -----------------------------------------------------------------
-
-function openSettingsWindow() {
-  if (settingsWindow) {
-    platform.presentWindow(app, settingsWindow);
-    return;
-  }
-  settingsWindow = new BrowserWindow({
+/**
+ * The app's window: the settings, in the taskbar or Dock like any other app. The pet is
+ * out for as long as it's open, and closing it quits.
+ */
+function createMainWindow({ minimised }: { minimised: boolean }) {
+  mainWindow = new BrowserWindow({
     width: 460,
     height: 780,
-    title: 'My Pet Settings',
-    icon: path.join(ASSETS, 'tray.png'),
+    title: 'My Pet',
+    // Packaged builds take the app's own icon; this one is only for development.
+    ...(!app.isPackaged && { icon: path.join(ASSETS, 'tray.png') }),
     resizable: false,
     maximizable: false,
-    minimizable: false,
     fullscreenable: false,
     autoHideMenuBar: true,
     show: false,
@@ -171,17 +160,32 @@ function openSettingsWindow() {
       sandbox: true,
     },
   });
-  settingsWindow.setMenu(null);
-  lockDown(settingsWindow.webContents);
-  settingsWindow.once('ready-to-show', () => settingsWindow && platform.presentWindow(app, settingsWindow));
+  mainWindow.setMenu(null);
+  lockDown(mainWindow.webContents);
+  mainWindow.once('ready-to-show', () => {
+    if (!mainWindow) return;
+    if (minimised) {
+      mainWindow.showInactive();
+      mainWindow.minimize();
+    } else {
+      platform.presentWindow(app, mainWindow);
+    }
+  });
   // Coming back from System Settings is the natural moment to notice a newly granted permission.
-  settingsWindow.on('focus', () => {
+  mainWindow.on('focus', () => {
     if (store.settings.keyboardReactions && keyboardStatus.access === 'denied') syncKeyboard({ prompt: false });
   });
-  settingsWindow.on('closed', () => {
-    settingsWindow = null;
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    app.quit();
   });
-  loadRenderer(settingsWindow, 'settings');
+  loadRenderer(mainWindow, 'settings');
+}
+
+function showMainWindow() {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  platform.presentWindow(app, mainWindow);
 }
 
 // ---- Settings and keyboard opt-in ------------------------------------------------------
@@ -198,7 +202,7 @@ function setKeyboardStatus(status: KeyboardStatus) {
  */
 function syncKeyboard({ prompt }: { prompt: boolean }) {
   const enabled = store.settings.keyboardReactions;
-  if (!enabled || !petVisible) {
+  if (!enabled) {
     keyboardMonitor.stop();
     setKeyboardStatus({ enabled, listening: false, access: platform.keyboardAccess.check(), message: null });
     return;
@@ -227,38 +231,13 @@ function syncKeyboard({ prompt }: { prompt: boolean }) {
 function applyLoginItem(settings: Settings) {
   // In development this would register the bare Electron binary, so only packaged builds do it.
   if (!app.isPackaged) return;
-  app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin });
+  app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin, args: [AT_LOGIN] });
 }
 
 function onSettingsChanged(previous: Settings, next: Settings) {
   broadcast(IPC.settingsChanged, next);
   if (previous.keyboardReactions !== next.keyboardReactions) syncKeyboard({ prompt: next.keyboardReactions });
   if (previous.launchAtLogin !== next.launchAtLogin) applyLoginItem(next);
-}
-
-// ---- Tray ------------------------------------------------------------------------------
-
-function rebuildTrayMenu() {
-  tray?.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: 'My Pet', enabled: false },
-      { type: 'separator' },
-      { label: 'Show pet', type: 'checkbox', checked: petVisible, click: (item) => setPetVisible(item.checked) },
-      { label: 'Settings…', click: openSettingsWindow },
-      { type: 'separator' },
-      { label: 'Quit', click: () => app.quit() },
-    ]),
-  );
-}
-
-function createTray() {
-  const icon = nativeImage.createFromPath(path.join(ASSETS, 'tray.png'));
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
-  tray.setToolTip('My Pet');
-  tray.on('click', () => {
-    if (platform.trayClickOpensSettings) openSettingsWindow();
-  });
-  rebuildTrayMenu();
 }
 
 // ---- IPC -------------------------------------------------------------------------------
@@ -292,7 +271,9 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   platform.configureApp(app);
-  app.on('second-instance', openSettingsWindow);
+  // Opening it again (from the Start menu, say) brings back the window that's already open.
+  app.on('second-instance', showMainWindow);
+  app.on('activate', showMainWindow);
 
   void app.whenReady().then(() => {
     store = new SettingsStore(path.join(app.getPath('userData'), 'settings.json'));
@@ -302,7 +283,9 @@ if (!app.requestSingleInstanceLock()) {
     );
     registerIpc();
     createPetWindow();
-    createTray();
+    // Fix up an existing "Start at login" entry, from before it started minimised.
+    applyLoginItem(store.settings);
+    createMainWindow({ minimised: launchedAtLogin() });
     // Silent check at startup: never prompt for permissions the user didn't just ask for.
     syncKeyboard({ prompt: false });
 
@@ -311,8 +294,8 @@ if (!app.requestSingleInstanceLock()) {
     screen.on('display-removed', refitToPrimaryDisplay);
   });
 
-  // Closing the settings window must not quit the app; the tray's Quit does that.
-  app.on('window-all-closed', () => {});
+  // Closing the main window quits (see createMainWindow), on macOS too.
+  app.on('window-all-closed', () => app.quit());
 
   app.on('before-quit', () => {
     keyboardMonitor.stop();
