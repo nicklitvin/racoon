@@ -1,5 +1,8 @@
 import type { Species } from '../critter/build';
 
+/** Every animal there's a build for: the chibis', and the ones only drawn in pixels. */
+export type ChibiSpecies = Species | 'blob' | 'bunny' | 'hedgehog' | 'frog';
+
 /** A point in drawing units: x forward (he faces right), y down, the floor at y = 0. */
 export interface Pt {
   x: number;
@@ -12,7 +15,7 @@ export interface Pt {
  * it's turned; everything else is from his feet.
  */
 export interface ChibiBuild {
-  species: Species | 'blob';
+  species: ChibiSpecies;
   /** Half the body's length and height, and where its middle is when he stands. */
   body: { rx: number; ry: number; at: Pt };
   /** Half the head's width and height, and where it sits from the body's middle. */
@@ -42,6 +45,10 @@ export interface ChibiBuild {
   desk: Pt;
   mouse: Pt;
   swims?: boolean;
+  /** Gets about in hops, both hind feet together (a bunny, a frog), rather than trotting. */
+  gait?: 'hop';
+  /** Rolls up into a spiky ball: to go fast, to sleep, when startled or picked up (a hedgehog). */
+  curls?: boolean;
 }
 
 /** Edge of a toy block, in drawing units. */

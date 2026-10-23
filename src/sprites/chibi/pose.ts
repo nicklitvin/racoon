@@ -66,6 +66,13 @@ export interface ChibiPose {
   mark: ChibiMark;
   /** Splashes about him: 0 none, 1 a few drops, 2 a proper splash. */
   splash: number;
+  /** Bubbles coming up where he is, under the water. */
+  bubbles: number;
+  /** Rolled up in a ball (a hedgehog), and how far round it has rolled, in degrees. */
+  ball: number;
+  roll: number;
+  /** A frog's tongue, shot out after a fly: 0 in, 1 all the way out. */
+  snap: number;
 }
 
 /** The water's surface for a swimmer, from its feet. */
@@ -113,6 +120,10 @@ const NUMBERS = [
   'wet',
   'swing',
   'splash',
+  'bubbles',
+  'ball',
+  'roll',
+  'snap',
 ] as const satisfies readonly (keyof ChibiPose)[];
 
 /** Where the body's middle is and how it's turned, and a way to place points on it. */
@@ -201,6 +212,10 @@ function stand(b: ChibiBuild): ChibiPose {
     eyes: 'open',
     mark: null,
     splash: 0,
+    bubbles: 0,
+    ball: 0,
+    roll: 0,
+    snap: 0,
   };
   plant(b, p);
   return p;
@@ -335,6 +350,37 @@ function gallop(b: ChibiBuild, p: ChibiPose, phase: number, reach: number): void
   p.tailCurl *= 0.4;
 }
 
+/**
+ * Hopping, both hind feet together: a crouch, a spring forward stretched out with the front
+ * paws reaching for the ground, and a landing that gathers into the next crouch. One hop a
+ * stride.
+ */
+function hop(b: ChibiBuild, p: ChibiPose, phase: number, height: number): void {
+  const flying = phase > 0.15 && phase < 0.85;
+  const air = clamp01((phase - 0.15) / 0.7);
+  const up = flying ? Math.sin(Math.PI * air) : 0;
+  // Crouched from landing (0.85) round to take-off (0.15).
+  const crouch = flying ? 0 : Math.sin(Math.PI * ((phase + 0.15) % 1) / 0.3);
+  p.lift = -height * up;
+  p.by += 2.2 * crouch;
+  p.sy *= 1 - 0.12 * crouch + 0.04 * up;
+  p.sx *= 1 + 0.06 * crouch + 0.08 * up;
+  p.rot += lerp(16, -14, smooth(air)) * up - 3 * crouch;
+  p.hy += 1.2 * crouch - 0.6 * up;
+  p.haunch = crouch > 0.5 ? 1 : 0;
+  const k = Math.min(1, up * 2.2);
+  for (const leg of LEGS) {
+    const root = legRoot(b, p, leg);
+    const front = leg.startsWith('front');
+    // Down, the hind feet are tucked under the haunch; up, they trail behind and the front paws reach forward.
+    const ground = { x: root.x + (front ? 1 : 3), y: 0 };
+    const reach = { x: root.x + (front ? 5 : -7), y: root.y - p.lift + (front ? 5 : 3.5) };
+    p.paws[leg] = { x: lerp(ground.x, reach.x, k), y: lerp(ground.y, reach.y, k) };
+  }
+  p.ears = lerp(p.ears, -0.7, up);
+  p.tailA += 10 * up;
+}
+
 /** A pounce or a leap: gather, spring up in an arc, land. `gather` is how much of it is the crouch. */
 function spring(b: ChibiBuild, p: ChibiPose, u: number, height: number, gather: number): void {
   const crouch = gather > 0 ? bump(Math.min(1, u / gather) * 0.5) : 0;
@@ -355,6 +401,91 @@ function spring(b: ChibiBuild, p: ChibiPose, u: number, height: number, gather: 
   }
   p.tailA = lerp(p.tailA, 168, up);
   p.ears = lerp(p.ears, -0.4, up);
+}
+
+/** A fox's mousing pounce: a crouch, a high arc, and down nose first onto whatever it's after. */
+function pounce(b: ChibiBuild, p: ChibiPose, u: number): void {
+  spring(b, p, u, 24, 0.35);
+  const air = clamp01((u - 0.35) / 0.65);
+  const up = Math.sin(Math.PI * air);
+  const dive = smooth(clamp01((air - 0.4) / 0.6));
+  p.rot -= 42 * dive * up;
+  p.hrot -= 18 * dive * up;
+  p.tailA += 30 * up;
+}
+
+/** Sat up on its hind legs to have a look about, front paws tucked to its chest (a bunny). */
+function lookout(b: ChibiBuild): ChibiPose {
+  const p = upright(b);
+  p.hold = 0;
+  p.haunch = 1;
+  const shoulder = legRoot(b, p, 'frontNear');
+  p.paws.frontNear = { x: shoulder.x + 3, y: shoulder.y + 4 };
+  p.paws.frontFar = { x: shoulder.x + 1.5, y: shoulder.y + 3 };
+  p.ears = 1;
+  p.lookX = 0.5;
+  p.lookY = -0.3;
+  return p;
+}
+
+/** How big a hedgehog is rolled up: the radius of its ball. */
+export function ballRadius(b: ChibiBuild): number {
+  return b.body.ry * 1.25;
+}
+
+/** What a hedgehog rolls up for. */
+const CURLS: ReadonlySet<AnimationName> = new Set(['run', 'chase', 'leap', 'sleep', 'surprised', 'dangle']);
+
+/** Rolled up in a spiky ball: rolling along, bouncing, asleep, startled, or hanging from your grip. */
+function curled(b: ChibiBuild, input: ChibiInput): ChibiPose {
+  const { t, phase } = input;
+  const R = ballRadius(b);
+  const p = input.animation === 'dangle' ? dangle(b, input) : stand(b);
+  p.ball = 1;
+  p.eyes = 'closed';
+  p.ears = -1;
+  if (input.animation === 'dangle') {
+    // Hanging just under your grip: the ball moves, and the head (where it's held) stays put.
+    const s = scruffPoint(b, p);
+    const f = bodyFrame(b, p);
+    const dx = s.x - f.cx;
+    const dy = s.y + R * 0.95 - f.cy;
+    p.bx += dx;
+    p.by += dy;
+    p.hx -= dx;
+    p.hy -= dy;
+    return p;
+  }
+  p.by = -R - b.body.at.y;
+  switch (input.animation) {
+    case 'run':
+    case 'chase':
+      // Half a turn a stride (a whole number of spikes, so it rolls on seamlessly), bumping along.
+      p.roll = phase * 180;
+      p.lift = -1.2 * Math.abs(Math.sin(phase * Math.PI * 4));
+      break;
+    case 'leap':
+      p.roll = phase * 180;
+      p.lift = -14 * Math.sin(Math.PI * clamp01(t / 420));
+      break;
+    case 'sleep': {
+      const breath = wave(t, 3200);
+      p.sy *= 1 + 0.04 * breath;
+      p.sx *= 1 + 0.02 * breath;
+      p.blush = 0.7;
+      p.mark = 'zzz';
+      break;
+    }
+    case 'surprised': {
+      // Pops up, bristling.
+      p.lift = -7 * Math.sin(Math.PI * Math.min(1, clamp01(t / 450) * 1.7));
+      p.sx = 1.08;
+      p.sy = 1.08;
+      p.mark = 'alarm';
+      break;
+    }
+  }
+  return p;
 }
 
 /** Hanging from your grip by the scruff: body straight down, legs and tail dangling. */
@@ -716,33 +847,45 @@ function angry(b: ChibiBuild, input: ChibiInput): ChibiPose {
 /** The pose for a land animal at this moment. */
 function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
   const { t, clock, phase } = input;
+  if (b.curls && CURLS.has(input.animation)) return curled(b, input);
+  const hops = b.gait === 'hop';
   switch (input.animation) {
     case 'idle': {
-      const p = stand(b);
+      let p = stand(b);
       alive(p, clock);
       // Now and then a curious tilt of the head.
       p.hrot += noise1(clock / 3100, 9) * 7;
+      // A bunny sits up every so often to have a look round.
+      if (b.species === 'bunny') {
+        const k = clock % 9000;
+        p = mix(p, lookout(b), span(k, 6000, 6400) * (1 - span(k, 8200, 8600)));
+      }
+      // A frog shoots its tongue out after a fly.
+      if (b.species === 'frog') p.snap = keyed(clock % 6000, [[5000, 0], [5080, 1], [5200, 1], [5320, 0]]);
       look(b, p, input.gaze);
       p.eyes = eyesFrom(input);
       return p;
     }
     case 'walk': {
       const p = stand(b);
-      walk(b, p, phase);
+      if (hops) hop(b, p, phase, 6);
+      else walk(b, p, phase);
       p.eyes = eyesFrom(input);
       return p;
     }
     case 'run':
     case 'chase': {
       const p = stand(b);
-      gallop(b, p, phase, input.animation === 'chase' ? 7.5 : 6.5);
+      if (hops) hop(b, p, phase, input.animation === 'chase' ? 11 : 10);
+      else gallop(b, p, phase, input.animation === 'chase' ? 7.5 : 6.5);
       p.eyes = input.animation === 'chase' ? 'wide' : eyesFrom(input);
       p.mouth = input.animation === 'chase' ? 0.15 : 0;
       return p;
     }
     case 'jump': {
       const p = stand(b);
-      spring(b, p, clamp01(t / 400), 17, 0.32);
+      if (b.species === 'fox') pounce(b, p, clamp01(t / 400));
+      else spring(b, p, clamp01(t / 400), 17, 0.32);
       p.eyes = 'wide';
       return p;
     }
@@ -857,7 +1000,9 @@ function walkerPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
     case 'happy': {
       const p = stand(b);
       const hop = Math.abs(Math.sin((t / 600) * Math.PI * 2));
-      p.lift = -2.6 * hop;
+      // A hopper jumps for joy, with a twist in the air.
+      p.lift = (hops ? -7 : -2.6) * hop;
+      if (hops) p.rot += 12 * Math.sin((t / 600) * Math.PI * 2);
       p.sy *= 1 + 0.05 * hop;
       p.tailA += 14 * Math.sin((t / 300) * Math.PI * 2);
       p.tailCurl += 30 * Math.sin((t / 300) * Math.PI * 2 + 1);
@@ -947,6 +1092,42 @@ function tread(b: ChibiBuild, clock: number): ChibiPose {
   return p;
 }
 
+/** Where in a dive (or another trick) on a loop of the wall clock it is, 0..1, or -1 between them. */
+function trick(clock: number, period: number, from: number, length: number): number {
+  const k = (clock % period) - from;
+  return k >= 0 && k < length ? k / length : -1;
+}
+
+/**
+ * A dive as it swims along: nose down under the surface, its tail flipping up after it,
+ * bubbles coming up while it's under, and up again nose first with a splash.
+ */
+function dive(b: ChibiBuild, phase: number, u: number): ChibiPose {
+  const p = swim(b, phase, 0.6);
+  p.rot = keyed(u, [[0, p.rot], [0.22, -50], [0.4, -8], [0.7, 6], [0.84, 34], [1, -2]]);
+  p.lift = keyed(u, [[0, 0], [0.08, -2], [0.3, 22], [0.42, 36], [0.68, 36], [0.86, 4], [1, 0]]);
+  p.tailA = keyed(u, [[0, 182], [0.2, 168], [0.32, 120], [0.44, 182]]);
+  p.tailCurl = keyed(u, [[0, 0], [0.32, -30], [0.44, 0]]);
+  p.hrot = keyed(u, [[0, 4], [0.2, -18], [0.75, 20], [1, 4]]);
+  p.ears = keyed(u, [[0, -0.2], [0.15, -1], [0.86, -1], [0.92, 0.8], [1, -0.2]]);
+  p.splash = 1.8 * bump(clamp01((u - 0.12) / 0.2)) + 1.6 * bump(clamp01((u - 0.78) / 0.18));
+  p.bubbles = keyed(u, [[0.36, 0], [0.42, 1], [0.7, 1], [0.76, 0]]);
+  return p;
+}
+
+/** Rolling right over as it swims, belly up and back, paws in the air halfway round. */
+function rollOver(b: ChibiBuild, phase: number, u: number): ChibiPose {
+  const p = swim(b, phase, 0.6);
+  p.sy = Math.cos(2 * Math.PI * u);
+  for (const leg of LEGS) {
+    const root = legRoot(b, p, leg);
+    p.paws[leg] = { x: root.x + (leg.startsWith('front') ? 1 : -2), y: root.y + 5 * p.sy };
+  }
+  p.splash = 1.2 * bump(u);
+  p.eyes = 'happy';
+  return p;
+}
+
 /** An arc right out of the water and back in, nose first. */
 function porpoise(b: ChibiBuild, u: number, height: number): ChibiPose {
   const p = swim(b, 0, 0);
@@ -1014,12 +1195,20 @@ function otterPose(b: ChibiBuild, input: ChibiInput): ChibiPose {
       return p;
     }
     case 'walk': {
+      // Now and then it dives, or rolls over.
+      const under = trick(clock, 9000, 5000, 1800);
+      if (under >= 0) return dive(b, phase, under);
+      const over = trick(clock, 9000, 2600, 900);
+      if (over >= 0) return rollOver(b, phase, over);
       const p = swim(b, phase, 0.6);
       p.eyes = eyesFrom(input);
       return p;
     }
     case 'run':
     case 'chase': {
+      // Going fast, it porpoises out of the water every so often.
+      const arc = trick(clock, 4200, 3000, 800);
+      if (arc >= 0) return porpoise(b, arc, 12);
       const p = swim(b, phase, input.animation === 'chase' ? 1.6 : 1.2);
       p.rot = 6 * Math.sin(phase * Math.PI * 2);
       p.hy += 1.5;

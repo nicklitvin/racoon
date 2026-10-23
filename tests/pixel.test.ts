@@ -6,13 +6,17 @@ import { drawPixelPet, PIXEL } from '../src/sprites/pixel/draw';
 import { drawPixelFacing } from '../src/sprites/pixel/facing';
 import { C, PIXEL_COATS, rgbaTable, SLOTS } from '../src/sprites/pixel/palette';
 import { ellipse, Raster } from '../src/sprites/pixel/raster';
-import { PIXEL_CAT, PIXEL_OTTER, PIXEL_RACCOON, type PixelBuild } from '../src/sprites/pixel/species';
+import { PIXEL_BUNNY, PIXEL_CAT, PIXEL_FOX, PIXEL_FROG, PIXEL_HEDGEHOG, PIXEL_OTTER, PIXEL_RACCOON, type PixelBuild } from '../src/sprites/pixel/species';
 import { ANIMATION_NAMES, type AnimationName } from '../src/sprites/types';
 
 const BUILDS = [
   ['raccoon', PIXEL_RACCOON],
   ['cat', PIXEL_CAT],
   ['otter', PIXEL_OTTER],
+  ['bunny', PIXEL_BUNNY],
+  ['hedgehog', PIXEL_HEDGEHOG],
+  ['fox', PIXEL_FOX],
+  ['frog', PIXEL_FROG],
 ] as const;
 
 /** A settled pose for an animation, `ms` in. */
@@ -249,7 +253,7 @@ describe('pixel pets walking up and down the screen', () => {
   });
 
   it('draws a face from the front and none from behind, the whole animal inside its canvas', () => {
-    for (const build of [PIXEL_RACCOON, PIXEL_CAT, PIXEL_OTTER]) {
+    for (const [, build] of BUILDS) {
       for (const view of ['front', 'back'] as const) {
         const r = new Raster(PIXEL.width, PIXEL.height);
         const { pose, clock } = poseAt(build, 'walk');

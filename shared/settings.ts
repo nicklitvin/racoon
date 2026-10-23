@@ -1,15 +1,16 @@
 // User settings, shared by the Electron main process (which stores them) and the renderer.
 
 /**
- * The pets to choose from: a raccoon, a cat, an otter and a floating puffball, in pixel art.
+ * The pets to choose from, in pixel art: a raccoon, a cat and an otter, and in beta a
+ * floating puffball, a bunny, a hedgehog, a fox and a frog.
  * The first one is the default. Anyone on a retired pet gets the nearest one still here
  * (see `retired`).
  */
-export const RACCOON_TYPES = ['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'blob-pixel'] as const;
+export const RACCOON_TYPES = ['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'blob-pixel', 'bunny-pixel', 'hedgehog-pixel', 'fox-pixel', 'frog-pixel'] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
 /** Pets still being tried out: only offered (and only kept) with `beta` switched on. */
-export const BETA_TYPES: readonly RaccoonType[] = ['blob-pixel'];
+export const BETA_TYPES: readonly RaccoonType[] = ['blob-pixel', 'bunny-pixel', 'hedgehog-pixel', 'fox-pixel', 'frog-pixel'];
 
 /** Hats to dress your pet up in. */
 export const HATS = ['none', 'party', 'beanie', 'tophat', 'crown', 'cap', 'bow', 'nightcap', 'headphones', 'wizard'] as const;
@@ -56,13 +57,14 @@ function isRaccoonType(value: unknown): value is RaccoonType {
 }
 
 /**
- * The nearest pet still here to a retired one: the same animal in pixel art (a fox gets the
- * cat, the nearest thing to one). The oldest retired pets (arena, cartoon, plush, classic,
- * cat) get the default.
+ * The nearest pet on offer to one that isn't: the same animal in pixel art (a fox gets the
+ * pixel fox in beta, or else the cat, the nearest thing to one). The oldest retired pets
+ * (arena, cartoon, plush, classic, cat), and the other beta pets with beta off, get the default.
  */
-function retired(type: string): RaccoonType | null {
+function nearest(type: string, beta: boolean): RaccoonType | null {
   if (/^raccoon-/.test(type)) return 'raccoon-pixel';
-  if (/^(cat|fox)-/.test(type)) return 'cat-pixel';
+  if (/^fox-/.test(type)) return beta ? 'fox-pixel' : 'cat-pixel';
+  if (/^cat-/.test(type)) return 'cat-pixel';
   if (/^otter-/.test(type)) return 'otter-pixel';
   return null;
 }
@@ -71,12 +73,11 @@ function retired(type: string): RaccoonType | null {
 export function normalizeSettings(raw: unknown): Settings {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const beta = r.beta === true;
-  const type = isRaccoonType(r.raccoonType)
-    ? r.raccoonType
-    : (typeof r.raccoonType === 'string' && retired(r.raccoonType)) || DEFAULT_SETTINGS.raccoonType;
+  const asked = typeof r.raccoonType === 'string' ? r.raccoonType : '';
+  // A beta pet is only kept with beta on; switched off, it's the nearest one on offer.
+  const offered = isRaccoonType(asked) && (beta || !BETA_TYPES.includes(asked));
   return {
-    // A beta pet goes back to the default when beta is switched off.
-    raccoonType: BETA_TYPES.includes(type) && !beta ? DEFAULT_SETTINGS.raccoonType : type,
+    raccoonType: offered ? (asked as RaccoonType) : (nearest(asked, beta) ?? DEFAULT_SETTINGS.raccoonType),
     keyboardReactions: r.keyboardReactions === true,
     launchAtLogin: r.launchAtLogin === true,
     hat: (HATS as readonly unknown[]).includes(r.hat) ? (r.hat as Hat) : DEFAULT_SETTINGS.hat,

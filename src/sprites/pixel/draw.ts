@@ -1,5 +1,5 @@
 import { DEG, clamp01 } from '../critter/kit';
-import { bodyFrame, headCentre, legRoot, WATER_Y, type ChibiMark, type ChibiPose, type LegName } from '../chibi/pose';
+import { ballRadius, bodyFrame, headCentre, legRoot, WATER_Y, type ChibiMark, type ChibiPose, type LegName } from '../chibi/pose';
 import { hatItem, NECK_WIDTH, outfitItem, UNDRESSED, type Dress, type Paint, type Wearable } from '../outfits';
 import { GLYPHS } from './glyphs';
 import { C } from './palette';
@@ -27,14 +27,40 @@ export const TAIL_BANDS: Record<PixelSpecies, [number, number][]> = {
     [0.67, 0.75],
   ],
   otter: [],
+  // A bunny's is all white, a cotton ball; a fox's brush has a white tip.
+  bunny: [[0, 1.01]],
+  hedgehog: [],
+  fox: [[0.72, 1.01]],
+  frog: [],
 };
 
-/** Ears: half width and height at the base, and where on the head they sit (degrees, 90 = top). */
-export const EARS: Record<PixelSpecies, { w: number; h: number; near: number; far: number }> = {
-  cat: { w: 6.4, h: 10.5, near: 58, far: 122 },
-  raccoon: { w: 6.6, h: 9.5, near: 56, far: 124 },
-  otter: { w: 3.6, h: 3.4, near: 42, far: 138 },
+/**
+ * Ears: pointed, round, long (a bunny's) or none at all (a frog's), their half width and
+ * height at the base, and where on the head they sit (degrees, 90 = top).
+ */
+export const EARS: Record<PixelSpecies, { kind: 'point' | 'round' | 'long' | 'none'; w: number; h: number; near: number; far: number }> = {
+  cat: { kind: 'point', w: 6.4, h: 10.5, near: 58, far: 122 },
+  raccoon: { kind: 'point', w: 6.6, h: 9.5, near: 56, far: 124 },
+  otter: { kind: 'round', w: 3.6, h: 3.4, near: 42, far: 138 },
+  bunny: { kind: 'long', w: 3.4, h: 19, near: 76, far: 100 },
+  hedgehog: { kind: 'round', w: 2.8, h: 2.6, near: 50, far: 70 },
+  fox: { kind: 'point', w: 6.2, h: 12, near: 58, far: 122 },
+  frog: { kind: 'none', w: 0, h: 0, near: 0, far: 0 },
 };
+
+/** Where the eyes are on the face, far one first, in head radii: a frog's are up on top of its head. */
+export const EYES: Record<PixelSpecies, [Pt, Pt]> = {
+  raccoon: [{ x: -0.18, y: 0.04 }, { x: 0.4, y: 0.06 }],
+  cat: [{ x: -0.18, y: 0.04 }, { x: 0.4, y: 0.06 }],
+  otter: [{ x: -0.18, y: 0.04 }, { x: 0.4, y: 0.06 }],
+  bunny: [{ x: -0.16, y: 0.02 }, { x: 0.42, y: 0.04 }],
+  hedgehog: [{ x: 0.1, y: -0.02 }, { x: 0.52, y: 0 }],
+  fox: [{ x: -0.16, y: 0.02 }, { x: 0.42, y: 0.04 }],
+  frog: [{ x: -0.1, y: -0.74 }, { x: 0.42, y: -0.72 }],
+};
+
+/** The bumps a frog's eyes sit in, in drawing units. */
+export const EYE_BULGE = 4.4;
 
 /** Cheek tufts: [angle round the head, how far out]. */
 const TUFTS: Record<PixelSpecies, [number, number][]> = {
@@ -47,6 +73,13 @@ const TUFTS: Record<PixelSpecies, [number, number][]> = {
     [330, 0.08],
   ],
   otter: [],
+  bunny: [[210, 0.06]],
+  hedgehog: [],
+  fox: [
+    [205, 0.22],
+    [335, 0.18],
+  ],
+  frog: [],
 };
 
 /** The palette slots for each of an item's paints. */
@@ -120,6 +153,16 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     const e = ellipse(at.x, at.y, (b.body.rx * squash + 7) * K * (1 - lifted * 0.6), 1.4);
     r.shape(e.sd, e.box, C.shadow, null);
   }
+  // A hedgehog rolled up is just its spiky ball (it's still held by its middle).
+  if (p.ball > 0.5) {
+    const at = T({ x: frame.cx, y: frame.cy });
+    const R = ballRadius(b);
+    drawSpikyBall(r, at, R * K, p.sx, p.sy, p.roll, moving < 0.2);
+    if (facing < 0) r.mirror(FX);
+    const box = r.bounds((c) => c === C.shadow);
+    drawMarks(r, p.mark, { x: FX + frame.cx * K * facing, y: FY + (frame.cy - R - 6) * K }, facing, clock);
+    return box ? joinBoxes(box) : null;
+  }
   const pond = { cx: -3 - moving * 4, rx: 34 + moving * 6, ry: 7 };
   if (wet) {
     const at = T({ x: pond.cx, y: WATER_Y });
@@ -146,6 +189,7 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     return tube(spine, radii);
   };
   const drawTail = () => {
+    if (b.tail.length <= 0) return;
     const t = tailShape();
     const bands = TAIL_BANDS[species];
     r.shape(t.sd, t.box, (x, y) => {
@@ -169,6 +213,12 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     const far = leg.endsWith('Far');
     const c = capsule(root, paw, w);
     r.shape(c.sd, c.box, far ? C.far : C.fur, C.outline);
+    // A fox's black socks.
+    if (species === 'fox') {
+      const top = { x: root.x + (paw.x - root.x) * 0.5, y: root.y + (paw.y - root.y) * 0.5 };
+      const sock = capsule(top, paw, w + 0.5);
+      r.shape(intersect(sock.sd, c.sd), sock.box, C.dark, null);
+    }
     // Sleeves and trouser legs, down to the cuffs.
     if (clothes && clothes.sleeves > 0) {
       const k = clothes.sleeves;
@@ -198,7 +248,10 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   };
   // From behind, his tummy and chest are out of sight.
   if (!behind) bodyMark(B.rx * 0.2, B.ry * 0.62, B.rx * 0.78, B.ry * 0.55, C.belly);
-  if (species === 'raccoon' && !behind) bodyMark(B.rx * 0.82, B.ry * 0.25, B.rx * 0.38, B.ry * 0.8, C.light);
+  if ((species === 'raccoon' || species === 'fox') && !behind) bodyMark(B.rx * 0.82, B.ry * 0.25, B.rx * 0.38, B.ry * 0.8, C.light);
+  if (species === 'frog') {
+    for (const [x, y, s] of [[-0.45, -0.45, 0.2], [0.1, -0.62, 0.16], [-0.1, -0.1, 0.13]] as const) bodyMark(B.rx * x, B.ry * y, B.rx * s, B.rx * s * 0.8, C.dark);
+  }
   if (species === 'cat') {
     for (const x of [-0.45, -0.1, 0.25]) {
       const a = T(frame.at({ x: B.rx * x - 2, y: -B.ry - 1 }));
@@ -208,6 +261,8 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     }
   }
   if (covered) dressBody();
+  // A hedgehog's spines, over its back from its shoulders round to its tail.
+  if (species === 'hedgehog') spines((l) => T(frame.at(l)), B.rx, B.ry, 22, 205, 0, 1.3, 9);
   if (p.haunch > 0.5) {
     const rr = B.ry * 0.62;
     const at = T(frame.at({ x: b.hip.x + 2, y: b.hip.y - 2 }));
@@ -368,10 +423,23 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     const back = p.ears < 0 ? p.ears * 40 : p.ears * -8;
     const tilt = (outward - back * (near ? 1 : 0.8)) * DEG;
     const place = (l: Pt) => onHead({ x: at.x + l.x * Math.cos(tilt) - l.y * Math.sin(tilt), y: at.y + l.x * Math.sin(tilt) + l.y * Math.cos(tilt) });
-    if (species === 'otter') {
+    if (ear.kind === 'none') return;
+    if (ear.kind === 'round') {
       const c = place({ x: 0, y: -0.6 });
       const e = ellipse(c.x, c.y, ear.w * K, ear.h * K, headAngle);
       r.shape(e.sd, e.box, near ? C.fur : C.far, C.outline);
+      return;
+    }
+    if (ear.kind === 'long') {
+      // Long and upright, pink inside, laid back as it hops.
+      const c = place({ x: 0, y: -ear.h * 0.5 });
+      const e = ellipse(c.x, c.y, ear.w * K, ear.h * 0.55 * K, headAngle + tilt);
+      r.shape(e.sd, e.box, near ? C.fur : C.far, C.outline);
+      if (!behind && near) {
+        const inside = place({ x: 0.3, y: -ear.h * 0.45 });
+        const i = ellipse(inside.x, inside.y, ear.w * 0.45 * K, ear.h * 0.38 * K, headAngle + tilt);
+        r.shape(intersect(i.sd, e.sd), i.box, C.inner, null);
+      }
       return;
     }
     const tri = (size: number, dx = 0, dy = 0) => polygon([{ x: -ear.w * size, y: 1.5 }, { x: -0.8 * size, y: -ear.h * size }, { x: ear.w * size, y: 1.5 }].map((q) => place({ x: q.x + dx, y: q.y + dy })));
@@ -381,9 +449,23 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
       const inner = tri(0.55);
       r.shape(intersect(inner.sd, outer.sd), inner.box, C.inner, null);
     }
+    // A fox's ears are black at the tips.
+    if (species === 'fox') {
+      const tip = polygon([{ x: -ear.w * 0.5, y: -ear.h * 0.45 }, { x: -0.8, y: -ear.h - 1 }, { x: ear.w * 0.5, y: -ear.h * 0.45 }].map(place));
+      r.shape(intersect(tip.sd, outer.sd), tip.box, C.dark, null);
+    }
   };
-  drawEar(ear.far, false);
-  drawEar(ear.near, true);
+  // A hat or a hood goes on over the top of the head; a bunny's long ears poke up in front of it.
+  const hatAt = ear.kind === 'long' ? { x: -H.rx * 0.32, y: -H.ry * 0.82 } : { x: -H.rx * 0.06, y: -H.ry * 0.9 };
+  const dressHead = () => {
+    wear(hoodOf(dress), hatAt, H.rx, PAINT_SLOT.wear);
+    wear(hatItem(dress.hat), hatAt, H.rx, PAINT_SLOT.hat);
+  };
+  const earsThrough = ear.kind === 'long' && (hatItem(dress.hat) !== null || hoodOf(dress) !== null);
+  if (!earsThrough) {
+    drawEar(ear.far, false);
+    drawEar(ear.near, true);
+  }
 
   // The head: round, with cheek tufts.
   const skull = ellipse(centre.x, centre.y, H.rx * K, H.ry * K, headAngle);
@@ -394,8 +476,11 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   const head = tufts.length ? union(skull.sd, ...tufts) : skull.sd;
   const headBox = { x0: skull.box.x0 - 3, y0: skull.box.y0 - 3, x1: skull.box.x1 + 3, y1: skull.box.y1 + 3 };
   r.shape(head, headBox, C.fur, C.outline, { light: C.furLight, dark: C.fur });
+  // A frog's eyes are up on top of its head, in front of whatever it's wearing there.
+  if (species === 'frog') dressHead();
   const rx = H.rx;
   const ry = H.ry;
+  const eyeAt = EYES[species].map((e) => ({ x: e.x * rx, y: e.y * ry }));
   /**
    * A point on the face, with the face turned round towards where he's looking: everything
    * slides forward, the back of it most, so the near eye and the nose come round to the
@@ -453,8 +538,33 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
       case 'otter':
         faceEllipse(rx * 0.42, ry * 0.5, rx * 0.72, ry * 0.42, C.light);
         break;
+      case 'bunny':
+        faceEllipse(rx * 0.62, ry * 0.5, rx * 0.42, ry * 0.32, C.light);
+        break;
+      case 'fox':
+        faceEllipse(rx * 0.55, ry * 0.55, rx * 0.55, ry * 0.36, C.light);
+        faceEllipse(-rx * 0.1, ry * 0.72, rx * 0.5, ry * 0.3, C.light);
+        break;
+      case 'hedgehog': {
+        // A pale face, and a pointed snout sticking out in front.
+        faceEllipse(rx * 0.35, ry * 0.2, rx * 0.75, ry * 0.75, C.light);
+        const at = onFace({ x: rx * 0.92, y: ry * 0.36 });
+        const snout = ellipse(at.x, at.y, rx * 0.36 * K, ry * 0.26 * K, headAngle);
+        r.shape(snout.sd, snout.box, C.light, C.outline);
+        break;
+      }
+      case 'frog': {
+        // A pale throat, and a wide smile right across.
+        faceEllipse(rx * 0.3, ry * 0.75, rx * 0.65, ry * 0.32, C.light);
+        for (const [a, z] of [[[0.88, 0.32], [0.15, 0.44]], [[0.15, 0.44], [0.02, 0.3]]] as const) {
+          const line = capsule(onFace({ x: rx * a[0], y: ry * a[1] }), onFace({ x: rx * z[0], y: ry * z[1] }), 0.5);
+          faceMark(line.sd, line.box, C.mouth);
+        }
+        break;
+      }
     }
-    const nose = species === 'otter' ? { x: rx * 0.78, y: ry * 0.22 } : { x: rx * 0.8, y: ry * 0.3 };
+    const nose =
+      species === 'otter' ? { x: rx * 0.78, y: ry * 0.22 } : species === 'hedgehog' ? { x: rx * 1.22, y: ry * 0.32 } : species === 'frog' ? { x: rx * 0.86, y: -ry * 0.05 } : { x: rx * 0.8, y: ry * 0.3 };
     if (species === 'otter') {
       for (const dx of [-1.9, 1.9]) {
         const at = onFace({ x: nose.x + dx * 0.8 - 0.5, y: nose.y + 2.7 });
@@ -492,15 +602,28 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
         }
       }
     };
-    eye({ x: -rx * 0.18, y: ry * 0.04 });
-    eye({ x: rx * 0.4, y: ry * 0.06 });
+    // A frog's eyes are up in bumps on top of its head, white round the middle.
+    if (species === 'frog') for (const [i, e] of eyeAt.entries()) bulge(e, i === 1);
+    for (const e of eyeAt) eye(e);
 
     // Nose, mouth and blush.
     const n = pix(nose);
-    r.dots(species === 'otter' ? [{ x: n.x - 1, y: n.y }, n, { x: n.x + 1, y: n.y }, { x: n.x, y: n.y + 1 }] : [{ x: n.x - 1, y: n.y }, n], C.nose);
+    const nostrils = species === 'frog' ? [{ x: n.x - 2, y: n.y }, n] : species === 'otter' ? [{ x: n.x - 1, y: n.y }, n, { x: n.x + 1, y: n.y }, { x: n.x, y: n.y + 1 }] : [{ x: n.x - 1, y: n.y }, n];
+    r.dots(nostrils, C.nose);
+    // A frog's tongue, shot out after a fly.
+    if (species === 'frog' && p.snap > 0.05) {
+      const from = onFace({ x: rx * 0.9, y: ry * 0.34 });
+      const to = onFace({ x: rx * 0.9 + p.snap * 16, y: ry * 0.34 - p.snap * 3 });
+      const tongue = capsule(from, to, 0.6);
+      r.shape(tongue.sd, tongue.box, C.tongue, C.outline);
+      const tip = ellipse(to.x, to.y, 1.2, 1.1);
+      r.shape(tip.sd, tip.box, C.tongue, C.outline);
+    }
     if (p.mouth > 0.12) {
+      // Open under the nose, or (a frog) in the middle of its smile.
+      const m = species === 'frog' ? pix({ x: rx * 0.62, y: ry * 0.3 }) : n;
       const h = 1 + Math.round(p.mouth * 2.5);
-      for (let i = 1; i <= h; i++) r.dots([{ x: n.x - 1, y: n.y + i }, { x: n.x, y: n.y + i }], i === h && p.tongue > 0.25 ? C.tongue : C.mouth);
+      for (let i = 1; i <= h; i++) r.dots([{ x: m.x - 1, y: m.y + i }, { x: m.x, y: m.y + i }], i === h && p.tongue > 0.25 ? C.tongue : C.mouth);
     }
     if (p.blush >= 0.6) {
       const near = pix({ x: rx * 0.62, y: ry * 0.42 });
@@ -509,10 +632,49 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     }
   }
 
+  // A frog's eye bumps from behind; a hedgehog's spines over the back of its head.
+  if (behind && species === 'frog') for (const [i, e] of eyeAt.entries()) bulge(e, i === 1);
+  if (species === 'hedgehog') {
+    if (behind) spines(onHead, rx, ry, -20, 250, 0, 1.28, 11);
+    else spines(onHead, rx, ry, 78, 228, 0.5, 1.28, 8);
+  }
+
+  /** One of a frog's eye bumps, white inside unless it's seen from behind. */
+  function bulge(e: Pt, near: boolean): void {
+    const c = onFace(e);
+    const bump = ellipse(c.x + 0.5, c.y, EYE_BULGE * K, EYE_BULGE * 0.92 * K);
+    r.shape(bump.sd, bump.box, near ? C.fur : C.far, C.outline, { light: C.furLight, dark: near ? C.fur : C.far });
+    if (behind) return;
+    const white = ellipse(c.x + 0.5, c.y, (EYE_BULGE - 1.6) * K, (EYE_BULGE - 1.8) * K);
+    r.shape(intersect(white.sd, bump.sd), white.box, C.inner, null);
+  }
+
+  /**
+   * A hedgehog's spines: a zigzag of spikes round the edge of an ellipse (`rx` by `ry`, placed
+   * by `place`), from angle `a0` to `a1` (degrees, 0 forward, 90 up), filled in to `inner` of
+   * the way out, with lighter streaks down them.
+   */
+  function spines(place: (l: Pt) => Pt, rx: number, ry: number, a0: number, a1: number, inner: number, tip: number, count: number): void {
+    const round = (a: number, k: number): Pt => ({ x: Math.cos(a * DEG) * rx * k, y: -Math.sin(a * DEG) * ry * k });
+    const step = (a1 - a0) / count;
+    const outside: Pt[] = [round(a0, 0.96)];
+    for (let i = 0; i < count; i++) outside.push(round(a0 + step * (i + 0.5), tip), round(a0 + step * (i + 1), 0.96));
+    const back = inner > 0 ? Array.from({ length: count + 1 }, (_, i) => round(a1 - step * i, inner)) : [{ x: 0, y: 0 }];
+    const coat = polygon([...outside, ...back].map(place));
+    r.shape(coat.sd, coat.box, C.dark, C.outline, { light: C.band, dark: C.dark });
+    for (let i = 0; i < count; i++) {
+      const a = a0 + step * (i + 0.5);
+      const streak = capsule(place(round(a, Math.max(inner, 0.45) + 0.12)), place(round(a, tip * 0.82)), 0.45);
+      r.shape(intersect(streak.sd, coat.sd), streak.box, C.band, null);
+    }
+  }
+
   // A costume's hood, then a hat, over the ears and the top of the head.
-  const hatAt = { x: -H.rx * 0.06, y: -H.ry * 0.9 };
-  wear(hoodOf(dress), hatAt, H.rx, PAINT_SLOT.wear);
-  wear(hatItem(dress.hat), hatAt, H.rx, PAINT_SLOT.hat);
+  if (species !== 'frog') dressHead();
+  if (earsThrough) {
+    drawEar(ear.far, false);
+    drawEar(ear.near, true);
+  }
 
   // --- Paws raised in front, and an otter's shell ---
   for (const leg of ['frontFar', 'frontNear'] as const) if (raised(leg)) drawLeg(leg);
@@ -556,6 +718,15 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
         r.stamp(['#'], at.x, at.y, C.waterLight, C.waterDark);
       }
     }
+    // Bubbles coming up where it's gone under.
+    if (p.bubbles > 0.05) {
+      for (let i = 0; i < 3; i++) {
+        const age = (clock / 700 + i / 3) % 1;
+        const at = T({ x: frame.cx + (i - 1) * 5 + Math.sin(clock / 180 + i * 2), y: WATER_Y - 2.5 - age * 8 * p.bubbles });
+        const bubble = ellipse(at.x, at.y, 1 + 0.5 * age, 1 + 0.5 * age);
+        r.shape(bubble.sd, bubble.box, C.waterLight, C.waterDark);
+      }
+    }
   }
 
   if (facing < 0) r.mirror(FX);
@@ -564,6 +735,35 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
   // --- Marks over the head, always the right way round ---
   drawMarks(r, p.mark, { x: FX + hc.x * K * facing, y: FY + (hc.y - H.ry - 6) * K }, facing, clock);
   return box ? joinBoxes(box) : null;
+}
+
+/**
+ * A hedgehog rolled up: a ball of spikes `R` pixels round (squashed by `sx` and `sy`) turned
+ * `roll` degrees, with its pale tummy tucked in at the bottom and, at rest, the tip of its
+ * snout peeking out.
+ */
+export function drawSpikyBall(r: Raster, at: Pt, R: number, sx: number, sy: number, roll: number, peeking: boolean): void {
+  const count = 12;
+  const point = (deg: number, k: number): Pt => ({ x: at.x + Math.cos(deg * DEG) * R * k * sx, y: at.y - Math.sin(deg * DEG) * R * k * sy });
+  const outline: Pt[] = [];
+  for (let i = 0; i < count * 2; i++) outline.push(point(-roll + (i * 180) / count, i % 2 ? 1.16 : 0.9));
+  const ball = polygon(outline);
+  r.shape(ball.sd, ball.box, C.dark, C.outline, { light: C.band, dark: C.dark });
+  // The tummy and face tucked in, turning with the ball.
+  const tummy = point(-roll - 55, 0.42);
+  const t = ellipse(tummy.x, tummy.y, R * 0.5 * sx, R * 0.38 * sy, (-roll - 55) * -DEG);
+  r.shape(intersect(t.sd, ball.sd), t.box, C.fur, null);
+  for (let i = 0; i < count; i++) {
+    const a = -roll + ((i * 2 + 1) * 180) / count;
+    const streak = capsule(point(a, 0.5), point(a, 0.95), 0.45);
+    r.shape(intersect(streak.sd, ball.sd), streak.box, C.band, null);
+  }
+  if (peeking) {
+    const tip = point(-28, 0.92);
+    const snout = ellipse(tip.x, tip.y, R * 0.3, R * 0.22);
+    r.shape(snout.sd, snout.box, C.light, C.outline);
+    r.dots([{ x: Math.floor(tip.x + R * 0.26), y: Math.floor(tip.y) }], C.nose);
+  }
 }
 
 /** A costume's hood, as something to wear (in hat units), or null. */
