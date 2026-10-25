@@ -5,6 +5,7 @@ import { RACCOON_STYLES } from '../sprites';
 import { HAT_ITEMS, OUTFIT_ITEMS, wearableIcon } from '../sprites/outfits';
 import { ModeScene } from './ModeScene';
 import { PatchNotes, VersionChip } from './PatchNotes';
+import { UpdateBanner, UpdateRow, useUpdateStatus } from './Updates';
 
 interface SettingsPanelProps {
   host: Host;
@@ -161,6 +162,7 @@ function Switch({ label, checked, onChange, title, children }: { label: string; 
 
 export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
   const { settings, keyboard } = useHostState(host);
+  const updates = useUpdateStatus(host);
   const [notes, setNotes] = useState(false);
   if (!settings) return null;
 
@@ -194,6 +196,8 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
   return (
     <section className="settings" aria-label="My Pet settings">
       {header}
+
+      <UpdateBanner host={host} status={updates} />
 
       <Section title="Mode">
         <ModePicker settings={settings} onChange={(mode) => update({ mode })} />
@@ -256,6 +260,7 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
               onChange={(launchAtLogin) => update({ launchAtLogin })}
               title="Applies to the installed app, not to development builds."
             />
+            <UpdateRow host={host} status={updates} />
           </div>
         </Section>
       )}

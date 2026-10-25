@@ -2,6 +2,7 @@
 // Imported by both sides; keep it free of Node, Electron and DOM dependencies.
 
 import type { KeyboardStatus, Settings } from './settings';
+import type { UpdateStatus } from './update';
 
 export const IPC = {
   getDisplay: 'racoon:get-display',
@@ -16,6 +17,11 @@ export const IPC = {
   keyboardStatusChanged: 'racoon:keyboard-status-changed',
   recheckKeyboardAccess: 'racoon:recheck-keyboard-access',
   openKeyboardPrivacySettings: 'racoon:open-keyboard-privacy-settings',
+  getUpdateStatus: 'racoon:get-update-status',
+  updateStatusChanged: 'racoon:update-status-changed',
+  checkForUpdate: 'racoon:check-for-update',
+  installUpdate: 'racoon:install-update',
+  openReleasesPage: 'racoon:open-releases-page',
 } as const;
 
 export interface Point {
@@ -58,4 +64,10 @@ export interface HostBridge {
   onKeyboardStatusChanged(listener: (status: KeyboardStatus) => void): Unsubscribe;
   recheckKeyboardAccess(): Promise<KeyboardStatus>;
   openKeyboardPrivacySettings(): void;
+  /** Newer builds on the GitHub Releases page: looking for one, and installing it. */
+  getUpdateStatus(): Promise<UpdateStatus>;
+  onUpdateStatusChanged(listener: (status: UpdateStatus) => void): Unsubscribe;
+  checkForUpdate(): Promise<UpdateStatus>;
+  installUpdate(): Promise<UpdateStatus>;
+  openReleasesPage(): void;
 }

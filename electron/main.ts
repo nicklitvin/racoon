@@ -6,6 +6,7 @@ import { CursorMonitor } from './cursorMonitor';
 import { KeyboardMonitor } from './keyboardMonitor';
 import { platform } from './platform';
 import { SettingsStore } from './settingsStore';
+import { Updater } from './updater';
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PRELOAD = path.join(__dirname, 'preload.js');
@@ -20,6 +21,8 @@ let interactive = false;
 let store: SettingsStore;
 let cursorMonitor: CursorMonitor;
 let keyboardStatus: KeyboardStatus = { enabled: false, listening: false, access: 'granted', message: null };
+
+const updater = new Updater((status) => broadcast(IPC.updateStatusChanged, status));
 
 const keyboardMonitor = new KeyboardMonitor(() => {
   // An empty pulse: no key information exists past this point.
@@ -260,6 +263,10 @@ function registerIpc() {
     return keyboardStatus;
   });
   ipcMain.on(IPC.openKeyboardPrivacySettings, () => platform.keyboardAccess.openSettings());
+  ipcMain.handle(IPC.getUpdateStatus, () => updater.current);
+  ipcMain.handle(IPC.checkForUpdate, () => updater.check());
+  ipcMain.handle(IPC.installUpdate, () => updater.install());
+  ipcMain.on(IPC.openReleasesPage, () => updater.openReleasesPage());
 }
 
 // ---- Startup ---------------------------------------------------------------------------
@@ -288,6 +295,7 @@ if (!app.requestSingleInstanceLock()) {
     createMainWindow({ minimised: launchedAtLogin() });
     // Silent check at startup: never prompt for permissions the user didn't just ask for.
     syncKeyboard({ prompt: false });
+    updater.start();
 
     screen.on('display-metrics-changed', refitToPrimaryDisplay);
     screen.on('display-added', refitToPrimaryDisplay);
@@ -299,6 +307,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     keyboardMonitor.stop();
+    updater.stop();
     cursorMonitor?.stop();
     store?.flush();
   });

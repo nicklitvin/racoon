@@ -1491,6 +1491,46 @@ html[data-view='settings'] .settings {
   color: var(--ok);
 }
 
+.hint.error {
+  color: var(--text);
+}
+
+/* ---- Updates ---------------------------------------------------------------------------- */
+
+.update-banner {
+  margin: 0 0 16px;
+}
+
+.update-progress {
+  height: 6px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--well-strong);
+}
+
+.update-progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.notice-actions button.secondary {
+  background: var(--well-strong);
+  color: var(--text);
+}
+
+.update-row .switch {
+  cursor: default;
+}
+
+.update-row .text-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
+
 /* ---- Version + patch notes ---------------------------------------------------------- */
 
 .version-chip,

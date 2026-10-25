@@ -57,6 +57,6 @@ npm test           # unit tests
 npm run dist:win   # My-Pet-Windows.exe in release/
 ```
 
-Releases are automatic: every push to `main` that changes the app builds the Windows and Mac apps on GitHub's machines and updates the release for the version in `package.json` (`v0.1.0`). To start a new release, bump `version` in `package.json`.
+Releases are automatic: every push to `main` that changes the app builds the Windows and Mac apps on GitHub's machines and updates the release for the version in `package.json` (`v0.1.0`). To start a new release, bump `version` in `package.json`. The installed app notices a new release by itself and offers to update in its settings.
 
 How it all works, the project layout, adding animations, packaging and the testing checklist: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.

@@ -15,6 +15,14 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-24',
+    title: 'Updates itself',
+    changes: [
+      'My Pet checks for a new version every few hours. When there is one, the settings say so at the top: click Update now and it downloads and installs it, then opens again by itself. On a Mac, it opens the new version for you to drag into Applications.',
+      'Desktop → Updates has a button to check now.',
+    ],
+  },
+  {
     date: '2026-10-23',
     title: 'Smoother play',
     changes: [

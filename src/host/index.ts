@@ -1,5 +1,6 @@
 import type { DisplayInfo, HostBridge, Point } from '../../shared/ipc';
 import { normalizeSettings, type KeyboardStatus, type Settings } from '../../shared/settings';
+import { INITIAL_UPDATE_STATUS, type UpdateStatus } from '../../shared/update';
 import type { Host } from './types';
 
 declare global {
@@ -9,6 +10,7 @@ declare global {
 }
 
 const SETTINGS_KEY = 'racoon.settings';
+const noUpdates: UpdateStatus = { ...INITIAL_UPDATE_STATUS, state: 'unsupported' };
 
 function electronHost(bridge: HostBridge): Host {
   return { ...bridge, kind: 'electron' };
@@ -106,6 +108,12 @@ function webHost(): Host {
     },
     recheckKeyboardAccess: () => Promise.resolve(status()),
     openKeyboardPrivacySettings() {},
+    // A web page is always the latest already.
+    getUpdateStatus: () => Promise.resolve(noUpdates),
+    onUpdateStatusChanged: () => () => {},
+    checkForUpdate: () => Promise.resolve(noUpdates),
+    installUpdate: () => Promise.resolve(noUpdates),
+    openReleasesPage() {},
   };
 }
 

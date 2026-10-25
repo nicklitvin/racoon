@@ -25,12 +25,14 @@ electron/                 Electron main process (Node side)
   cursorMonitor.ts        Polls screen.getCursorScreenPoint() at 40 Hz, sends only changes
   keyboardMonitor.ts      Opt-in key-press counter (uiohook-napi). Never reads which key.
   settingsStore.ts        Settings as JSON in the app's user-data folder
+  updater.ts              Checks GitHub Releases for a newer build, downloads and installs it
   platform/               Everything OS-specific, behind one PlatformAdapter interface
     windows.ts            App id, z-order level
     mac.ts                All Spaces, Accessibility/Input Monitoring permission
 shared/                   Used by both the main process and the page
   ipc.ts                  IPC channel names and the HostBridge API type
   settings.ts             Settings type, defaults, ranges and validation
+  update.ts               Reading the latest GitHub release and telling whether it's newer
 src/                      The page (React). Runs in Electron and in a browser
   core/                   Plain TypeScript: no React, no DOM, no Electron. All unit-tested
     behavior/brain.ts     The behaviour state machine and movement
@@ -251,7 +253,13 @@ CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac   # release/My-Pet-Mac.dmg (A
 
 ### Downloads on GitHub
 
-`.github/workflows/build.yml` builds the two downloads (`My-Pet-Windows.exe` and `My-Pet-Mac.dmg`) on GitHub's own Windows and Mac machines and publishes them as a **GitHub Release**, so anyone can download them from the repo's **Releases** page. It runs by itself on every push to `main` that changes the app (pushes that only touch `*.md` or `docs/` are skipped, and a newer push cancels a build still running). There's one release per version in `package.json`: each run moves the `v<version>` tag to the new commit and replaces its downloads (deleting any others), so the release always has the latest build. Bump `version` for a new release; older ones stay as they were. Pushing a tag yourself (`git tag v0.2.0 && git push origin v0.2.0`) or **Actions → Build desktop apps → Run workflow** works too. The Mac builds aren't signed with a Developer ID or notarized, so the first time, macOS needs `xattr -cr "/Applications/My Pet.app"` or **Open Anyway** in **System Settings → Privacy & Security**.
+`.github/workflows/build.yml` builds the two downloads (`My-Pet-Windows.exe` and `My-Pet-Mac.dmg`) on GitHub's own Windows and Mac machines and publishes them as a **GitHub Release**, so anyone can download them from the repo's **Releases** page. It runs by itself on every push to `main` that changes the app (pushes that only touch `*.md` or `docs/` are skipped, and a newer push cancels a build still running). There's one release per version in `package.json`: each run moves the `v<version>` tag to the new commit and replaces its downloads (deleting any others), so the release always has the latest build. Bump `version` for a new release; older ones stay as they were. The installed app updates itself from here (see **Updating itself** below). Pushing a tag yourself (`git tag v0.2.0 && git push origin v0.2.0`) or **Actions → Build desktop apps → Run workflow** works too. The Mac builds aren't signed with a Developer ID or notarized, so the first time, macOS needs `xattr -cr "/Applications/My Pet.app"` or **Open Anyway** in **System Settings → Privacy & Security**.
+
+### Updating itself
+
+The installed app checks the repo's latest release 15 seconds after it starts and every 4 hours after that (`electron/updater.ts`, using GitHub's public API, no sign-in). Every push rebuilds the same version's release, so the version number can't tell it a release is newer. Instead each build is stamped with the commit it was built from and when (`__BUILD_COMMIT__` and `__BUILD_TIME__`, set in `scripts/build-electron.mjs` from `GITHUB_SHA` or `git rev-parse HEAD`). A release built from the same commit is the same build. Otherwise it's newer if its download was uploaded after this build was made, so a build you made yourself since then never gets "updated" to an older release (`isNewer` in `shared/update.ts`).
+
+When there's a newer one, the settings show a banner at the top with **Update now**, and **Desktop → Updates** has **Check now**. Updating downloads the installer into a temp folder, checking it's the full size, and only ever from this repo's own release downloads. On Windows it runs `My-Pet-Windows.exe /S --force-run`: that installs silently over the running app (closing it, see `build/installer.nsh`) and starts the new one. On a Mac it opens the disk image for you to drag the new app into Applications. Development builds and the web version don't update themselves.
 
 Already handled:
 
