@@ -130,9 +130,25 @@ export class PetRuntime {
       dragStarted: () => this.clickThrough.dragStarted(),
       dragEnded: (p) => this.clickThrough.dragEnded(p, this.grabRects()),
     });
-    this.deskLayer = new DeskLayer(document, els.stage, () => {
-      this.brain.deskTapped();
-      this.wake();
+    this.deskLayer = new DeskLayer(document, els.stage, {
+      tapped: () => {
+        this.brain.deskTapped();
+        this.wake();
+      },
+      lifted: () => {
+        this.brain.deskLifted();
+        this.clickThrough.dragStarted();
+        this.wake();
+      },
+      moved: () => {
+        this.syncDesk();
+        this.wake();
+      },
+      dropped: (p) => {
+        this.brain.deskDropped();
+        this.clickThrough.dragEnded(p, this.grabRects());
+        this.wake();
+      },
     });
     this.applySettings();
     this.applyLayout();
@@ -329,6 +345,7 @@ export class PetRuntime {
     this.render(snap, now);
     this.carryToy(snap);
     this.toyLayer.render(snap.position);
+    this.deskLayer.setDepth(snap.position);
     if (this.cursor) this.updateHover(this.cursor);
     this.schedule();
   };
@@ -357,7 +374,7 @@ export class PetRuntime {
 
   private isResting(): boolean {
     const turning = this.renderer.turnsItself && isTurning(this.heading, this.headingTarget);
-    const toysStill = this.toybox.settled && !this.toyLayer.dragging;
+    const toysStill = this.toybox.settled && !this.toyLayer.dragging && !this.deskLayer.dragging;
     return !this.drag && !turning && toysStill && !this.renderer.isSettling?.() && (this.snap?.resting ?? false);
   }
 
@@ -515,6 +532,7 @@ export class PetRuntime {
       mouse: { x: mouse.x * this.scale, y: mouse.y * this.scale },
       // The desk is pixel art, at the pixel pets' pixel size.
       pixel: PIXEL_PX * this.scale,
+      minSeatX: wa.x + this.size.width / 2,
     });
   }
 

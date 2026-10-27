@@ -171,9 +171,20 @@ html[data-host='web'][data-theme='dark'] {
 .desk-art {
   display: block;
   pointer-events: auto;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   image-rendering: pixelated;
   filter: drop-shadow(0 0 1.2px var(--halo));
+}
+
+/* Picked up: lifted a little off the floor, with a shadow under it. */
+.desk.held {
+  translate: 0 -6px;
+}
+
+.desk.held .desk-art {
+  cursor: grabbing;
+  filter: drop-shadow(0 0 1.2px var(--halo)) drop-shadow(0 8px 4px rgb(0 0 0 / 0.25));
 }
 
 .speech {

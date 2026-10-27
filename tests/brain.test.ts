@@ -470,14 +470,36 @@ describe('Brain: naps', () => {
     expect(Math.abs(snap.position.x - moved.x)).toBeLessThan(size.width * 0.6);
   });
 
-  it('with the pointer busy or away, naps somewhere out of the way: the bottom of the screen, by the nearer corner', () => {
+  it('with the pointer busy or away, naps somewhere near where he is, not always in the same place', () => {
+    const spots: { x: number; y: number }[] = [];
+    for (const [seed, at] of [[2, { x: 1300, y: 400 }], [3, { x: 300, y: 300 }], [4, { x: 800, y: 700 }]] as const) {
+      const brain = makeBrain(seed, SLEEPY);
+      place(brain, at);
+      const busy = world({ cursor: { x: 800, y: 100 }, cursorStillMs: 200 });
+      const from = runUntil(brain, (s) => s.reaction === 'nap' || s.animation === 'yawn', busy, 60_000).snap.position;
+      const { snap } = runUntil(brain, (s) => s.mode === 'sleep', busy, 60_000);
+      expect(Math.hypot(snap.position.x - from.x, snap.position.y - from.y)).toBeLessThan(size.width * 2);
+      expect(inBounds(snap)).toBe(true);
+      // Facing into the screen, not the wall.
+      expect(snap.facing).toBe(snap.position.x < bounds.x + bounds.width / 2 ? 1 : -1);
+      spots.push(snap.position);
+    }
+    expect(spots.filter((p) => bottom - p.y < 6).length).toBeLessThan(spots.length);
+  });
+
+  it('woken by being picked up, is cross about it, then goes back to sleep where it was put', () => {
     const brain = makeBrain(2, SLEEPY);
     place(brain, { x: 1300, y: 400 });
-    const { snap } = runUntil(brain, (s) => s.mode === 'sleep', world({ cursor: { x: 800, y: 300 }, cursorStillMs: 200 }), 60_000);
-    expect(bottom - snap.position.y).toBeLessThan(6);
-    expect(bounds.x + bounds.width - snap.position.x).toBeLessThan(size.width);
-    // Facing into the screen, not the wall.
-    expect(snap.facing).toBe(-1);
+    runUntil(brain, (s) => s.mode === 'sleep', world(), 60_000);
+    brain.grab();
+    brain.dragTo({ x: 500, y: 600 });
+    run(brain, 300);
+    brain.release();
+    const cross = run(brain, 100).at(-1)!;
+    expect(cross.animation).toBe('angry');
+    expect(cross.say).toMatch(/sleeping/i);
+    const { snap } = runUntil(brain, (s) => s.mode === 'sleep', world(), 10_000);
+    expect(Math.hypot(snap.position.x - 500, snap.position.y - 600)).toBeLessThan(10);
   });
 });
 
@@ -541,6 +563,26 @@ describe('Brain: work mode', () => {
     expect(Math.hypot(snap.position.x - desk.seat.x, snap.position.y - desk.seat.y)).toBeLessThan(5);
   });
 
+  it('cross when you pick its desk up, then off to wherever you put it, and back to work', () => {
+    const brain = makeBrain(4);
+    place(brain, { x: 400, y: 700 });
+    runUntil(brain, (s) => s.phase === 'type', atWork(), 20_000);
+    brain.deskLifted();
+    // Carried about, the desk goes here and there: he stays put, cross, watching it.
+    const moving = (t: number) => {
+      const x = 1300 - t * 0.5;
+      return atWork({ desk: { seat: { x, y: 600 }, facing: 1, screen: { x: x + 120, y: 520 } } });
+    };
+    const held = run(brain, 1500, moving);
+    expect(held[5]!.say).toMatch(/need to work/i);
+    expect(held.every((s) => s.animation === 'angry' && speed(s) < 1)).toBe(true);
+    expect(held.at(-1)!.lookAt!.x).toBeLessThan(1300 - 1400 * 0.5 + 120);
+    const moved = { seat: { x: 500, y: 600 }, facing: 1 as const, screen: { x: 620, y: 520 } };
+    brain.deskDropped();
+    const { snap } = runUntil(brain, (s) => s.phase === 'type', atWork({ desk: moved }), 20_000);
+    expect(Math.hypot(snap.position.x - moved.seat.x, snap.position.y - moved.seat.y)).toBeLessThan(5);
+  });
+
   it('enjoys a pat, then gets back to work', () => {
     const brain = makeBrain(4);
     place(brain, { x: 400, y: 700 });
@@ -563,10 +605,11 @@ describe('Brain: work mode', () => {
 describe('Brain: sleep mode', () => {
   const asleep = (overrides: Partial<WorldInput> = {}) => world({ mode: 'sleep', ...overrides });
 
-  it('goes off somewhere cosy and sleeps, and stays asleep whatever the pointer does', () => {
+  it('lies down and sleeps right where it is, and stays asleep whatever the pointer does', () => {
     const brain = makeBrain(6);
     place(brain, { x: 800, y: 500 });
-    runUntil(brain, (s) => s.mode === 'sleep', asleep(), 60_000);
+    const { snap } = runUntil(brain, (s) => s.mode === 'sleep', asleep(), 10_000);
+    expect(Math.hypot(snap.position.x - 800, snap.position.y - 500)).toBeLessThan(10);
     const shaken = asleep({ cursor: { x: 700, y: 400 }, cursorExcited: true, cursorStillMs: 0, typingActive: true });
     expect(run(brain, 20_000, shaken).every((s) => s.mode === 'sleep')).toBe(true);
   });
@@ -578,10 +621,16 @@ describe('Brain: sleep mode', () => {
     brain.poke();
     expect(run(brain, 100, asleep()).at(-1)!.animation).toBe('happy');
     runUntil(brain, (s) => s.mode === 'sleep', asleep(), 60_000);
+    // Carried off somewhere else, it's cross about it, and falls asleep there.
     brain.grab();
+    brain.dragTo({ x: 300, y: 300 });
     run(brain, 200, asleep());
     brain.release();
-    runUntil(brain, (s) => s.mode === 'sleep', asleep(), 60_000);
+    const cross = run(brain, 100, asleep()).at(-1)!;
+    expect(cross.animation).toBe('angry');
+    expect(cross.say).toMatch(/sleeping/i);
+    const { snap } = runUntil(brain, (s) => s.mode === 'sleep', asleep(), 10_000);
+    expect(Math.hypot(snap.position.x - 300, snap.position.y - 300)).toBeLessThan(10);
   });
 
   it('wakes up with a yawn when you switch back to play', () => {

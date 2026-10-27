@@ -31,8 +31,8 @@ My Pet opens as a small window in your taskbar (Windows) or Dock (Mac), and you 
 In the settings you can pick your pet, give it a hat and an outfit (or a whole costume: a dino, a bee, an astronaut, a knight, a wizard or a ballerina), and choose a **mode**:
 
 - **Play:** it wanders, plays with its blocks, chases the pointer and watches you type.
-- **Work:** it sits at a little desk in the corner and works away (typing, browsing, the odd reel). Drag it off and it stomps straight back, cross.
-- **Sleep:** it curls up somewhere cosy and sleeps.
+- **Work:** it sits at a little desk and works away (typing, browsing, the odd reel). Drag it off and it stomps straight back, cross. Drag the desk somewhere else and it follows, grumbling.
+- **Sleep:** it curls up wherever it is and sleeps. Move it and it's cross, then falls asleep where you put it.
 - **Hide:** it runs off the screen until you want it back.
 
 It sits in a transparent layer above your windows, and clicks go straight through to whatever is underneath, except on the pet and its blocks.

@@ -15,6 +15,15 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-26',
+    title: 'Sleep anywhere, and a desk you can move',
+    changes: [
+      'Your pet falls asleep wherever it is, not off in the bottom corner. Pick it up while it’s asleep and it’s cross about it, then curls up again wherever you put it.',
+      'You can pick up the work desk and put it anywhere on the screen. Your pet complains that it needs to work, and goes over to it.',
+      'The hedgehog is rounder, with a smaller nose.',
+    ],
+  },
+  {
     date: '2026-10-24',
     title: 'Updates itself',
     changes: [

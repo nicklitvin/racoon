@@ -144,11 +144,13 @@ interface AwayState {
   target: Point;
 }
 
-/** Off for a nap: going to curl up next to the pointer, or somewhere out of the way. */
+/** Off for a nap: going to curl up next to the pointer, or somewhere nearby. */
 interface NapState {
   mode: 'react';
   reaction: 'nap';
   spot: Point;
+  /** Woken up and carried off: he's cross until this time, before lying down again (0 if not). */
+  cross: number;
   /** The way he'll face, lying there: towards the pointer, or his toy. */
   face: 1 | -1;
   /** Where the pointer was when he picked the spot next to it, or null if it isn't by the pointer. */
@@ -201,8 +203,10 @@ const NAP_GO_MS = 20_000;
 const NAP_CURSOR_MOVED = 60;
 /** Off to his desk, he gives up if he can't get there in this long. */
 const DESK_GO_MS = 20_000;
-/** How long he's cross for, taken away from his work. */
+/** How long he's cross for, taken away from his work or woken up. */
 const ANGRY_MS = 1700;
+/** His desk put down somewhere new, he's cross this much longer before going over to it. */
+const DESK_DROPPED_MS = 700;
 /** How long he says something for. */
 const SAY_MS = 2200;
 /** How he sits at the computer for each thing he does at it. */
@@ -267,6 +271,10 @@ export class Brain {
   private cursorWasNear = false;
   private speedScale = 1;
   private dragTarget: Point | null = null;
+  /** He was asleep (or about to be) when you picked him up. */
+  private wokenByDrag = false;
+  /** You're carrying his desk about. */
+  private deskHeld = false;
   /** In the air in an excited leap until this time, and when the next one may come. */
   private leapUntil = 0;
   private nextLeapAt = 0;
@@ -308,6 +316,8 @@ export class Brain {
   // ---- Direct manipulation ---------------------------------------------------------
 
   grab(): void {
+    const s = this.state;
+    if (this.reaction !== 'dragged') this.wokenByDrag = s.mode === 'sleep' || (s.mode === 'sit' && s.then === 'sleep') || this.reaction === 'nap';
     this.state = { mode: 'react', reaction: 'dragged' };
     this.dragTarget = { ...this.pos };
     this.vel = { x: 0, y: 0 };
@@ -321,7 +331,8 @@ export class Brain {
 
   /**
    * Lets go: he settles exactly where he was dropped. In work mode he's cross at being
-   * taken away from his work, and goes back to it; in sleep mode, he goes back to sleep.
+   * taken away from his work, and goes back to it. Woken up (or in sleep mode), he's cross
+   * at that, and then lies down to sleep again right there.
    */
   release(): void {
     if (this.reaction !== 'dragged') return;
@@ -335,7 +346,12 @@ export class Brain {
       this.speak('Hey! I was working!');
       return;
     }
-    if (this.mode === 'sleep') this.speak('Five more minutes…');
+    if (this.mode === 'sleep' || this.wokenByDrag) {
+      this.wokenByDrag = false;
+      this.speak('Hey! I was sleeping!');
+      this.state = { mode: 'react', reaction: 'nap', spot: { ...this.pos }, face: this.facing, cursorAt: null, cross: this.now + ANGRY_MS, until: this.now + NAP_GO_MS };
+      return;
+    }
     this.idle(1000, 2500);
   }
 
@@ -357,6 +373,24 @@ export class Brain {
   /** A tap on his desk while he's working at it gets you shushed. */
   deskTapped(): void {
     if (this.busyWorking) this.speak('Shh! Working.');
+  }
+
+  /** You've picked his desk up: sat at it (or on his way), he's cross, and waits to see where it goes. */
+  deskLifted(): void {
+    this.deskHeld = true;
+    const s = this.state;
+    if (s.mode !== 'react' || s.reaction !== 'work' || (s.phase !== 'type' && s.phase !== 'go')) return;
+    this.vel = { x: 0, y: 0 };
+    s.phase = 'angry';
+    s.until = Infinity;
+    this.speak('Hey! I need to work!');
+  }
+
+  /** You've put his desk down somewhere else: off he goes to it, to get back to work. */
+  deskDropped(): void {
+    this.deskHeld = false;
+    const s = this.state;
+    if (s.mode === 'react' && s.reaction === 'work' && s.phase === 'angry' && s.until === Infinity) s.until = this.now + DESK_DROPPED_MS;
   }
 
   /**
@@ -572,6 +606,11 @@ export class Brain {
         return;
 
       case 'nap': {
+        if (this.now < s.cross) {
+          // Woken up: cross about it first.
+          this.brake(dt);
+          return;
+        }
         // The pointer has settled somewhere else: he goes and lies down next to it there.
         if (s.cursorAt && cursor && dist(cursor, s.cursorAt) > NAP_CURSOR_MOVED && this.input.cursorStillMs >= 800) {
           Object.assign(s, this.napSpot());
@@ -1100,14 +1139,23 @@ export class Brain {
 
   // ---- Naps --------------------------------------------------------------------------
 
-  /** Nothing's happened for a while: he goes off somewhere to curl up and sleep. */
+  /**
+   * Nothing's happened for a while: he goes off somewhere to curl up and sleep. Told to
+   * sleep (sleep mode), he lies down right where he is.
+   */
   private nap(): void {
-    const spot = this.napSpot();
+    const spot = this.mode === 'sleep' ? this.napHere() : this.napSpot();
     if (dist(this.pos, spot.spot) < 12) {
       this.settleDown(spot.face);
       return;
     }
-    this.state = { mode: 'react', reaction: 'nap', ...spot, until: this.now + NAP_GO_MS };
+    this.state = { mode: 'react', reaction: 'nap', ...spot, cross: 0, until: this.now + NAP_GO_MS };
+  }
+
+  /** Lying down where he is: where he'd come to a stop, if he's on the move. */
+  private napHere(): Pick<NapState, 'spot' | 'face' | 'cursorAt'> {
+    const spot = this.clampToArea({ x: this.pos.x + this.vel.x * 0.25, y: this.pos.y + this.vel.y * 0.25 });
+    return { spot, face: this.facing, cursorAt: null };
   }
 
   /** Lying down for a nap: a yawn, then sleep. */
@@ -1119,9 +1167,8 @@ export class Brain {
 
   /**
    * Where to nap. With the pointer resting somewhere (you're reading, say), right next to
-   * it, facing it, on the side he's coming from. Otherwise somewhere sensible: curled up
-   * with a toy block if one is nearby, or else down at the bottom of the screen, tucked
-   * into the nearer corner, out of the way.
+   * it, facing it, on the side he's coming from. Otherwise curled up with a toy block if
+   * one is nearby, or else wherever he fancies, a few steps from where he is.
    */
   private napSpot(): Pick<NapState, 'spot' | 'face' | 'cursorAt'> {
     const { cursor, size, bounds } = this.input;
@@ -1149,10 +1196,11 @@ export class Brain {
       const spot = this.clampToArea({ x: toy.x - side * this.toyReach * 1.2, y: toy.y });
       return { spot, face: toy.x < spot.x ? -1 : 1, cursorAt: null };
     }
-    const left = this.pos.x < (area.minX + area.maxX) / 2;
-    const inset = size.width * 0.25;
-    const spot = this.clampToArea({ x: left ? area.minX + inset : area.maxX - inset, y: area.maxY });
-    return { spot, face: left ? 1 : -1, cursorAt: null };
+    const angle = this.random() * Math.PI * 2;
+    const far = size.width * (0.4 + this.random() * 1.2);
+    const spot = this.clampToArea({ x: this.pos.x + Math.cos(angle) * far, y: this.pos.y + Math.sin(angle) * far * 0.6 });
+    // Facing into the screen, not the wall.
+    return { spot, face: spot.x < (area.minX + area.maxX) / 2 ? 1 : -1, cursorAt: null };
   }
 
   // ---- Play --------------------------------------------------------------------------
@@ -1652,7 +1700,7 @@ export class Brain {
             animation = this.playAnimation(s, speed);
             break;
           case 'nap':
-            animation = speed > this.config.motion.walkSpeed * 1.5 ? 'run' : speed > 25 ? 'walk' : 'idle';
+            animation = this.now < s.cross ? 'angry' : speed > this.config.motion.walkSpeed * 1.5 ? 'run' : speed > 25 ? 'walk' : 'idle';
             break;
           case 'work':
             phase = s.phase;
@@ -1703,10 +1751,13 @@ export class Brain {
       aim = desk.facing > 0 ? 0 : Math.PI;
       lookAt = desk.screen;
     }
-    if (s.mode === 'react' && s.reaction === 'work' && (s.phase === 'announce' || s.phase === 'angry') && speed < 25) {
+    const cross = (s.mode === 'react' && s.reaction === 'work' && (s.phase === 'announce' || s.phase === 'angry')) || (s.mode === 'react' && s.reaction === 'nap' && this.now < s.cross);
+    if (cross && speed < 25) {
       // Saying it to you: turned three-quarters towards you, never with his back to you.
       aim = this.facing > 0 ? 0.6 : Math.PI - 0.6;
     }
+    // Watching you carry his desk off.
+    if (s.mode === 'react' && s.reaction === 'work' && s.phase === 'angry' && this.deskHeld && desk) lookAt = desk.screen;
     if (s.mode === 'react' && s.reaction === 'peek' && s.phase === 'beg') aim = this.facing > 0 ? 0.6 : Math.PI - 0.6;
     const say = this.speech && this.now < this.speech.until ? this.speech.text : null;
     const screen = s.mode === 'react' && s.reaction === 'work' && s.phase === 'type' && desk ? s.task : null;

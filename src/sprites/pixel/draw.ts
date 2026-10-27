@@ -609,11 +609,10 @@ export function drawPixelPet(r: Raster, b: PixelBuild, p: ChibiPose, clock: numb
     // Nose, mouth and blush.
     const n = pix(nose);
     if (species === 'hedgehog') {
-      // A round, shiny black nose on the end of its snout.
-      const at = onFace(nose);
-      const ball = ellipse(at.x, at.y, 1.4, 1.2);
-      r.shape(ball.sd, ball.box, C.nose, C.outline);
-      r.set(Math.floor(at.x), Math.floor(at.y) - 1, C.glint);
+      // A little shiny black button of a nose on the end of its snout.
+      const at = pix(nose);
+      r.dots([at, { x: at.x - 1, y: at.y }, { x: at.x, y: at.y + 1 }, { x: at.x - 1, y: at.y + 1 }], C.nose);
+      r.set(at.x - 1, at.y, C.glint);
     } else if (species === 'bunny') {
       // A little pink nose, twitching now and then, over a split lip.
       const twitch = Math.sin(clock / 70) > 0 && clock % 2600 < 700 ? 1 : 0;
@@ -779,7 +778,7 @@ export function drawSpikyBall(r: Raster, at: Pt, R: number, sx: number, sy: numb
 }
 
 /** Where a hedgehog's snout ends, in head units, for a head `rx` by `ry`. */
-const SNOUT_TIP = (rx: number, ry: number): Pt => ({ x: rx * 1.42, y: ry * 0.42 });
+const SNOUT_TIP = (rx: number, ry: number): Pt => ({ x: rx * 1.3, y: ry * 0.4 });
 
 /**
  * The spine of a long ear (a bunny's) `h` long, in drawing units from the middle of a head

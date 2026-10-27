@@ -149,7 +149,7 @@ export function drawPixelFacing(r: Raster, b: PixelBuild, p: ChibiPose, view: Vi
   // --- Body ---
   const bodyC = T(0, bodyY);
   // From the front, a hedgehog's spines stand out all round it, a dome bigger than its head.
-  if (species === 'hedgehog' && front) spikes(bodyC, bodyR * 1.4, bodyR * 1.25, -14, 194, 13);
+  if (species === 'hedgehog' && front) spikes(bodyC, bodyR * 1.18, bodyR * 1.12, -14, 194, 13);
   const body = ellipse(bodyC.x, bodyC.y, bodyR * K, bodyR * K * 0.95);
   r.shape(body.sd, body.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
   if (front) {
@@ -343,8 +343,7 @@ export function drawPixelFacing(r: Raster, b: PixelBuild, p: ChibiPose, view: Vi
     const n = pix(0, ry * (species === 'hedgehog' ? 0.42 : 0.32));
     if (species === 'hedgehog') {
       // Its shiny black nose, right in the middle.
-      r.dots([{ x: n.x - 1, y: n.y }, n, { x: n.x - 1, y: n.y + 1 }, { x: n.x, y: n.y + 1 }], C.nose);
-      r.set(n.x, n.y, C.glint);
+      r.dots([{ x: n.x - 1, y: n.y }, n], C.nose);
     } else {
       const nostrils = species === 'otter' ? [{ x: n.x - 1, y: n.y }, n, { x: n.x + 1, y: n.y }, { x: n.x, y: n.y + 1 }] : [{ x: n.x - 1, y: n.y }, n];
       r.dots(nostrils, C.nose);
