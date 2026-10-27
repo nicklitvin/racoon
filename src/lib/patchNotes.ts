@@ -16,6 +16,14 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     date: '2026-10-27',
+    title: 'Busier at work',
+    changes: [
+      'At the desk, your pet switches between code, the web and reels every 15 to 30 seconds, instead of sticking with one for a minute or more.',
+      'Moving the desk no longer leaves bits of it behind on the screen.',
+    ],
+  },
+  {
+    date: '2026-10-27',
     title: 'Floaties',
     beta: true,
     changes: [

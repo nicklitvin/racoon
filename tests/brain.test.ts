@@ -548,6 +548,28 @@ describe('Brain: work mode', () => {
     expect(share('reels')).toBeLessThan(share('terminal'));
   });
 
+  it('changes tab every 15 to 30 seconds', () => {
+    const brain = makeBrain(4);
+    place(brain, { x: 400, y: 700 });
+    runUntil(brain, (s) => s.phase === 'type', atWork(), 20_000);
+    const snaps = run(brain, 10 * 60_000, atWork());
+    const step = 10 * 60_000 / snaps.length;
+    // How long each tab was up, leaving out the first and last (cut short by the run).
+    const spells: number[] = [];
+    let length = 0;
+    snaps.forEach((s, i) => {
+      if (i > 0 && s.screen !== snaps[i - 1]!.screen) spells.push(length), (length = 0);
+      length += step;
+    });
+    const whole = spells.slice(1);
+    expect(whole.length).toBeGreaterThan(15);
+    for (const ms of whole) {
+      expect(ms).toBeGreaterThanOrEqual(15_000 - 2 * step);
+      expect(ms).toBeLessThanOrEqual(30_000 + 2 * step);
+    }
+    expect(new Set(snaps.map((s) => s.screen))).toEqual(new Set(['terminal', 'web', 'reels']));
+  });
+
   it('dragged off its desk, it’s cross, and goes straight back to work', () => {
     const brain = makeBrain(4);
     place(brain, { x: 400, y: 700 });

@@ -156,6 +156,9 @@ html[data-host='web'][data-theme='dark'] {
   top: 0;
   z-index: 1;
   pointer-events: none;
+  /* Its own layer, like the pet's, so carrying it about moves it rather than repainting
+     the page under it (which can leave bits of it behind on a scaled screen). */
+  will-change: transform;
 }
 
 .desk.tapped {

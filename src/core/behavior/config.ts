@@ -175,11 +175,11 @@ export const DEFAULT_CONFIG: BehaviorConfig = {
     fetchDistance: { min: 120, max: 300 },
   },
   work: {
+    // A tab for 15-30 seconds, then another: mostly code, some browsing, a few reels.
     tasks: {
-      terminal: { weight: 0.5, ms: { min: 40_000, max: 110_000 } },
-      web: { weight: 0.35, ms: { min: 25_000, max: 70_000 } },
-      // Every once in a while, a few reels.
-      reels: { weight: 0.15, ms: { min: 12_000, max: 30_000 } },
+      terminal: { weight: 0.4, ms: { min: 15_000, max: 30_000 } },
+      web: { weight: 0.35, ms: { min: 15_000, max: 30_000 } },
+      reels: { weight: 0.25, ms: { min: 15_000, max: 30_000 } },
     },
   },
 };
