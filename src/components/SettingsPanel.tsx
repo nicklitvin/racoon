@@ -48,8 +48,11 @@ function PetPreview({ type }: { type: RaccoonType }) {
     const renderer = RACCOON_STYLES[type].create();
     renderer.setScale(scale);
     renderer.draw({ animation: 'idle', timeMs: 1000, keystrokes: 0, eyes: 'open', heading: 0.5 });
-    // Stand every pet on the same floor, whatever empty space its drawing has below the feet.
-    const below = renderer.baseSize.height * scale * (1 - (renderer.anchor?.y ?? 1));
+    // Stand every pet on the same floor, whatever empty space its drawing has below the feet
+    // (and one that floats with its bottom there, its shadow out of sight).
+    // (Pixel pets come out a little bigger than asked, on whole screen pixels.)
+    const height = parseFloat((renderer.element as HTMLElement).style.height) || renderer.baseSize.height * scale;
+    const below = height * (1 - (renderer.anchor?.y ?? 1)) + ((renderer.hover ?? 0) * height) / renderer.baseSize.height;
     (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${4 - below}px`;
     host.replaceChildren(renderer.element);
     return () => host.replaceChildren();

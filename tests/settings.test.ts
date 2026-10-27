@@ -21,9 +21,9 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ mode: 'party' }).mode).toBe('play');
   });
 
-  it('offers the three pixel pets, and the bunny and hedgehog in beta, defaulting to the raccoon', () => {
-    expect(RACCOON_TYPES).toEqual(['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'bunny-pixel', 'hedgehog-pixel']);
-    expect(BETA_TYPES).toEqual(['bunny-pixel', 'hedgehog-pixel']);
+  it('offers the three pixel pets, and the bunny, hedgehog and floaties in beta, defaulting to the raccoon', () => {
+    expect(RACCOON_TYPES).toEqual(['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'bunny-pixel', 'hedgehog-pixel', 'blip-floaty', 'mochi-floaty', 'ember-floaty']);
+    expect(BETA_TYPES).toEqual(['bunny-pixel', 'hedgehog-pixel', 'blip-floaty', 'mochi-floaty', 'ember-floaty']);
     expect(DEFAULT_SETTINGS.raccoonType).toBe('raccoon-pixel');
     for (const type of RACCOON_TYPES) expect(normalizeSettings({ raccoonType: type, beta: true }).raccoonType).toBe(type);
   });

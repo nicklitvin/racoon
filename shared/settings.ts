@@ -1,16 +1,16 @@
 // User settings, shared by the Electron main process (which stores them) and the renderer.
 
 /**
- * The pets to choose from, in pixel art: a raccoon, a cat and an otter, and in beta a bunny
- * and a hedgehog.
+ * The pets to choose from, in pixel art: a raccoon, a cat and an otter, and in beta a bunny,
+ * a hedgehog, and the floaties (little blobs that float about).
  * The first one is the default. Anyone on a retired pet gets the nearest one still here
  * (see `retired`).
  */
-export const RACCOON_TYPES = ['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'bunny-pixel', 'hedgehog-pixel'] as const;
+export const RACCOON_TYPES = ['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'bunny-pixel', 'hedgehog-pixel', 'blip-floaty', 'mochi-floaty', 'ember-floaty'] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
 /** Pets still being tried out: only offered (and only kept) with `beta` switched on. */
-export const BETA_TYPES: readonly RaccoonType[] = ['bunny-pixel', 'hedgehog-pixel'];
+export const BETA_TYPES: readonly RaccoonType[] = ['bunny-pixel', 'hedgehog-pixel', 'blip-floaty', 'mochi-floaty', 'ember-floaty'];
 
 /** Hats to dress your pet up in. */
 export const HATS = ['none', 'party', 'beanie', 'tophat', 'crown', 'cap', 'bow', 'nightcap', 'headphones', 'wizard', 'cowboy', 'chef', 'pirate', 'viking', 'santa', 'propeller', 'graduate', 'flowers', 'sombrero', 'beret'] as const;

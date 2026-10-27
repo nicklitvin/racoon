@@ -15,6 +15,15 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-10-27',
+    title: 'Floaties',
+    beta: true,
+    changes: [
+      'Three new little characters that float about instead of walking: Blip, a round blue one with a blinking antenna; Mochi, a squishy pink one with a leaf on top; and Ember, an orange drop with a flickering tip.',
+      'They bob along in the air with a pair of floating hands, play with the blocks, nap, sit at the desk typing, and wear hats like everyone else.',
+    ],
+  },
+  {
     date: '2026-10-26',
     title: 'Sleep anywhere, and a desk you can move',
     changes: [

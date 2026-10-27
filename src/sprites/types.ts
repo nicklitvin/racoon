@@ -159,6 +159,8 @@ export interface RaccoonRenderer {
   readonly mouseReach?: { x: number; y: number };
   /** Puts a hat on him and something round his neck (or takes them off). */
   dress?(dress: Dress): void;
+  /** Floats this far off the ground (its shadow on the ground under it), px at scale 1. */
+  readonly hover?: number;
   /** Draws its own marks over its head (z's asleep), so the page shouldn't add its own. */
   readonly drawsMarks?: boolean;
   setScale(scale: number): void;

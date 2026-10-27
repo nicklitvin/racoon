@@ -51,6 +51,7 @@ src/                      The page (React). Runs in Electron and in a browser
     critter/              The lifelike raccoon, cat, fox and otter: rig, gaits, poses, motion, drawing
     chibi/                The flat 2D chibi pets: builds, poses and drawing
     pixel/                The pixel-art pets: a little rasteriser, palettes and drawing (the raccoon, tabby and otter; the bunny and hedgehog in beta)
+    floaty/               The floaties (beta): Blip, Mochi and Ember, blobs that float about, drawn in the pixel pets' pixels
     toys.ts               The toy blocks' drawings, one for each art style
     outfits.ts            Hats, neckwear and costumes, as shapes every art style draws its own way
     desk.ts               The work-mode desk in pixel art, built to fit the pet, and what's on its screen
@@ -225,6 +226,8 @@ To add an animation for them too, add a `case` to `walkerPose()` and `otterPose(
 The version is the date of the build, stamped in by `vite.config.mts` (`__BUILD_DATE__`), and shows at the top of the settings panel. Clicking it opens "What's new", the hand-written notes in `src/lib/patchNotes.ts`. When you ship something worth noticing, add an entry at the top, written for someone watching their pet rather than reading the code.
 
 **Beta pets.** A pet in `BETA_TYPES` (`shared/settings.ts`) is only offered once `beta` is switched on, and the switch for it, "Try beta pets", is at the top of the patch notes; a note with `beta: true` gets a Beta tag. Switching it off moves anyone on a beta pet back to the default (`normalizeSettings` sees to it). To take a pet out of beta, drop it from `BETA_TYPES`.
+
+**Floaties** (`src/sprites/floaty/`, in beta) aren't animals, so they don't move with the chibi poses: `floatyPose` says, for each animation, how high one floats (`hover`, bobbing; down on the ground only asleep), its squash and stretch and lean, its face (eyes, mouth, blush) and where its two floating hands are, and `drawFloaty` draws that into the same pixel canvas as the pixel pets (`pixelCanvas`), with its shadow on the ground where a pet's feet would be. The face slides round the body towards its heading, and going away you see its back. The renderer eases between poses (`isSettling`), is held by the top of its head, carries a block between its hands, and puts its hands on the keyboard (`keyboardReach`, which the desk is built to). They use the same brain as every other pet. Their kinds (`FLOATIES`: Blip, round with an antenna; Mochi, a squircle with a sprout; Ember, a drop with a flickering tip) and colours (`FLOATY_COATS`) are in `kinds.ts`.
 
 ## Building and packaging
 
