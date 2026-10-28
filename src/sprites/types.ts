@@ -161,6 +161,11 @@ export interface RaccoonRenderer {
   dress?(dress: Dress): void;
   /** Floats this far off the ground (its shadow on the ground under it), px at scale 1. */
   readonly hover?: number;
+  /**
+   * A goose, and it acts like one: it honks instead of talking, goes for your pointer
+   * rather than running from it, and makes off with the blocks (see `WorldInput.goose`).
+   */
+  readonly goose?: boolean;
   /** Draws its own marks over its head (z's asleep), so the page shouldn't add its own. */
   readonly drawsMarks?: boolean;
   setScale(scale: number): void;

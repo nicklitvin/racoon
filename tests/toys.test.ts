@@ -383,6 +383,30 @@ describe('Brain: different ways to play', () => {
     expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeGreaterThan(80);
   });
 
+  it('a goose snatches a block and runs off with it, away from you, honking', () => {
+    const box = toybox({ x: 800, y: 700 });
+    const toy = box.toys[0]!;
+    const cursor = { x: 500, y: 650 };
+    // Only ever stealing: nothing else it might do with it.
+    const brain = makeBrain(box, { play: { tossChance: 0, pounceChance: 0, chargeChance: 0, moves: { bat: 1, sniff: 0, nudge: 0, fetch: 0 } } });
+    const input = world({ goose: true, cursor, cursorStillMs: 5000 });
+    const grabbed = runUntil(brain, (s) => s.animation === 'fetch', 60_000, input);
+    expect(toy.holder).toBe('pet');
+    expect(grabbed.say).toMatch(/HONK/);
+    const from = grabbed.position;
+    let fastest = 0;
+    let to = grabbed;
+    for (let t = 0; t < 10_000 && toy.holder === 'pet'; t += STEP) {
+      to = run(brain, STEP, input)[0]!;
+      fastest = Math.max(fastest, Math.hypot(to.velocity.x, to.velocity.y));
+    }
+    expect(toy.holder).toBeNull();
+    // Well away, further from you than it was, and in a hurry.
+    expect(Math.hypot(to.position.x - from.x, to.position.y - from.y)).toBeGreaterThan(200);
+    expect(Math.hypot(to.position.x - cursor.x, to.position.y - cursor.y)).toBeGreaterThan(Math.hypot(from.x - cursor.x, from.y - cursor.y) + 150);
+    expect(fastest).toBeGreaterThan(DEFAULT_CONFIG.motion.walkSpeed * 1.5);
+  });
+
   it('creeps up on a block low to the ground before it pounces', () => {
     const box = toybox({ x: 800, y: 700 });
     const brain = makeBrain(box, { play: { pounceChance: 1, stalkChance: 1, chargeChance: 0 } });

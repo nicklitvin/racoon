@@ -6,11 +6,11 @@
  * The first one is the default. Anyone on a retired pet gets the nearest one still here
  * (see `retired`).
  */
-export const RACCOON_TYPES = ['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'bunny-pixel', 'hedgehog-pixel', 'blip-floaty', 'mochi-floaty', 'ember-floaty'] as const;
+export const RACCOON_TYPES = ['raccoon-pixel', 'cat-pixel', 'otter-pixel', 'bunny-pixel', 'hedgehog-pixel', 'goose-pixel', 'blip-floaty', 'mochi-floaty', 'ember-floaty'] as const;
 export type RaccoonType = (typeof RACCOON_TYPES)[number];
 
 /** Pets still being tried out: only offered (and only kept) with `beta` switched on. */
-export const BETA_TYPES: readonly RaccoonType[] = ['bunny-pixel', 'hedgehog-pixel', 'blip-floaty', 'mochi-floaty', 'ember-floaty'];
+export const BETA_TYPES: readonly RaccoonType[] = ['bunny-pixel', 'hedgehog-pixel', 'goose-pixel', 'blip-floaty', 'mochi-floaty', 'ember-floaty'];
 
 /** Hats to dress your pet up in. */
 export const HATS = ['none', 'party', 'beanie', 'tophat', 'crown', 'cap', 'bow', 'nightcap', 'headphones', 'wizard', 'cowboy', 'chef', 'pirate', 'viking', 'santa', 'propeller', 'graduate', 'flowers', 'sombrero', 'beret'] as const;

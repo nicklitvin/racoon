@@ -98,8 +98,8 @@ export function readRelease(json: unknown, platform: string): ReleaseBuild | nul
 }
 
 /**
- * Whether `release` is newer than the build running. Every push to main rebuilds the same
- * version's release, so the version number doesn't say: the commit does. Built from the
+ * Whether `release` is newer than the build running. The version number doesn't say (a
+ * build you make yourself has package.json's version): the commit does. Built from the
  * same commit, it's the same. Otherwise, it's newer if it came out after this build was
  * made (a build you made yourself since then is newer than the release, not older).
  */

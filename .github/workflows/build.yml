@@ -2,10 +2,11 @@
 # can be downloaded from the repo's Releases page. macOS apps can only be built on a Mac,
 # so each is built on its own machine.
 #
-# It runs by itself whenever a push to main changes the app (not just the docs), and keeps
-# one release per version in package.json (v0.1.0): each run moves that tag to the new
-# commit and replaces the downloads. Bump the version for a new release. Pushing a tag like
-# v0.2.0, or "Run workflow" in the Actions tab, also works.
+# It runs by itself whenever a push to main changes the app (not just the docs), and every
+# run is a new release with a version of its own: package.json's major and minor version and
+# the run's number (v0.1.57, then v0.1.58...). Its notes say what's new since the last
+# release, from the patch notes (scripts/release-notes.mjs). Pushing a tag like v0.2.0, or
+# "Run workflow" in the Actions tab, also works.
 name: Build desktop apps
 
 on:
@@ -17,13 +18,33 @@ on:
       - '**.md'
       - 'docs/**'
 
-# Pushes in quick succession only build the newest.
+# One at a time, in order: a push made while another is building waits its turn, so each
+# gets its own release.
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Pick the version
+        id: version
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            base=$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")
+            echo "version=$base.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -49,6 +70,9 @@ jobs:
 
       - run: npm ci
 
+      # The app says this version (in its installer, and in About on a Mac).
+      - run: npm version ${{ needs.version.outputs.version }} --no-git-tag-version --allow-same-version
+
       - run: npm test
 
       # No signing certificate: Windows builds go out unsigned, and macOS builds are
@@ -64,57 +88,55 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      TAG: v${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Reads the patch notes (TypeScript) as they are.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
 
       - uses: actions/download-artifact@v4
         with:
           path: out
           merge-multiple: true
 
-      - name: Name the release
-        id: name
+      - name: Tag this commit
+        if: github.ref_type != 'tag'
         shell: bash
         run: |
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
-          else
-            tag="v$(node -p "require('./package.json').version")"
-            echo "tag=$tag" >> "$GITHUB_OUTPUT"
-            # Point the version's tag at this commit. (A push made with the workflow's own
-            # token doesn't start another run.)
-            git tag -f "$tag" "$GITHUB_SHA"
-            git push -f origin "refs/tags/$tag"
-          fi
+          # (A push made with the workflow's own token doesn't start another run.)
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
 
-      # Take down the release's old downloads first, so only this build's two are left.
-      - name: Clear old downloads
+      # What's new since the last release: the patch notes it didn't have.
+      - name: Write the notes
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.name.outputs.tag }}
         run: |
-          for asset in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null); do
-            gh release delete-asset "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes
-          done
+          last=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)
+          if [ -n "$last" ] && [ "$last" != "$TAG" ] && git show "$last:src/lib/patchNotes.ts" > "$RUNNER_TEMP/last-patchNotes.ts" 2>/dev/null; then
+            node scripts/release-notes.mjs "$GITHUB_SHA" "$RUNNER_TEMP/last-patchNotes.ts" > "$RUNNER_TEMP/notes.md"
+          else
+            node scripts/release-notes.mjs "$GITHUB_SHA" > "$RUNNER_TEMP/notes.md"
+          fi
+          cat "$RUNNER_TEMP/notes.md"
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.name.outputs.tag }}
-          name: My Pet ${{ steps.name.outputs.tag }}
+          tag_name: ${{ env.TAG }}
+          name: My Pet ${{ env.TAG }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           overwrite_files: true
           files: out/*
-          body: |
-            Built from ${{ github.sha }}.
-
-            ## Download
-
-            **Windows:** `My-Pet-Windows.exe`. Open it and My Pet sets itself up and starts (no admin rights needed). The app isn't code-signed, so Windows may say "Windows protected your PC": click **More info → Run anyway**.
-
-            **Mac:** `My-Pet-Mac.dmg` (Apple silicon, M1 and later). Open it and drag My Pet to Applications. It isn't notarized by Apple, so macOS blocks it at first (it may even say it's "damaged"). To let it run, open Terminal and run `xattr -cr "/Applications/My Pet.app"`, or try to open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
+          body_path: ${{ runner.temp }}/notes.md

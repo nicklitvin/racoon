@@ -392,6 +392,7 @@ export class PetRuntime {
       typingActive: keyboard && this.typingTracker.isActive,
       toyReach: this.renderer.toyReach === undefined ? undefined : this.renderer.toyReach * this.scale,
       carries: this.renderer.carriesToys === true,
+      goose: this.renderer.goose === true,
       desk: this.desk,
       mode: this.settings.mode,
     };

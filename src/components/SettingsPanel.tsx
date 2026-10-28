@@ -38,6 +38,11 @@ const shortName = (type: RaccoonType) => {
   return name.charAt(0).toUpperCase() + name.slice(1);
 };
 
+/** How far above the bottom of its tile a pet stands, px. */
+const FLOOR_PX = 4;
+/** How far over the top of its tile a pet may go before it's drawn smaller, px. */
+const OVER_TOP_PX = 6;
+
 /** A small still of the pet, drawn once. */
 function PetPreview({ type }: { type: RaccoonType }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -46,14 +51,29 @@ function PetPreview({ type }: { type: RaccoonType }) {
     const host = ref.current;
     if (!host) return;
     const renderer = RACCOON_STYLES[type].create();
+    const frame = { animation: 'idle', timeMs: 1000, keystrokes: 0, eyes: 'open', heading: 0.5 } as const;
     renderer.setScale(scale);
-    renderer.draw({ animation: 'idle', timeMs: 1000, keystrokes: 0, eyes: 'open', heading: 0.5 });
+    renderer.draw(frame);
+    let size = scale;
     // Stand every pet on the same floor, whatever empty space its drawing has below the feet
-    // (and one that floats with its bottom there, its shadow out of sight).
-    // (Pixel pets come out a little bigger than asked, on whole screen pixels.)
-    const height = parseFloat((renderer.element as HTMLElement).style.height) || renderer.baseSize.height * scale;
-    const below = height * (1 - (renderer.anchor?.y ?? 1)) + ((renderer.hover ?? 0) * height) / renderer.baseSize.height;
-    (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${4 - below}px`;
+    // (and one that floats with its bottom there, its shadow out of sight). (Pixel pets come
+    // out a little bigger than asked, on whole screen pixels.)
+    const heightOf = () => parseFloat((renderer.element as HTMLElement).style.height) || renderer.baseSize.height * size;
+    const belowOf = (height: number) => height * (1 - (renderer.anchor?.y ?? 1)) + ((renderer.hover ?? 0) * height) / renderer.baseSize.height;
+    // A tall one (the goose, its neck up) is made smaller, so its head isn't cut off by the
+    // top of the tile. (Not for the tip of an antenna: smaller is a whole screen pixel smaller.)
+    const figure = renderer.figure as HTMLElement;
+    for (let i = 0; i < 4 && host.clientHeight > 0; i++) {
+      const height = heightOf();
+      const tall = FLOOR_PX + height - belowOf(height) - (parseFloat(figure.style.top) || 0);
+      if (tall <= host.clientHeight + OVER_TOP_PX) break;
+      size *= Math.max(0.6, (host.clientHeight - FLOOR_PX) / (tall - FLOOR_PX)) * 0.98;
+      renderer.setScale(size);
+      renderer.draw(frame);
+    }
+    const height = heightOf();
+    const below = belowOf(height);
+    (renderer.element as HTMLElement | SVGElement).style.marginBottom = `${FLOOR_PX - below}px`;
     host.replaceChildren(renderer.element);
     return () => host.replaceChildren();
   }, [type]);

@@ -47,6 +47,12 @@ export interface WorldInput {
   desk?: Desk | null;
   /** What he's up to (from the settings): playing, working, sleeping or hiding. Play if not given. */
   mode?: PetMode;
+  /**
+   * A goose, and a horrible one: it honks instead of talking, honks at nothing now and then,
+   * goes for the pointer with its wings out rather than running from it (and after a pat,
+   * or being put down), and snatches the blocks and runs off with them, away from you.
+   */
+  goose?: boolean;
 }
 
 export interface Desk {
@@ -162,7 +168,7 @@ interface NapState {
 type State =
   | { mode: 'idle'; until: number }
   | { mode: 'walk'; from: Point; via: Point; to: Point; elapsed: number; duration: number }
-  | { mode: 'sit'; activity: 'rest' | 'groom' | 'yawn'; until: number; then: 'idle' | 'sleep' }
+  | { mode: 'sit'; activity: 'rest' | 'groom' | 'yawn' | 'honk'; until: number; then: 'idle' | 'sleep' }
   | { mode: 'sleep' }
   | { mode: 'react'; reaction: 'surprised'; until: number; next: 'chase' | 'idle' }
   | { mode: 'react'; reaction: 'chase'; until: number }
@@ -211,6 +217,26 @@ const DESK_DROPPED_MS = 700;
 const SAY_MS = 2200;
 /** How he sits at the computer for each thing he does at it. */
 const TASK_ANIMATION: Record<DeskTask, AnimationName> = { terminal: 'work', web: 'browse', reels: 'reels' };
+
+/** A goose: how likely it honks at nothing when it's deciding what to do next, and for how long. */
+const GOOSE_HONK_CHANCE = 0.2;
+const GOOSE_HONK_MS = 1300;
+/** How likely a goose goes for the pointer when it comes near (instead of running off). */
+const GOOSE_CHARGE_CHANCE = 0.7;
+/** At a block, how likely a goose snatches it and runs off with it. */
+const GOOSE_STEAL_CHANCE = 0.55;
+/** How far a goose runs off with a block, px. */
+const GOOSE_STEAL_DISTANCE = { min: 260, max: 460 };
+/** Honking as it goes, every so often. */
+const GOOSE_HONK_EVERY = { min: 1300, max: 2600 };
+
+/** What a goose says instead: it only honks (or hisses). */
+export function honk(text: string, now: number): string {
+  if (/^Shh/.test(text)) return 'Hssss!';
+  if (text.includes('?') && !text.includes('!')) return 'Honk?';
+  const loud = ['HONK!', 'HONK HONK!', 'HONK!!'];
+  return loud[Math.floor(now / 997) % loud.length]!;
+}
 
 /** Play phases he has hold of the block through. */
 const HOLDING = new Set<PlayState['phase']>(['toss', 'grab', 'fetch', 'lift', 'carry', 'throw']);
@@ -275,6 +301,8 @@ export class Brain {
   private wokenByDrag = false;
   /** You're carrying his desk about. */
   private deskHeld = false;
+  /** A goose on the attack honks again at this time. */
+  private nextHonkAt = 0;
   /** In the air in an excited leap until this time, and when the next one may come. */
   private leapUntil = 0;
   private nextLeapAt = 0;
@@ -318,6 +346,7 @@ export class Brain {
   grab(): void {
     const s = this.state;
     if (this.reaction !== 'dragged') this.wokenByDrag = s.mode === 'sleep' || (s.mode === 'sit' && s.then === 'sleep') || this.reaction === 'nap';
+    if (this.input.goose && this.reaction !== 'dragged') this.speak('Put me down!');
     this.state = { mode: 'react', reaction: 'dragged' };
     this.dragTarget = { ...this.pos };
     this.vel = { x: 0, y: 0 };
@@ -352,6 +381,11 @@ export class Brain {
       this.state = { mode: 'react', reaction: 'nap', spot: { ...this.pos }, face: this.facing, cursorAt: null, cross: this.now + ANGRY_MS, until: this.now + NAP_GO_MS };
       return;
     }
+    // Put down, a goose turns on the hand that held it.
+    if (this.input.goose && this.mode === 'play') {
+      this.honkAt();
+      return;
+    }
     this.idle(1000, 2500);
   }
 
@@ -360,6 +394,12 @@ export class Brain {
     const s = this.state;
     if (this.reaction === 'dragged' || this.reaction === 'away') return;
     this.calmMs = 0;
+    // A goose doesn't want patting: it honks, and goes for your pointer.
+    if (this.input.goose && this.mode === 'play' && this.reaction !== 'chase' && this.reaction !== 'pounce') {
+      this.honkAt();
+      return;
+    }
+    if (this.input.goose) this.speak('Honk!');
     const resume = s.mode === 'react' && s.reaction === 'work' ? s : s.mode === 'react' && s.reaction === 'petted' ? s.resume : null;
     this.state = { mode: 'react', reaction: 'petted', until: this.now + PETTED_MS, resume };
   }
@@ -479,7 +519,9 @@ export class Brain {
 
     const near = cursor !== null && dist(cursor, this.center) < this.config.reactions.fleeRadius;
     const skittish = s.mode === 'idle' || s.mode === 'walk' || s.mode === 'sit';
-    if (near && !this.cursorWasNear && skittish && this.random() < this.config.reactions.fleeChance) this.flee(cursor);
+    if (this.input.goose) {
+      if (near && !this.cursorWasNear && skittish && this.random() < GOOSE_CHARGE_CHANCE) this.honkAt();
+    } else if (near && !this.cursorWasNear && skittish && this.random() < this.config.reactions.fleeChance) this.flee(cursor);
     this.cursorWasNear = near;
 
     if (s.mode === 'react' && !napping) this.calmMs = 0;
@@ -542,6 +584,10 @@ export class Brain {
         if (!cursor || this.now >= s.until) {
           this.confused();
           return;
+        }
+        if (this.input.goose && this.now >= this.nextHonkAt) {
+          this.speak('HONK!', 900);
+          this.nextHonkAt = this.now + pick(GOOSE_HONK_EVERY, this.random);
         }
         // Mid-leap he flies straight on.
         if (this.leaping) return;
@@ -834,6 +880,11 @@ export class Brain {
       this.nap();
       return;
     }
+    if (this.input.goose && this.random() < GOOSE_HONK_CHANCE) {
+      this.speak('HONK!', GOOSE_HONK_MS);
+      this.state = { mode: 'sit', activity: 'honk', until: this.now + GOOSE_HONK_MS, then: 'idle' };
+      return;
+    }
     const r = this.random();
     if (r < w.sitChance) {
       const roll = this.random();
@@ -920,6 +971,13 @@ export class Brain {
   private surprise(next: 'chase' | 'idle'): void {
     this.calmMs = 0;
     this.state = { mode: 'react', reaction: 'surprised', until: this.now + 450, next };
+  }
+
+  /** A goose has had enough of you: a honk, and it goes for the pointer. */
+  private honkAt(): void {
+    this.speak('HONK!');
+    this.surprise('chase');
+    this.nextHonkAt = this.now + pick(GOOSE_HONK_EVERY, this.random);
   }
 
   private confused(): void {
@@ -1011,6 +1069,7 @@ export class Brain {
   }
 
   private speak(text: string | null, ms = SAY_MS): void {
+    if (text && this.input.goose) text = honk(text, this.now);
     this.speech = text ? { text, until: this.now + ms } : null;
   }
 
@@ -1255,6 +1314,11 @@ export class Brain {
   private pickMove(s: PlayState): void {
     const p = this.config.play;
     const carries = this.input.carries === true;
+    // A goose is mostly after making off with it.
+    if (this.input.goose && this.random() < GOOSE_STEAL_CHANCE) {
+      this.playPhase(s, 'grab', PLAY.tossMs);
+      return;
+    }
     if (this.random() < p.tossChance) {
       if (carries && this.random() < p.carryChance) this.playPhase(s, 'lift', PLAY.liftMs);
       else this.playPhase(s, 'toss', PLAY.tossMs);
@@ -1457,7 +1521,11 @@ export class Brain {
         }
         if (elapsed < PLAY.tossGrabMs + 160) return;
         if (toy.holder === 'pet') {
-          s.dest = this.carryTo(s, p.fetchDistance);
+          if (this.input.goose) {
+            // Got it! Off with it, away from you.
+            s.dest = this.stealTo();
+            this.speak('HONK!', 1200);
+          } else s.dest = this.carryTo(s, p.fetchDistance);
           this.playPhase(s, 'fetch', CARRY_MS);
         } else {
           this.playPhase(s, 'watch', pick(WATCH_MS, this.random));
@@ -1471,7 +1539,9 @@ export class Brain {
           return;
         }
         const dest = s.dest ?? this.pos;
-        this.vel = this.steer(dest, m.walkSpeed * 1.4 * k, m.accel * 1.5 * k, dt, 40);
+        // A goose legs it.
+        const goose = this.input.goose === true;
+        this.vel = this.steer(dest, (goose ? m.runSpeed * 0.9 : m.walkSpeed * 1.4) * k, (goose ? m.runAccel : m.accel * 1.5) * k, dt, 40);
         if ((dist(this.pos, dest) < 6 && length(this.vel) < 15) || this.now >= s.until) {
           // Drops it, and has a look at it.
           this.vel = { x: 0, y: 0 };
@@ -1615,6 +1685,28 @@ export class Brain {
     return this.clampToArea({ x: this.pos.x + way * along, y: this.pos.y + across });
   }
 
+  /**
+   * Where a goose runs off to with a block: well away, the other way from the pointer (or
+   * any way, with it off the screen), wherever there's the most room.
+   */
+  private stealTo(): Point {
+    const cursor = this.input.cursor;
+    const away = cursor ? Math.atan2(this.pos.y - cursor.y, this.pos.x - cursor.x) : this.random() * Math.PI * 2;
+    let best = this.pos;
+    let bestRoom = -1;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const angle = away + (this.random() * 2 - 1) * 0.9;
+      const far = pick(GOOSE_STEAL_DISTANCE, this.random);
+      const to = this.clampToArea({ x: this.pos.x + Math.cos(angle) * far, y: this.pos.y + Math.sin(angle) * far * this.config.wander.floorDepth });
+      const room = dist(to, this.pos) + (cursor ? dist(to, cursor) * 0.5 : 0);
+      if (room > bestRoom) {
+        best = to;
+        bestRoom = room;
+      }
+    }
+    return best;
+  }
+
   /** Charging about, he sends flying any block in his way (not the one he's playing with). */
   private kickToys(): void {
     const speed = length(this.vel);
@@ -1654,7 +1746,7 @@ export class Brain {
         animation = speed > this.config.motion.walkSpeed * 1.5 ? 'run' : speed < 8 ? 'idle' : 'walk';
         break;
       case 'sit':
-        animation = s.activity === 'rest' ? 'sit' : s.activity;
+        animation = s.activity === 'rest' ? 'sit' : s.activity === 'honk' ? 'attention' : s.activity;
         break;
       case 'sleep':
         animation = 'sleep';

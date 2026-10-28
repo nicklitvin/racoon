@@ -1,6 +1,6 @@
 # My Pet
 
-A little pixel-art pet that lives on your screen: a raccoon, a ginger cat or an otter (or, in beta, a bunny, a hedgehog, or one of the floaties, little blobs that float about: switch them on in the patch notes). It wanders about, naps next to your mouse pointer, plays with its toy blocks, chases the cursor when you shake the mouse, and (if you let it) comes down to ask you to play while you type.
+A little pixel-art pet that lives on your screen: a raccoon, a ginger cat or an otter (or, in beta, a bunny, a hedgehog, a horrible goose that honks at you and steals the blocks, or one of the floaties, little blobs that float about: switch them on in the patch notes). It wanders about, naps next to your mouse pointer, plays with its toy blocks, chases the cursor when you shake the mouse, and (if you let it) comes down to ask you to play while you type.
 
 ## Download
 
@@ -57,6 +57,6 @@ npm test           # unit tests
 npm run dist:win   # My-Pet-Windows.exe in release/
 ```
 
-Releases are automatic: every push to `main` that changes the app builds the Windows and Mac apps on GitHub's machines and updates the release for the version in `package.json` (`v0.1.0`). To start a new release, bump `version` in `package.json`. The installed app notices a new release by itself and offers to update in its settings.
+Releases are automatic: every push to `main` that changes the app builds the Windows and Mac apps on GitHub's machines and publishes them as a new release (`v0.1.<run number>`), with notes saying what's new from the patch notes. The installed app notices a new release by itself and offers to update in its settings.
 
 How it all works, the project layout, adding animations, packaging and the testing checklist: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.

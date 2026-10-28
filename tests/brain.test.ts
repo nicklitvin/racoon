@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Brain, type PetSnapshot, type WorldInput } from '../src/core/behavior/brain';
+import { Brain, honk, type PetSnapshot, type WorldInput } from '../src/core/behavior/brain';
 import { DEFAULT_CONFIG, withConfig, type ConfigOverrides } from '../src/core/behavior/config';
 import { seededRandom } from '../src/core/behavior/motion';
 
@@ -697,5 +697,64 @@ describe('Brain: play mode', () => {
       const peeked = run(typing, 5000, world({ mode, typingActive: true })).some((s) => s.reaction === 'peek');
       expect(peeked, mode).toBe(mode === 'play');
     }
+  });
+});
+
+describe('Brain: the goose', () => {
+  const goose = (overrides: Partial<WorldInput> = {}) => world({ goose: true, ...overrides });
+
+  it('only honks: whatever it would have said comes out as a honk (or a hiss)', () => {
+    expect(honk('Work time!', 0)).toMatch(/^HONK/);
+    expect(honk('Psst… play with me?', 0)).toBe('Honk?');
+    expect(honk('Shh! Working.', 0)).toBe('Hssss!');
+    const brain = makeBrain(3);
+    const { snap } = runUntil(brain, (s) => s.phase === 'beg', goose({ typingActive: true }), 20_000);
+    expect(snap.say).toMatch(/^(HONK|Honk)/);
+  });
+
+  it('goes for the pointer when it comes near, instead of running off', () => {
+    let charged = 0;
+    for (let seed = 1; seed <= 10; seed++) {
+      const brain = makeBrain(seed);
+      run(brain, 500, goose());
+      const cursor = { x: 760, y: bottom - 45 };
+      const snaps = run(brain, 1500, goose({ cursor, cursorStillMs: 0 }));
+      expect(snaps.some((s) => s.reaction === 'flee' || s.reaction === 'hide')).toBe(false);
+      if (snaps[0]!.reaction === 'surprised') {
+        charged++;
+        expect(snaps[0]!.say).toMatch(/HONK/);
+        expect(snaps.some((s) => s.reaction === 'chase' || s.reaction === 'pounce')).toBe(true);
+      }
+    }
+    expect(charged).toBeGreaterThan(4);
+  });
+
+  it('won’t be patted or carried: it honks, and goes for your pointer', () => {
+    const brain = makeBrain(4);
+    run(brain, 500, goose());
+    const cursor = { x: 1100, y: 500 };
+    brain.poke();
+    const patted = run(brain, 1500, goose({ cursor, cursorStillMs: 0 }));
+    expect(patted[0]!.reaction).toBe('surprised');
+    expect(patted[0]!.say).toMatch(/HONK/);
+    expect(patted.some((s) => s.reaction === 'chase')).toBe(true);
+    // Once it gets there, it pecks at it.
+    const { snap } = runUntil(brain, (s) => s.reaction === 'pounce', goose({ cursor, cursorStillMs: 1000 }), 10_000);
+    expect(snap.animation).toBe('jump');
+
+    brain.grab();
+    expect(run(brain, 100, goose({ cursor })).at(-1)!.say).toMatch(/HONK/);
+    brain.release();
+    expect(run(brain, 50, goose({ cursor })).at(-1)!.reaction).toBe('surprised');
+  });
+
+  it('honks at nothing now and then', () => {
+    const brain = makeBrain(6);
+    const snaps = run(brain, 120_000, goose());
+    const honks = snaps.filter((s, i) => s.animation === 'attention' && snaps[i - 1]?.animation !== 'attention');
+    expect(honks.length).toBeGreaterThan(1);
+    expect(snaps.filter((s) => s.animation === 'attention').every((s) => s.say !== null)).toBe(true);
+    // Anything else is a pet's ordinary day.
+    expect(run(makeBrain(6), 120_000).some((s) => s.animation === 'attention')).toBe(false);
   });
 });

@@ -16,6 +16,16 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     date: '2026-10-27',
+    title: 'The goose',
+    beta: true,
+    changes: [
+      'A goose. It honks instead of talking, and sometimes just honks at nothing.',
+      'Bring your pointer near it and it comes at you, neck out and wings up, honking. Pat it or pick it up and it does the same.',
+      'It snatches the blocks in its beak and runs off with them, away from you. It naps with its head tucked in, and pecks at the keyboard at work.',
+    ],
+  },
+  {
+    date: '2026-10-27',
     title: 'Busier at work',
     changes: [
       'At the desk, your pet switches between code, the web and reels every 15 to 30 seconds, instead of sticking with one for a minute or more.',
