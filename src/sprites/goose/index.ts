@@ -1,10 +1,10 @@
-import { TIMING } from '../chibi';
+import { TIMING, viewWhile, type ChibiView } from '../chibi';
 import { PIXEL } from '../pixel/draw';
 import { pixelCanvas, PIXEL_FPS, PIXEL_PX, PIXEL_TOY } from '../pixel';
 import { PIXEL_COATS, type Palette } from '../pixel/palette';
 import type { Pt } from '../pixel/raster';
 import type { RaccoonRenderer } from '../types';
-import { drawGoose, goosePose, KEYBOARD, type GoosePose } from './draw';
+import { drawGoose, drawGooseFacing, GOOSE_QUARTER, goosePose, KEYBOARD, type GoosePose } from './draw';
 
 /** A white goose with an orange beak and feet (`band`, and `dark` for the far foot and under its beak). */
 export const GOOSE_COAT: Palette = {
@@ -44,6 +44,8 @@ export function createGoose(doc: Document, label: string): RaccoonRenderer {
   let back: Pt | null = null;
   let tip: Pt | null = null;
   let dir = 1;
+  /** Which way you see it: side on, or going up or down the screen from behind or in front (or three-quarters, diagonally). */
+  let turned: ChibiView = 'side';
   view.onChange = () => void (shownTick = NaN);
   view.sizeTo();
 
@@ -94,13 +96,20 @@ export function createGoose(doc: Document, label: string): RaccoonRenderer {
       }
       settling = far > 0.3;
       const pose: GoosePose = { ...target, ...shown, head: { ...shown.head } };
-      // A new picture only every so often, like an old game, but at once when it turns round.
+      // Facing the way it's going, held while it goes straight up or down the screen; and
+      // going up or down, seen from behind or in front (three-quarters going diagonally).
+      const facing = frame.animation !== 'dangle' && Math.abs(Math.cos(heading)) > 0.2 ? (Math.cos(heading) < 0 ? -1 : 1) : dir;
+      const seen = viewWhile(frame.animation, heading, turned);
+      // A new picture only every so often, like an old game, but at once when it turns.
       const tick = Math.floor(clock / (1000 / PIXEL_FPS));
-      const facing = Math.cos(heading) < 0 ? -1 : 1;
-      if (tick === shownTick && facing === dir) return;
+      if (tick === shownTick && facing === dir && seen === turned) return;
       shownTick = tick;
       dir = facing;
-      const drawn = drawGoose(view.raster, pose, dir, clock, view.dressed);
+      turned = seen;
+      const drawn =
+        turned === 'front' || turned === 'back'
+          ? drawGooseFacing(view.raster, pose, turned, dir, clock, view.dressed)
+          : drawGoose(view.raster, pose, dir, clock, view.dressed, turned === 'side' ? 1 : GOOSE_QUARTER);
       back = drawn.back;
       tip = drawn.tip;
       view.paint(drawn.box);

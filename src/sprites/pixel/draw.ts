@@ -100,7 +100,7 @@ function curvy(points: [number, number][], rx: number, ry: number): Pt[] {
 export type Quarter = 'front' | 'back' | null;
 
 /** In a three-quarter view the body is this much shorter, end on to you. */
-const QUARTER_SQUASH = 0.62;
+export const QUARTER_SQUASH = 0.62;
 
 /**
  * Draws the pet into `r` (cleared first) and returns the box round the figure itself, for

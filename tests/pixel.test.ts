@@ -229,6 +229,18 @@ describe('pixel pets walking up and down the screen', () => {
     expect(viewWalking(Math.PI / 2, 'idle')).toBe('side');
   });
 
+  it('carrying a block, nosing one along or creeping up, turns three-quarters rather than sliding along side on', () => {
+    for (const animation of ['carry', 'nudge', 'stalk', 'fetch'] as const) {
+      expect(viewWalking(-Math.PI / 2, animation), animation).not.toBe('side');
+      expect(viewWalking(-Math.PI / 4, animation), animation).toBe('backQuarter');
+    }
+    // With a block in his mouth, not straight on: it'd be in front of his face.
+    expect(viewWalking(Math.PI / 2, 'carry')).toBe('frontQuarter');
+    expect(viewWalking(Math.PI / 2, 'fetch')).toBe('front');
+    // Pouncing down the screen at something, from the front.
+    expect(viewWalking(Math.PI / 2, 'jump')).toBe('front');
+  });
+
   it(`holds a view until he's clearly going another way, so it doesn't flicker on the boundary`, () => {
     const edge = Math.asin(0.38);
     expect(viewFor(edge + 0.02, 'side')).toBe('side');

@@ -42,6 +42,22 @@ export function viewFor(heading: number, current: ChibiView): ChibiView {
   return 'side';
 }
 
+/** Going along in these (or pouncing), up or down the screen he's seen from the front or behind. */
+const TURNS_FULLY: ReadonlySet<AnimationName> = new Set(['walk', 'run', 'chase', 'leap', 'fetch', 'jump']);
+/**
+ * In these he turns only three-quarters: with a block in his mouth or paws, nosing one
+ * along, or creeping up low (poses only the side views have), but not sliding along side on.
+ */
+const TURNS_PART: ReadonlySet<AnimationName> = new Set(['carry', 'nudge', 'stalk']);
+
+/** The view for `heading` doing `animation`, given the one he's in now: side on unless he's going somewhere. */
+export function viewWhile(animation: AnimationName, heading: number, current: ChibiView): ChibiView {
+  if (TURNS_FULLY.has(animation)) return viewFor(heading, current);
+  if (!TURNS_PART.has(animation)) return 'side';
+  const view = viewFor(heading, current);
+  return view === 'front' ? 'frontQuarter' : view === 'back' ? 'backQuarter' : view;
+}
+
 /** How long a change of animation takes to blend through, and a turn round to flip. */
 const BLEND_MS = 240;
 const FLIP_MS = 90;
@@ -100,8 +116,7 @@ export class ChibiMotion {
     // Going up or down the screen, you see him from behind or in front, and going diagonally,
     // three-quarters. Each view holds until he's clearly going another way, so it doesn't
     // flicker between two on a heading halfway between them.
-    const walking = frame.animation === 'walk' || frame.animation === 'run' || frame.animation === 'chase' || frame.animation === 'leap';
-    this.view = walking ? viewFor(heading, this.view) : 'side';
+    this.view = viewWhile(frame.animation, heading, this.view);
     const turn = dt / (FLIP_MS / 1000);
     this.flip = this.flip < this.facing ? Math.min(this.facing, this.flip + turn) : Math.max(this.facing, this.flip - turn);
 

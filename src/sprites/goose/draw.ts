@@ -1,6 +1,7 @@
 import type { ChibiMark } from '../chibi/pose';
 import { hatItem, NECK_WIDTH, outfitItem, UNDRESSED, type Dress, type Paint, type Wearable } from '../outfits';
 import { drawMarks, PAINT_SLOT, PIXEL } from '../pixel/draw';
+import { isFrontPiece } from '../pixel/facing';
 import { C } from '../pixel/palette';
 import { capsule, ellipse, polygon, Raster, tube, type Box, type Pt } from '../pixel/raster';
 import type { AnimationName, EyeStyle } from '../types';
@@ -370,35 +371,48 @@ function mix(a: Pt, b: Pt, k: number): Pt {
   return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
 }
 
-/** One of its wings, thrown up and out from its shoulder: a long feathered kite. */
-function spreadWing(shoulder: Pt, angle: number, length: number, dir: number): Pt[] {
+/** One of its wings, thrown up and out from its shoulder: a long feathered kite, `squash` as wide (turned three-quarters). */
+function spreadWing(shoulder: Pt, angle: number, length: number, dir: number, squash = 1): Pt[] {
   const along = { x: Math.cos(angle) * dir, y: -Math.sin(angle) };
   const across = { x: -along.y, y: along.x };
-  const at = (u: number, v: number): Pt => ({ x: shoulder.x + along.x * u + across.x * v, y: shoulder.y + along.y * u + across.y * v });
+  const at = (u: number, v: number): Pt => ({ x: shoulder.x + (along.x * u + across.x * v) * squash, y: shoulder.y + along.y * u + across.y * v });
   return [at(0, -2.6), at(length * 0.4, -4.6 * dir), at(length, -1 * dir), at(length * 0.9, 1.6 * dir), at(length * 0.55, 3.6 * dir), at(0, 3)];
+}
+
+/** Turned three-quarters towards you or away (going diagonally), everything across it is this much shorter. */
+export const GOOSE_QUARTER = 0.64;
+
+/** What `drawGoose` and `drawGooseFacing` give back: the box round it (for grabbing it), its back (where you hold it up by) and its beak's tip (where it holds a block). */
+export interface GooseDrawn {
+  box: Box | null;
+  back: Pt;
+  tip: Pt;
 }
 
 /**
  * Draws the goose into `r` (cleared first), its feet at the feet point, facing `dir` (1
- * right, -1 left). Returns the box round it (for grabbing it), its back (where you hold it
- * up by) and its beak's tip (where it holds a block).
+ * right, -1 left). `squash` below 1 turns it three-quarters (going diagonally): its body
+ * end on to you, so shorter across.
  */
-export function drawGoose(r: Raster, p: GoosePose, dir: number, clock: number, dress: Dress = UNDRESSED): { box: Box | null; back: Pt; tip: Pt } {
+export function drawGoose(r: Raster, p: GoosePose, dir: number, clock: number, dress: Dress = UNDRESSED, squash = 1): GooseDrawn {
   r.clear();
-  const P = (q: Pt): Pt => ({ x: FX + q.x * dir, y: FY + q.y });
+  const P = (q: Pt): Pt => ({ x: FX + q.x * dir * squash, y: FY + q.y });
   const local = (q: Pt) => rot(q, p.tilt * dir);
   const b = bodyCentre(p);
   const B = P(b);
-  const onBody = (q: Pt): Pt => add(B, local({ x: q.x * dir, y: q.y }));
+  const onBody = (q: Pt): Pt => {
+    const l = local({ x: q.x * dir, y: q.y });
+    return add(B, { x: l.x * squash, y: l.y });
+  };
 
   // Its shadow on the ground, smaller the higher it hops.
-  const shadow = ellipse(FX - dir, FY - 0.5, 11 * (1 - Math.min(0.4, p.lift / 25)), 1.6);
+  const shadow = ellipse(FX - dir, FY - 0.5, (11 * squash + 2 * (1 - squash)) * (1 - Math.min(0.4, p.lift / 25)), 1.6);
   r.shape(shadow.sd, shadow.box, C.shadow, null);
 
   // Speed lines behind it.
   if (p.dash > 0.2) {
     for (const [dy, len] of [[-4, 5], [0, 7], [4, 4]] as const) {
-      const x0 = Math.round(B.x - dir * 15);
+      const x0 = Math.round(B.x - dir * 15 * squash);
       for (let i = 0; i < Math.round(len * p.dash); i++) r.set(x0 - dir * i, Math.round(B.y + dy), C.light);
     }
   }
@@ -408,7 +422,7 @@ export function drawGoose(r: Raster, p: GoosePose, dir: number, clock: number, d
   const shoulder = onBody({ x: 4, y: -3 });
   // The far wing, up behind it.
   if (spread) {
-    const far = polygon(spreadWing(add(shoulder, { x: dir * 1.5, y: -1 }), wingAngle - 0.2, 13 + p.wing * 2, dir));
+    const far = polygon(spreadWing(add(shoulder, { x: dir * 1.5 * squash, y: -1 }), wingAngle - 0.2, 13 + p.wing * 2, dir, squash));
     r.shape(far.sd, far.box, C.far, C.outline);
   }
 
@@ -430,7 +444,7 @@ export function drawGoose(r: Raster, p: GoosePose, dir: number, clock: number, d
   // Its body: a plump oval, a tail flicked up at the back.
   const tail = polygon([onBody({ x: -8, y: -3.5 }), onBody({ x: -15, y: -6.5 }), onBody({ x: -13.5, y: -2.5 }), onBody({ x: -8, y: 2 })]);
   r.shape(tail.sd, tail.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
-  const body = ellipse(B.x, B.y, 11, p.sitting ? 7.5 : 7, p.tilt * dir);
+  const body = ellipse(B.x, B.y, Math.max(7, 11 * squash), p.sitting ? 7.5 : 7, p.tilt * dir * squash);
   r.shape(body.sd, body.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
 
   // The neck, from the front of its body up to its head, curved like an S; or, asleep, the head on its back.
@@ -452,10 +466,10 @@ export function drawGoose(r: Raster, p: GoosePose, dir: number, clock: number, d
 
   // The near wing: folded on its back, or thrown wide.
   if (spread) {
-    const near = polygon(spreadWing(shoulder, wingAngle, 14 + p.wing * 2, dir));
+    const pts = spreadWing(shoulder, wingAngle, 14 + p.wing * 2, dir, squash);
+    const near = polygon(pts);
     r.shape(near.sd, near.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
     // Grey flight feathers along its trailing edge.
-    const pts = spreadWing(shoulder, wingAngle, 14 + p.wing * 2, dir);
     const tip = pts[2]!;
     const back = pts[3]!;
     const tail2 = pts[4]!;
@@ -469,7 +483,7 @@ export function drawGoose(r: Raster, p: GoosePose, dir: number, clock: number, d
     }
   } else {
     const at = onBody({ x: -2.5, y: -0.6 });
-    const folded = ellipse(at.x, at.y, 7.5, 3.4, p.tilt * dir - 0.1 * dir);
+    const folded = ellipse(at.x, at.y, Math.max(4.5, 7.5 * squash), 3.4, (p.tilt * dir - 0.1 * dir) * squash);
     r.shape(folded.sd, folded.box, C.fur, C.furDark, undefined, (_x, y) => y > at.y - 1.5);
     // The tips of its folded feathers, down by its tail.
     const tipAt = onBody({ x: -9.5, y: 0 });
@@ -479,7 +493,7 @@ export function drawGoose(r: Raster, p: GoosePose, dir: number, clock: number, d
   // Head, beak and eye.
   const head = ellipse(H.x, H.y, 4.4, 3.8);
   r.shape(head.sd, head.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
-  drawBeak(r, H, p.nod, p.beak, dir);
+  drawBeak(r, H, p.nod, p.beak, dir, squash);
   drawEye(r, H, p, dir, clock);
 
   // Round its neck, and on its head.
@@ -490,16 +504,24 @@ export function drawGoose(r: Raster, p: GoosePose, dir: number, clock: number, d
   const box = r.bounds((col) => col === C.shadow);
   const top = p.tucked ? add(B, { x: 0, y: -8 }) : add(H, { x: 0, y: -4 });
   drawMarks(r, p.mark, { x: top.x, y: top.y - 3 }, dir, clock);
-  const tipPt = add(H, { x: beakTip(p.nod).x * dir, y: beakTip(p.nod).y });
+  const tipPt = add(H, { x: beakOut(beakTip(p.nod).x, squash) * dir, y: beakTip(p.nod).y });
   return { box, back: onBody({ x: -1, y: -7 }), tip: tipPt };
 }
 
-/** Its orange beak, pointing `nod` down from straight ahead, `open` 0 to 1. */
-function drawBeak(r: Raster, H: Pt, nod: number, open: number, dir: number): void {
+/**
+ * How far out from its head's middle a point `x` along its beak shows, turned three-quarters
+ * (`squash`): shorter, from where it meets its head (which is round, the same any way on).
+ */
+function beakOut(x: number, squash: number): number {
+  return x > 2.4 ? 2.4 + (x - 2.4) * (0.35 + 0.65 * squash) : x;
+}
+
+/** Its orange beak, pointing `nod` down from straight ahead, `open` 0 to 1 (`squash` as long, pointing partly at you or away). */
+function drawBeak(r: Raster, H: Pt, nod: number, open: number, dir: number, squash = 1): void {
   const o = open * 1.6;
   const at = (x: number, y: number): Pt => {
     const q = rot({ x, y }, nod);
-    return { x: H.x + q.x * dir, y: H.y + q.y };
+    return { x: H.x + beakOut(q.x, squash) * dir, y: H.y + q.y };
   };
   if (o > 0.3) {
     const mouth = polygon([at(2.6, -0.2), at(6.6, -0.6 - o), at(6, 1.6 + o), at(2.6, 0.8)]);
@@ -551,6 +573,185 @@ function wear(r: Raster, item: Wearable | null, origin: Pt, size: number, dir: n
         ? polygon(s.points.map(([x, y]) => at(x, y)))
         : (() => {
             const c = at(s.cx, s.cy);
+            return ellipse(c.x, c.y, Math.max(0.6, s.rx * size), Math.max(0.6, s.ry * size));
+          })();
+    r.shape(shape.sd, shape.box, slots[s.paint], C.outline);
+  }
+}
+
+/** Seen end on, how much lower a point in front of it shows (nearer you, down the screen), per px. */
+const DEPTH = 0.15;
+
+/**
+ * The goose coming straight at you (`front`, down the screen) or going away (up it), the way
+ * sprites in old games have a picture for each way they can face: from the front, its round
+ * white chest, its neck up the middle, its beak pointing at you and its eyes either side;
+ * from behind, its folded wings and its tail, and the back of its head. The same pose as
+ * side on: its head, as far forward, shows lower from the front (nearer you) and higher from
+ * behind. `side` is the way it last faced side on (its hat and its tie lean that way).
+ */
+export function drawGooseFacing(r: Raster, p: GoosePose, view: 'front' | 'back', side: number, clock: number, dress: Dress = UNDRESSED): GooseDrawn {
+  r.clear();
+  const front = view === 'front';
+  // Waddling, its body rocks over the foot that's down.
+  const lifted = (k: 0 | 1) => (p.sitting ? 0 : Math.min(0, p.feet[k].y));
+  const sway = (lifted(1) - lifted(0)) * 0.55;
+  const B = { x: FX + sway, y: FY + bodyCentre(p).y };
+  // (On the middle of a pixel, so its face comes out the same both sides.)
+  const H = { x: Math.floor(FX + sway * 0.6) + 0.5, y: FY + p.head.y + (front ? 1 : -1) * DEPTH * p.head.x };
+
+  const shadow = ellipse(FX, FY - 0.5, 9 * (1 - Math.min(0.4, p.lift / 25)), 1.6);
+  r.shape(shadow.sd, shadow.box, C.shadow, null);
+
+  // Its wings thrown out to either side: from the front they come up behind it, from
+  // behind up off its back, nearer you than its body.
+  const spread = p.wing > 0.15;
+  const wingAngle = Math.PI * (0.98 - 0.36 * p.wing) + p.flap;
+  const wings = () => {
+    for (const s of [-1, 1]) {
+      // (Thrown back side on is out to its side end on.)
+      const pts = spreadWing({ x: B.x + s * 4.5, y: B.y - 3 }, wingAngle, 12 + p.wing * 2, -s, 0.9);
+      const wing = polygon(pts);
+      r.shape(wing.sd, wing.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
+      // Grey feathers at its tip.
+      const tip = pts[2]!;
+      r.dots([{ x: tip.x - s, y: tip.y }, { x: tip.x - s * 2, y: tip.y + 1 }], C.furDark);
+    }
+  };
+  if (spread && front) wings();
+
+  // Its legs under it, each foot stepping up in turn.
+  if (!p.sitting) {
+    for (const k of [0, 1] as const) {
+      const s = k === 0 ? side : -side;
+      const x = FX + s * 3;
+      const fy = FY + lifted(k) - p.lift * 0.85;
+      const shin = capsule({ x: B.x + s * 3, y: B.y + 4 }, { x, y: fy - 1 }, 0.7);
+      r.shape(shin.sd, shin.box, C.band, C.outline);
+      // Webbed, pointing at you (wide), or away (only their backs show).
+      const w = front ? 2.4 : 1.6;
+      const web = polygon([{ x: x - w, y: fy }, { x: x + w, y: fy }, { x: x + w * 0.5, y: fy - 1.6 }, { x: x - w * 0.5, y: fy - 1.6 }]);
+      r.shape(web.sd, web.box, front ? C.band : C.dark, C.outline);
+    }
+  }
+
+  // Its neck comes up from behind its chest, or the top of its back; its head is in front
+  // of its body from the front, and behind it (out of sight, if it's down low) from behind.
+  const neckBase = { x: B.x, y: B.y + (front ? -3 : -4) };
+  const neckMid = { x: (neckBase.x + H.x) / 2, y: (neckBase.y + H.y) / 2 };
+  const neck = () => {
+    const tubed = tube([neckBase, neckMid, H], [3.2, 2.4, 2.3]);
+    r.shape(tubed.sd, tubed.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
+  };
+  const head = () => {
+    const skull = ellipse(H.x, H.y, 4.3, 4);
+    r.shape(skull.sd, skull.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
+    if (front) face();
+  };
+  if (!p.tucked) neck();
+  if (!front && !p.tucked) head();
+
+  // Its body, round, end on.
+  const body = ellipse(B.x, B.y, 8, p.sitting ? 7.5 : 7.2, sway * 0.05);
+  r.shape(body.sd, body.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
+
+  if (front) {
+    if (!p.tucked) head();
+  } else {
+    // Its folded wings down its back, meeting over its tail, and its tail sticking up between them.
+    if (!spread) {
+      for (let i = 0; i < 5; i++) {
+        const y = Math.round(B.y - 3 + i * 1.5);
+        const x = Math.round(B.x + 0.5 - (4 - i) * 0.9);
+        r.dots([{ x, y }, { x: Math.round(2 * B.x - x), y }], C.furDark);
+      }
+    }
+    const tail = polygon([{ x: B.x - 2.2, y: B.y + 4 }, { x: B.x, y: B.y + 1 }, { x: B.x + 2.2, y: B.y + 4 }, { x: B.x, y: B.y + 5.5 }]);
+    r.shape(tail.sd, tail.box, C.furLight, C.furDark);
+    if (spread) wings();
+  }
+  // Asleep, its head tucked in on its back.
+  if (p.tucked) {
+    const tucked = ellipse(B.x + side * 2, B.y - 5, 3.6, 3.2);
+    r.shape(tucked.sd, tucked.box, C.fur, C.outline, { light: C.furLight, dark: C.furDark });
+  }
+
+  // Round its neck, and on its head.
+  if (!p.tucked) {
+    const collar = { x: neckBase.x + (H.x - neckBase.x) * 0.25, y: neckBase.y + (H.y - neckBase.y) * 0.25 - 1 };
+    wearEndOn(r, outfitItem(dress.outfit), collar, 7 * NECK_WIDTH, side, front, PAINT_SLOT.wear, true);
+    wearEndOn(r, hatItem(dress.hat), { x: H.x, y: H.y - 3.9 }, 6, side, front, PAINT_SLOT.hat, false);
+  }
+
+  const box = r.bounds((col) => col === C.shadow);
+  const top = p.tucked ? { x: B.x, y: B.y - 8 } : { x: H.x, y: H.y - 4 };
+  drawMarks(r, p.mark, { x: top.x, y: top.y - 3 }, side, clock);
+  return { box, back: { x: B.x, y: B.y - 7 }, tip: { x: H.x, y: H.y + 1 + (front ? beakLength(p) : 0) } };
+
+  /** From the front: its eyes either side, and its beak down the middle, pointing at you. */
+  function face(): void {
+    const len = beakLength(p);
+    const o = p.beak * 1.8;
+    const top = H.y + 0.2;
+    if (o > 0.3) {
+      const mouth = polygon([{ x: H.x - 1.3, y: top + 1 }, { x: H.x + 1.3, y: top + 1 }, { x: H.x + 1, y: top + len + o }, { x: H.x - 1, y: top + len + o }]);
+      r.shape(mouth.sd, mouth.box, C.mouth, null);
+      const lower = polygon([{ x: H.x - 1.1, y: top + len + o - 1 }, { x: H.x + 1.1, y: top + len + o - 1 }, { x: H.x + 0.8, y: top + len + o + 0.8 }, { x: H.x - 0.8, y: top + len + o + 0.8 }]);
+      r.shape(lower.sd, lower.box, C.dark, C.outline);
+    }
+    // (Outlined only round its tip: orange on white shows well enough.)
+    const upper = polygon([{ x: H.x - 1.4, y: top }, { x: H.x + 1.4, y: top }, { x: H.x + 1, y: top + len }, { x: H.x - 1, y: top + len }]);
+    r.shape(upper.sd, upper.box, C.band, C.outline, undefined, (_x, y) => y > top + len - 0.2);
+    const blinking = p.eyes === 'open' && clock % 5200 < 140;
+    for (const s of [-1, 1]) {
+      // Either side of the top of its beak (under a hat's brim).
+      const ex = Math.floor(H.x) + s * 3;
+      const ey = Math.floor(H.y - 1.2);
+      switch (blinking ? 'closed' : p.eyes) {
+        case 'open':
+          r.dots([{ x: ex, y: ey }, { x: ex, y: ey + 1 }], C.eye);
+          break;
+        case 'wide':
+          r.dots([{ x: ex, y: ey - 1 }, { x: ex, y: ey }, { x: ex, y: ey + 1 }], C.eye);
+          r.set(ex, ey - 1, C.glint);
+          break;
+        case 'closed':
+          r.dots([{ x: ex - s, y: ey + 1 }, { x: ex, y: ey + 1 }], C.eye);
+          break;
+        case 'happy':
+          r.dots([{ x: ex - s, y: ey + 1 }, { x: ex, y: ey }], C.eye);
+          break;
+        case 'cross':
+          // Mean little eyes under brows slanting down to its beak.
+          r.dots([{ x: ex, y: ey }, { x: ex, y: ey + 1 }], C.eye);
+          r.dots([{ x: ex + s, y: ey - 2 }, { x: ex, y: ey - 1 }], C.outline);
+          break;
+      }
+    }
+  }
+}
+
+/** From the front, how far down its face its beak shows: longer pointing down, foreshortened pointing at you. */
+function beakLength(p: GoosePose): number {
+  return 2.6 + Math.max(0, p.nod) * 1.6 - Math.max(0, -p.nod) * 1.2;
+}
+
+/**
+ * Something it's wearing, seen end on: drawn as from the side, but neckwear that hangs at
+ * its front (a tie, a bell) comes round to the middle, and is out of sight from behind.
+ */
+function wearEndOn(r: Raster, item: Wearable | null, origin: Pt, size: number, side: number, front: boolean, slots: Record<Paint, number>, neckwear: boolean): void {
+  if (!item) return;
+  const at = (x: number, y: number): Pt => ({ x: origin.x + x * size * side, y: origin.y + y * size });
+  for (const s of item.shapes) {
+    const hangs = neckwear && isFrontPiece(s);
+    if (hangs && !front) continue;
+    const dx = hangs ? -0.85 : 0;
+    const shape =
+      s.kind === 'poly'
+        ? polygon(s.points.map(([x, y]) => at(x + dx, y)))
+        : (() => {
+            const c = at(s.cx + dx, s.cy);
             return ellipse(c.x, c.y, Math.max(0.6, s.rx * size), Math.max(0.6, s.ry * size));
           })();
     r.shape(shape.sd, shape.box, slots[s.paint], C.outline);

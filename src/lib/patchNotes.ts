@@ -16,6 +16,14 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     date: '2026-10-27',
+    title: 'No more sliding about',
+    changes: [
+      'The goose turns the way it’s going: walking up the screen you see it from behind, coming down it you see its face, and going diagonally it turns three-quarters. It used to slide up and down side on.',
+      'The other pets turn the same way carrying a block, nosing one along, creeping up on one, fetching, and pouncing, not just walking and running.',
+    ],
+  },
+  {
+    date: '2026-10-27',
     title: 'The goose',
     beta: true,
     changes: [

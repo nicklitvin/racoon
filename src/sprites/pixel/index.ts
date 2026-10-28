@@ -3,7 +3,7 @@ import { scruffPoint, toyHoldPoint } from '../chibi/pose';
 import type { Pt } from '../chibi/species';
 import { hatItem, outfitItem, UNDRESSED, type Dress } from '../outfits';
 import type { RaccoonRenderer } from '../types';
-import { drawPixelPet, PIXEL } from './draw';
+import { drawPixelPet, PIXEL, QUARTER_SQUASH } from './draw';
 import { drawPixelFacing } from './facing';
 import { rgbaTable, shade, type Palette } from './palette';
 import { Raster, type Box } from './raster';
@@ -104,6 +104,8 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
   let shownTick = NaN;
   let shownFacing = 0;
   let shownView = '';
+  /** Turned three-quarters, everything across him is this much shorter. */
+  let across = 1;
   view.onChange = () => void (shownTick = NaN);
   view.sizeTo();
 
@@ -117,7 +119,7 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
     pixelated: true,
     animations: TIMING,
     isSettling: () => motion.settling,
-    holdPoint: () => (scruff ? { x: scruff.x * motion.facing * K * view.cell, y: scruff.y * K * view.cell } : null),
+    holdPoint: () => (scruff ? { x: scruff.x * across * motion.facing * K * view.cell, y: scruff.y * K * view.cell } : null),
     toyReach: build.toyReach * K * PIXEL_PX,
     toySize: PIXEL_TOY * PIXEL_PX,
     toyLook: 'pixel',
@@ -125,7 +127,7 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
     deskReach: { x: build.desk.x * K * PIXEL_PX, y: build.desk.y * K * PIXEL_PX },
     mouseReach: { x: build.mouse.x * K * PIXEL_PX, y: build.mouse.y * K * PIXEL_PX },
     drawsMarks: true,
-    toyPoint: () => (toy ? { x: toy.x * motion.facing * K * view.cell, y: toy.y * K * view.cell } : null),
+    toyPoint: () => (toy ? { x: toy.x * across * motion.facing * K * view.cell, y: toy.y * K * view.cell } : null),
     dress: (d) => view.dress(d),
     setScale(next) {
       view.scale = next;
@@ -145,6 +147,7 @@ export function createPixel(doc: Document, build: PixelBuild, palette: Palette, 
       scruff = scruffPoint(build, pose);
       toy = toyHoldPoint(build, pose);
       const quarter = turned === 'frontQuarter' ? 'front' : turned === 'backQuarter' ? 'back' : null;
+      across = quarter ? QUARTER_SQUASH : 1;
       const box =
         turned !== 'front' && turned !== 'back'
           ? drawPixelPet(view.raster, build, pose, clock, facing, motion.moving, scruff, view.dressed, quarter)
