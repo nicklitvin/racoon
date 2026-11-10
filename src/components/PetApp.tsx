@@ -30,10 +30,13 @@ export function PetApp({ host }: PetAppProps) {
     void host.getSettings().then((s) => alive && setSettings(s));
     const offDisplay = host.onDisplayChanged(setDisplay);
     const offSettings = host.onSettingsChanged(setSettings);
+    // Out of sight while the desktop slides over, and back once it's done.
+    const offSwitching = host.onDesktopSwitching((switching) => stageRef.current?.classList.toggle('away', switching));
     return () => {
       alive = false;
       offDisplay();
       offSettings();
+      offSwitching();
     };
   }, [host]);
 

@@ -23,7 +23,7 @@ export async function buildElectron({ dev = false } = {}) {
     platform: 'node',
     format: 'cjs',
     target: 'node22',
-    external: ['electron', 'uiohook-napi'],
+    external: ['electron', 'uiohook-napi', 'koffi'],
     sourcemap: dev ? 'inline' : false,
     minify: !dev,
     logLevel: 'warning',

@@ -15,6 +15,15 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-11-09',
+    title: 'Staying put',
+    changes: [
+      'Closing the window asks first: hide it and keep your pet out, or quit. A hidden window comes back from the My Pet icon by the clock, or by opening My Pet again.',
+      'Switching desktop, your pet hides while the screens slide over, and comes back once they’ve settled, instead of being dragged off with them.',
+      'Clicking your pet always reaches it, even over an app that keeps itself on top.',
+    ],
+  },
+  {
     date: '2026-10-27',
     title: 'No more sliding about',
     changes: [

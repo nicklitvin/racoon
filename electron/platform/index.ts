@@ -7,6 +7,9 @@ const genericPlatform: PlatformAdapter = {
   configureWindow(win) {
     win.setAlwaysOnTop(true);
   },
+  raiseWindow(win) {
+    win.moveTop();
+  },
   presentWindow(_app, win) {
     win.show();
     win.focus();

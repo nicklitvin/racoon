@@ -81,6 +81,8 @@ function webHost(): Host {
         document.documentElement.removeEventListener('pointerleave', leave);
       };
     },
+    // A tab has no desktops to switch between.
+    onDesktopSwitching: () => () => {},
     onKeyPulse(listener) {
       // The event is not inspected: no key, code or character is ever read.
       return on('keydown', () => listener());

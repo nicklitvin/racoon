@@ -13,6 +13,7 @@ const bridge: HostBridge = {
   onDisplayChanged: (listener) => subscribe(IPC.displayChanged, listener),
   setInteractive: (interactive) => ipcRenderer.send(IPC.setInteractive, interactive),
   onCursor: (listener) => subscribe(IPC.cursor, listener),
+  onDesktopSwitching: (listener) => subscribe(IPC.desktopSwitching, listener),
   onKeyPulse(listener) {
     // Deliberately drops any payload: the renderer only learns "a key was pressed".
     const handler = () => listener();

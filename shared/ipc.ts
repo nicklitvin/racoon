@@ -9,6 +9,7 @@ export const IPC = {
   displayChanged: 'racoon:display-changed',
   setInteractive: 'racoon:set-interactive',
   cursor: 'racoon:cursor',
+  desktopSwitching: 'racoon:desktop-switching',
   keyPulse: 'racoon:key-pulse',
   getSettings: 'racoon:get-settings',
   updateSettings: 'racoon:update-settings',
@@ -55,6 +56,8 @@ export interface HostBridge {
   setInteractive(interactive: boolean): void;
   /** Cursor position relative to the pet window, or null when it's on another display. */
   onCursor(listener: (cursor: Point | null) => void): Unsubscribe;
+  /** The OS is switching virtual desktop (true), and has finished (false): the pet keeps out of sight meanwhile. */
+  onDesktopSwitching(listener: (switching: boolean) => void): Unsubscribe;
   /** Fires once per key press while keyboard reactions are on. Carries no data at all. */
   onKeyPulse(listener: () => void): Unsubscribe;
   getSettings(): Promise<Settings>;

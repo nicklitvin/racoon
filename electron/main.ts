@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, type WebContents } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, screen, Tray, type WebContents } from 'electron';
 import path from 'node:path';
 import { IPC, type DisplayInfo } from '../shared/ipc';
 import type { KeyboardStatus, Settings } from '../shared/settings';
@@ -13,10 +13,17 @@ const PRELOAD = path.join(__dirname, 'preload.js');
 const ASSETS = path.join(__dirname, '../assets');
 /** Passed when Windows starts the app at login, so it starts minimised. */
 const AT_LOGIN = '--at-login';
+/** How long the pet keeps out of sight after the desktop switches: the slide takes about half a second. */
+const AWAY_AFTER_SWITCH_MS = 650;
+/** How often the pet's window goes back in front of windows that made themselves always on top since. */
+const RAISE_EVERY_MS = 3000;
 
 let petWindow: BrowserWindow | null = null;
 let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
 let interactive = false;
+/** Set once the app is really quitting (Quit picked, an update installing, Windows shutting down). */
+let quitting = false;
 
 let store: SettingsStore;
 let cursorMonitor: CursorMonitor;
@@ -72,8 +79,33 @@ function displayInfo(): DisplayInfo {
 function setInteractive(next: boolean) {
   if (!petWindow || next === interactive) return;
   interactive = next;
-  if (next) petWindow.setIgnoreMouseEvents(false);
-  else petWindow.setIgnoreMouseEvents(true, { forward: true });
+  if (next) {
+    // In front of anything that's come up over it since, so the click is his and not theirs.
+    platform.raiseWindow(petWindow);
+    petWindow.setIgnoreMouseEvents(false);
+  } else {
+    petWindow.setIgnoreMouseEvents(true, { forward: true });
+  }
+}
+
+let awayTimer: NodeJS.Timeout | undefined;
+let away = false;
+/**
+ * The desktop is switching: the pet's window is on every desktop, so as the old one slid away
+ * he went with it. He keeps out of sight until the new one has slid in, then comes back.
+ */
+function desktopSwitched() {
+  clearTimeout(awayTimer);
+  if (!away) {
+    away = true;
+    petWindow?.webContents.send(IPC.desktopSwitching, true);
+  }
+  awayTimer = setTimeout(() => {
+    away = false;
+    if (!petWindow) return;
+    platform.raiseWindow(petWindow);
+    petWindow.webContents.send(IPC.desktopSwitching, false);
+  }, AWAY_AFTER_SWITCH_MS);
 }
 
 let refitTimer: NodeJS.Timeout | undefined;
@@ -125,9 +157,16 @@ function createPetWindow() {
     petWindow?.showInactive();
     cursorMonitor.start();
   });
+  const stopWatchingDesktops = platform.watchDesktopSwitches?.(desktopSwitched) ?? null;
+  const raising = setInterval(() => {
+    if (petWindow && !away) platform.raiseWindow(petWindow);
+  }, RAISE_EVERY_MS);
   petWindow.on('closed', () => {
     petWindow = null;
     cursorMonitor.stop();
+    stopWatchingDesktops?.();
+    clearInterval(raising);
+    clearTimeout(awayTimer);
   });
 
   loadRenderer(petWindow, 'pet');
@@ -141,8 +180,9 @@ function launchedAtLogin() {
 }
 
 /**
- * The app's window: the settings, in the taskbar or Dock like any other app. The pet is
- * out for as long as it's open, and closing it quits.
+ * The app's window: the settings, in the taskbar or Dock like any other app. The pet is out
+ * for as long as the app runs. Closing it asks first: quit (the pet goes too), or only hide
+ * the window and leave the pet out.
  */
 function createMainWindow({ minimised }: { minimised: boolean }) {
   mainWindow = new BrowserWindow({
@@ -178,11 +218,64 @@ function createMainWindow({ minimised }: { minimised: boolean }) {
   mainWindow.on('focus', () => {
     if (store.settings.keyboardReactions && keyboardStatus.access === 'denied') syncKeyboard({ prompt: false });
   });
+  mainWindow.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    void askBeforeClosing();
+  });
+  // Windows signing out or shutting down: no questions, or it would hold that up.
+  mainWindow.on('query-session-end', () => {
+    quitting = true;
+  });
+  mainWindow.on('session-end', () => {
+    quitting = true;
+  });
   mainWindow.on('closed', () => {
     mainWindow = null;
     app.quit();
   });
   loadRenderer(mainWindow, 'settings');
+}
+
+let asking = false;
+/** Quit, or only hide the window and leave the pet out? */
+async function askBeforeClosing() {
+  if (!mainWindow || asking) return;
+  asking = true;
+  // Closed from its taskbar button while minimised: a dialog on it would be minimised too.
+  const shown = mainWindow.isVisible() && !mainWindow.isMinimized();
+  const options: Electron.MessageBoxOptions = {
+    type: 'question',
+    title: 'My Pet',
+    message: 'Quit My Pet?',
+    detail:
+      'Quitting puts your pet away until you open My Pet again.' +
+      ` Hide the window instead to keep your pet out. You can open it again from ${process.platform === 'darwin' ? 'the Dock' : 'the My Pet icon by the clock, or the Start menu'}.`,
+    buttons: ['Hide window', 'Quit', 'Cancel'],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true,
+  };
+  const { response } = await (shown ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options));
+  asking = false;
+  if (response === 0) mainWindow?.hide();
+  else if (response === 1) app.quit();
+}
+
+/** By the clock: the way back to the window once it's hidden, and another way to quit. */
+function createTray() {
+  // The Dock does this on macOS.
+  if (process.platform === 'darwin') return;
+  tray = new Tray(path.join(ASSETS, 'tray.png'));
+  tray.setToolTip('My Pet');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Open My Pet', click: showMainWindow },
+      { type: 'separator' },
+      { label: 'Quit', click: () => app.quit() },
+    ]),
+  );
+  tray.on('click', showMainWindow);
 }
 
 function showMainWindow() {
@@ -293,6 +386,7 @@ if (!app.requestSingleInstanceLock()) {
     // Fix up an existing "Start at login" entry, from before it started minimised.
     applyLoginItem(store.settings);
     createMainWindow({ minimised: launchedAtLogin() });
+    createTray();
     // Silent check at startup: never prompt for permissions the user didn't just ask for.
     syncKeyboard({ prompt: false });
     updater.start();
@@ -302,10 +396,11 @@ if (!app.requestSingleInstanceLock()) {
     screen.on('display-removed', refitToPrimaryDisplay);
   });
 
-  // Closing the main window quits (see createMainWindow), on macOS too.
+  // Closing the main window for good quits (see createMainWindow), on macOS too.
   app.on('window-all-closed', () => app.quit());
 
   app.on('before-quit', () => {
+    quitting = true;
     keyboardMonitor.stop();
     updater.stop();
     cursorMonitor?.stop();

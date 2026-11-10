@@ -130,6 +130,13 @@ html[data-host='web'][data-theme='dark'] {
   pointer-events: none;
   /* The pet and his toys stack among themselves, under the settings panel. */
   isolation: isolate;
+  transition: opacity 250ms ease-out;
+}
+
+/* While the desktop switches: gone at once, and faded back in once the new one's in. */
+.stage.away {
+  opacity: 0;
+  transition: none;
 }
 
 .pet {

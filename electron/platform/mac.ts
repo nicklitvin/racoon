@@ -10,6 +10,9 @@ export const macPlatform: PlatformAdapter = {
     // Follow the user across Spaces and stay visible over full-screen apps.
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   },
+  raiseWindow(win) {
+    win.moveTop();
+  },
   presentWindow(app, win) {
     win.show();
     app.focus({ steal: true });

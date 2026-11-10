@@ -20,14 +20,15 @@ How it's built, how it works inside, and how to package and test it. For downloa
 
 ```
 electron/                 Electron main process (Node side)
-  main.ts                 Pet overlay window, click-through, main (settings) window, IPC, startup
+  main.ts                 Pet overlay window, click-through, main (settings) window, tray, IPC, startup
   preload.ts              Exposes a small, typed API to the page as window.racoonHost
   cursorMonitor.ts        Polls screen.getCursorScreenPoint() at 40 Hz, sends only changes
   keyboardMonitor.ts      Opt-in key-press counter (uiohook-napi). Never reads which key.
   settingsStore.ts        Settings as JSON in the app's user-data folder
   updater.ts              Checks GitHub Releases for a newer build, downloads and installs it
   platform/               Everything OS-specific, behind one PlatformAdapter interface
-    windows.ts            App id, z-order level
+    windows.ts            App id, z-order level, raising the overlay (SetWindowPos via koffi)
+    desktopSwitches.ts    Notices a virtual desktop switch (reads one registry value via koffi)
     mac.ts                All Spaces, Accessibility/Input Monitoring permission
 shared/                   Used by both the main process and the page
   ipc.ts                  IPC channel names and the HostBridge API type
@@ -79,6 +80,12 @@ Two rules keep this portable and testable: **`src/core` never imports React, the
 - Frameless, transparent, always on top, no taskbar or Dock entry, and **never focusable** (`focusable: false`, shown with `showInactive()`), so it can't take focus from the app you're typing in.
 - It covers the whole primary display. The raccoon's world is the display's **work area**, so it walks along the top of the taskbar or Dock. Changes to resolution, scaling or connected monitors re-fit the window, and the raccoon is kept on screen.
 - **Click-through:** the window starts with `setIgnoreMouseEvents(true, { forward: true })`, so clicks pass straight through to whatever is underneath. Using the polled cursor position and forwarded mouse moves, the page asks the main process to capture the mouse only while the pointer is over the visible part of the raccoon or one of its toy blocks, and to release it as soon as the pointer leaves.
+- **Staying in front:** an app that makes itself always on top (some typing apps do) goes above the pet when you use it, and would take a click meant for him. So the moment the pointer comes over him, before the window starts taking the mouse, the main process puts it back in front of every always-on-top window (`platform.raiseWindow`: on Windows `SetWindowPos(HWND_TOPMOST)` with `SWP_NOACTIVATE`, through `koffi`, so the app you're using keeps focus), and again every 3 seconds (`RAISE_EVERY_MS`) so he isn't hidden under one.
+- **Switching desktops (Windows):** the overlay is on every virtual desktop, so as the old desktop slid away the pet was carried off with it, then came back in from the side. Explorer writes the desktop it's switching to (`CurrentVirtualDesktop`, under `SessionInfo\<session>\VirtualDesktops` on Windows 10 or `VirtualDesktops` on 11) about 20 ms after the keys, as the slide starts. `electron/platform/desktopSwitches.ts` reads that value every 15 ms, and on a change the page hides the stage at once (`.stage.away`) and fades it back in 650 ms after the last switch (`AWAY_AFTER_SWITCH_MS`), once the new desktop has slid in. The slide is drawn live, so hiding partway through takes him out of it. macOS keeps the window on every Space, where it doesn't slide.
+
+### The main window
+
+Closing it asks first (`askBeforeClosing` in `main.ts`): **Hide window** (the default) hides it and leaves the pet out, **Quit** quits, **Cancel** keeps it open. A hidden window comes back from the tray icon by the clock (Open My Pet, or Quit), from opening My Pet again (the single-instance lock hands over to the copy that's running), or from the Dock on macOS. Quitting from the tray, an update installing, or Windows signing out or shutting down quits without asking (`quitting`, set in `before-quit` and on `query-session-end`).
 
 ### Behaviour
 

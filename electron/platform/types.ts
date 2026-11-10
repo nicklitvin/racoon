@@ -11,6 +11,17 @@ export interface PlatformAdapter {
   configureApp(app: App): void;
   /** Window-level setup for the pet overlay: z-order level, workspace visibility. */
   configureWindow(win: BrowserWindow): void;
+  /**
+   * Calls `onSwitch` whenever the OS switches virtual desktop, where the pet's window would be
+   * slid away with the old desktop instead of staying put. Returns a function that stops
+   * watching, or null where there's nothing to watch (macOS keeps it on every Space already).
+   */
+  watchDesktopSwitches?(onSwitch: () => void): (() => void) | null;
+  /**
+   * Puts the pet's window back in front of other always-on-top windows (an app that made
+   * itself always on top since), without taking focus from the app you're using.
+   */
+  raiseWindow(win: BrowserWindow): void;
   /** Shows a normal window (the main window) and brings it to the front. */
   presentWindow(app: App, win: BrowserWindow): void;
   keyboardAccess: {
