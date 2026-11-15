@@ -25,6 +25,13 @@ public struct HeadingInput {
     public var animation: AnimationName
     /// Standing, a way the behaviour wants him to face (square on to a toy), if any.
     public var aim: Double?
+
+    public init(velocity: Pt, facing: Double, animation: AnimationName, aim: Double?) {
+        self.velocity = velocity
+        self.facing = facing
+        self.animation = animation
+        self.aim = aim
+    }
 }
 
 /// The heading he wants to turn to, given what he's doing.

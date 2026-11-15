@@ -76,6 +76,6 @@ enum LoginItem {
     /// Opened by macOS at login, rather than by you.
     static var launchedAtLogin: Bool {
         guard let event = NSAppleEventManager.shared().currentAppleEvent else { return false }
-        return event.eventID == kAEOpenApplication && event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+        return event.eventID == AEEventID(kAEOpenApplication) && event.paramDescriptor(forKeyword: AEKeyword(keyAEPropData))?.enumCodeValue == OSType(keyAELaunchedAsLogInItem)
     }
 }

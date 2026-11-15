@@ -299,6 +299,10 @@ To distribute to others:
 - Each newly signed build may need the Accessibility permission granted again during development.
 - Test the overlay on a Mac: the window level (`floating`), menu-bar height and notch handling are configured but haven't been run on macOS yet.
 
+## The Swift version (Mac App Store)
+
+`mac/` is a native Swift version of the app for the Mac App Store: the behaviour and every pet's drawing ported line for line into a Swift package (`mac/PetCore`), and an AppKit/SwiftUI app around it (`mac/MyPet.xcodeproj`). See [mac/README.md](../mac/README.md) for how it's laid out, running it, and publishing it. Pushes that touch `mac/` build and test it on a Mac (`.github/workflows/mac-app.yml`) and don't make an Electron release. After adding a patch note, run `node scripts/swift-patch-notes.mjs` so the Swift app shows it too.
+
 ## Web version and Vercel
 
 `npm run build:web` produces a static site in `dist/`, and `vercel.json` is ready: import the GitHub repo in Vercel and deploy with no extra settings. The install step skips downloading Electron, since the web build doesn't need it.

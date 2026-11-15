@@ -1,12 +1,12 @@
 # Talking to Alarmie
 
-On a Mac with Alarmie on it, My Pet's settings offer **Click your pet to talk to Alarmie**. With it on, clicking the pet opens his speech bubble with a box to type in and a mic button. What you type (or say) goes to Alarmie's live talk; the pet thinks while Alarmie answers, and the answer comes back in the same bubble. This page is what Alarmie's side needs to do for that to work. Both the Electron app (`electron/alarmie.ts`, `shared/alarmie.ts`) and the Swift app (`mac/MyPet/Alarmie/`) speak it the same way.
+On a Mac with Alarmie on it, My Pet's settings offer **Click your pet to talk to Alarmie**. With it on, clicking the pet opens his speech bubble with a box to type in and a mic button. What you type (or say) goes to Alarmie's live talk; the pet thinks while Alarmie answers, and the answer comes back in the same bubble. This page is what Alarmie's side needs to do for that to work. Both the Electron app (`electron/alarmie.ts`, `shared/alarmie.ts`) and the Swift app (`mac/MyPet/Alarmie/`, `mac/PetCore/Sources/PetCore/App/Alarmie.swift`) speak it the same way.
 
 ## Finding Alarmie
 
 The setting only shows on a Mac, and only once Alarmie is found, either way:
 
-- **Installed:** `Alarmie.app` in `/Applications` or `~/Applications`, or found by Spotlight (bundle id `com.nicklitvin.alarmie`, or an app named `Alarmie.app`). The Swift app asks Launch Services for the bundle id instead. If Alarmie's bundle id ends up different, change `ALARMIE_BUNDLE_IDS` in `shared/alarmie.ts` and `Alarmie.bundleIDs` in `mac/MyPet/Alarmie/Alarmie.swift`.
+- **Installed:** `Alarmie.app` in `/Applications` or `~/Applications`, or found by Spotlight (bundle id `com.nicklitvin.alarmie`, or an app named `Alarmie.app`). The Swift app asks Launch Services for the bundle id instead. If Alarmie's bundle id ends up different, change `ALARMIE_BUNDLE_IDS` in `shared/alarmie.ts` and `Alarmie.bundleIDs` in `mac/PetCore/Sources/PetCore/App/Alarmie.swift`.
 - **Answering:** anything at all answers at the endpoint (any HTTP status, so a `405` counts). That's so it works while Alarmie runs from source.
 
 ## The endpoint

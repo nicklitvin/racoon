@@ -19,7 +19,7 @@ final class PetController {
     private let cursorTracker = CursorActivityTracker()
     private let typingTracker = TypingActivityTracker()
     private var clickThrough: ClickThroughController!
-    private let toybox = Toybox()
+    private let toybox: Toybox
     private var settings: Settings
     private var subscriptions = Set<AnyCancellable>()
 
@@ -121,16 +121,19 @@ final class PetController {
         self.store = store
         self.alarmie = alarmie
         self.keyboardPulse = keyboardPulse
-        settings = store.settings
-        rendererType = settings.raccoonType
-        renderer = createPet(rendererType)
+        let initial = store.settings
+        settings = initial
+        rendererType = initial.raccoonType
+        renderer = createPet(initial.raccoonType)
+        let toys = Toybox()
+        toybox = toys
         let screen = NSScreen.screens.first ?? NSScreen.main!
         panel = PetPanel(frame: screen.frame)
         let talk = TalkBubbleView(alarmie: alarmie)
         view = PetView(frame: NSRect(origin: .zero, size: screen.frame.size), talk: talk)
         panel.contentView = view
         // Placeholder until the first layout says where the screen is.
-        brain = Brain(WorldInput(bounds: Rect(x: 0, y: 0, width: screen.frame.width, height: screen.frame.height), size: Size(width: 100, height: 100)), toys: toybox)
+        brain = Brain(WorldInput(bounds: Rect(x: 0, y: 0, width: screen.frame.width, height: screen.frame.height), size: Size(width: 100, height: 100)), toys: toys)
         view.controller = self
         clickThrough = ClickThroughController { [weak self] on in self?.setInteractive(on) }
         view.sprites.root.addSublayer(deskLayer)
