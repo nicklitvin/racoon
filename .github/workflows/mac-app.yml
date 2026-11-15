@@ -1,7 +1,7 @@
-# Builds and tests the Swift version of My Pet (mac/): the PetCore package with `swift test`,
-# and the app itself with xcodebuild, unsigned (signing and the App Store upload happen on a
-# Mac with the developer account; see mac/README.md). Compiler errors show on the commit as
-# annotations.
+# Builds and tests the Swift version of My Pet (mac/): the PetCore package (mac/PetCore) with
+# `swift test`, and the app itself (mac/MyPet.xcodeproj) with xcodebuild, unsigned. Signing and
+# the App Store upload happen on a Mac with the developer account; see mac/README.md. Compiler
+# errors show on the commit as annotations.
 name: Mac app (Swift)
 
 on:
@@ -29,16 +29,18 @@ jobs:
         run: xcrun swift --version
 
       - name: Build PetCore
+        working-directory: mac/PetCore
         run: |
           set -o pipefail
-          swift build 2>&1 | tee "$RUNNER_TEMP/core.log" || { bash scripts/annotate.sh "$RUNNER_TEMP/core.log" "PetCore"; exit 1; }
+          swift build 2>&1 | tee "$RUNNER_TEMP/core.log" || { bash ../scripts/annotate.sh "$RUNNER_TEMP/core.log" "PetCore"; exit 1; }
 
       - name: Test PetCore
+        working-directory: mac/PetCore
         run: |
           set -o pipefail
           swift test 2>&1 | tee "$RUNNER_TEMP/test.log" || {
-            bash scripts/annotate.sh "$RUNNER_TEMP/test.log" "PetCore tests"
-            grep -E 'error|failed|XCTAssert' "$RUNNER_TEMP/test.log" | head -30 | while IFS= read -r line; do echo "::error title=Test failure::$line"; done
+            bash ../scripts/annotate.sh "$RUNNER_TEMP/test.log" "PetCore tests"
+            grep -E 'error|failed' "$RUNNER_TEMP/test.log" | head -30 | while IFS= read -r line; do echo "::error title=Test failure::$line"; done
             exit 1
           }
 
@@ -47,5 +49,5 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild -project MyPet.xcodeproj -scheme MyPet -configuration Release -destination 'generic/platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" build 2>&1 | tee "$RUNNER_TEMP/app.log" | grep -E 'error:|warning: unre|BUILD' || true
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" build 2>&1 | tee "$RUNNER_TEMP/app.log" | grep -E 'error:|BUILD' || true
           grep -q 'BUILD SUCCEEDED' "$RUNNER_TEMP/app.log" || { bash scripts/annotate.sh "$RUNNER_TEMP/app.log" "MyPet app"; exit 1; }
