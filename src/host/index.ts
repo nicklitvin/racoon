@@ -120,7 +120,7 @@ function webHost(): Host {
     // Alarmie is a Mac app: a tab has nothing to talk to.
     getAlarmie: () => Promise.resolve(NO_ALARMIE),
     onAlarmieChanged: () => () => {},
-    openChat() {},
+    setTalking() {},
     sendChat: () => Promise.resolve({ ok: false, error: 'Alarmie is only on the Mac app.' }),
   };
 }

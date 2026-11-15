@@ -92,7 +92,13 @@ Closing it asks first (`askBeforeClosing` in `main.ts`): **Hide window** (the de
 
 ### Talking to Alarmie (macOS)
 
-With Alarmie on the Mac (installed, or its live talk answering), the settings offer **Click your pet to talk to Alarmie**. A click on the pet (not a drag) then still pokes him, and also opens a chat window beside him (`openChat` in `main.ts`, the `#chat` view, `src/components/AlarmieChat.tsx`). The main process does the talking (`electron/alarmie.ts`), to the endpoint in the settings. What the endpoint takes and gives back is in [ALARMIE.md](ALARMIE.md).
+With Alarmie on the Mac (installed, or its live talk answering), the settings offer **Click your pet to talk to Alarmie**. A click on the pet (not a drag) then opens his speech bubble with a box to type in, instead of patting him (`src/runtime/talkBubble.ts`). The brain's `talk()` keeps him where he is meanwhile, turned to you: sat listening, tilting his head while Alarmie answers (`confused`), sat again for the answer, which comes back in the same bubble with the box under it to reply. Escape, the ×, or clicking somewhere else closes it, and he carries on with what he was doing (back to his desk in work mode).
+
+The pet's window never takes the keyboard, so as not to steal it from the app you're using. While the bubble is open it does: the page asks with `setTalking(true)`, and the main process makes the window focusable and focuses it (`setTalking` in `main.ts`), and gives it back when the bubble closes.
+
+The mic button records with `MediaRecorder` (Opus in WebM where it can) until you press it again or Enter, at most a minute, and sends the clip to Alarmie to hear, base64 in the request. The Mac build asks for the mic with `NSMicrophoneUsageDescription` and the `audio-input` entitlement (`build/entitlements.mac.plist`).
+
+The main process does the talking (`electron/alarmie.ts`), to the endpoint in the settings. What the endpoint takes and gives back is in [ALARMIE.md](ALARMIE.md).
 
 ### Behaviour
 

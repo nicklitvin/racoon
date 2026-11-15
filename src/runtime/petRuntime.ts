@@ -13,6 +13,7 @@ import { ANIMATIONS, RACCOON_STYLES, type AnimationName, type RaccoonRenderer } 
 import { PIXEL_PX } from '../sprites/pixel';
 import type { AnimationSpec } from '../sprites/types';
 import { DeskLayer } from './deskLayer';
+import { TalkBubble } from './talkBubble';
 import { ToyLayer } from './toyLayer';
 
 export interface PetElements {
@@ -87,6 +88,10 @@ export class PetRuntime {
   private readonly toybox = new Toybox();
   private readonly toyLayer: ToyLayer;
   private readonly deskLayer: DeskLayer;
+  /** His speech bubble for talking to Alarmie through him. */
+  private readonly talk: TalkBubble;
+  /** Alarmie is on this Mac to talk to. */
+  private alarmie = false;
   /** His desk, in work mode. */
   private desk: Desk | null = null;
   private lastSaid: string | null = null;
@@ -150,6 +155,18 @@ export class PetRuntime {
         this.wake();
       },
     });
+    this.talk = new TalkBubble(document, els.pet, els.stage, {
+      phase: (phase) => {
+        this.brain.talk(phase);
+        this.wake();
+      },
+      send: (message, conversationId, audio) => host.sendChat(message, conversationId, audio),
+      keyboard: (on) => host.setTalking(on),
+      changed: () => {
+        if (this.cursor) this.updateHover(this.cursor);
+        this.wake();
+      },
+    });
     this.applySettings();
     this.applyLayout();
     this.brain = new Brain(this.worldInput(performance.now()), Math.random, DEFAULT_CONFIG, this.toybox);
@@ -160,6 +177,8 @@ export class PetRuntime {
     this.running = true;
 
     this.cleanups.push(this.host.onCursor((p) => this.onCursor(p)));
+    void this.host.getAlarmie().then((s) => (this.alarmie = s.available));
+    this.cleanups.push(this.host.onAlarmieChanged((s) => (this.alarmie = s.available)));
 
     // Mouse moves are forwarded even while the overlay is click-through, which is how
     // we notice the pointer arriving over the raccoon between cursor polls.
@@ -196,6 +215,7 @@ export class PetRuntime {
     this.cleanups.splice(0).forEach((off) => off());
     this.toyLayer.destroy();
     this.deskLayer.destroy();
+    this.talk.destroy();
     this.host.setInteractive(false);
   }
 
@@ -207,6 +227,7 @@ export class PetRuntime {
 
   setSettings(settings: Settings): void {
     this.settings = settings;
+    if (!settings.alarmieChat) this.talk.close();
     this.applySettings();
     this.syncToys();
     this.syncDesk();
@@ -294,20 +315,23 @@ export class PetRuntime {
     this.drag = null;
     if (drag.moved) {
       this.brain.release();
+    } else if (this.talk.isOpen || (this.settings.alarmieChat && this.alarmie)) {
+      // A click with the Alarmie chat on: his bubble opens to talk to Alarmie through him
+      // (or, open already, takes the keyboard back).
+      this.talk.open();
     } else {
       this.brain.poke();
-      // A click, with the Alarmie chat on: the chat opens beside him (where there's Alarmie).
-      if (this.settings.alarmieChat) this.host.openChat(this.hitRect() ?? { x: e.clientX, y: e.clientY, width: 0, height: 0 });
     }
     this.wake();
     this.clickThrough.dragEnded({ x: e.clientX, y: e.clientY }, this.grabRects());
   }
 
-  /** Everything on the page you can pick up or tap: him, his toys and his desk. */
+  /** Everything on the page you can pick up or tap: him, his toys, his desk, and his Alarmie bubble. */
   private grabRects(): Rect[] {
     const rect = this.hitRect();
     const desk = this.deskLayer.rect();
-    return [...(rect ? [rect] : []), ...this.toyLayer.rects(), ...(desk ? [desk] : [])];
+    const talk = this.talk.rect();
+    return [...(rect ? [rect] : []), ...this.toyLayer.rects(), ...(desk ? [desk] : []), ...(talk ? [talk] : [])];
   }
 
   private updateHover(p: Point): void {
@@ -348,6 +372,9 @@ export class PetRuntime {
     this.carryToy(snap);
     this.toyLayer.render(snap.position);
     this.deskLayer.setDepth(snap.position);
+    // Picked up, or gone off the screen, he's stopped talking: the bubble goes.
+    if (this.talk.isOpen && this.brain.talking === null) this.talk.close();
+    this.talk.fit();
     if (this.cursor) this.updateHover(this.cursor);
     this.schedule();
   };

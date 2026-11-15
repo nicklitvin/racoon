@@ -239,7 +239,7 @@ function AlarmieRow({ settings, status, onChange }: { settings: Settings; status
     <Switch label="Click your pet to talk to Alarmie" checked={settings.alarmieChat} onChange={(alarmieChat) => onChange({ alarmieChat })}>
       <p className={status.reachable ? 'hint ok' : 'hint'}>
         {status.reachable
-          ? 'Opens a chat with Alarmie’s live talk beside your pet.'
+          ? 'Click your pet and type (or press the mic) to ask Alarmie; the answer comes back in its speech bubble.'
           : 'Alarmie is here, but its live talk isn’t answering yet. Open Alarmie and turn live talk on.'}
       </p>
       <EndpointField value={settings.alarmieEndpoint} onChange={(alarmieEndpoint) => onChange({ alarmieEndpoint })} />

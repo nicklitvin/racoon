@@ -90,7 +90,12 @@
         }
       ],
       "category": "public.app-category.entertainment",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "My Pet uses the mic only after you press the mic in your pet’s speech bubble, to send what you say to Alarmie."
+      }
     },
     "linux": {
       "target": [

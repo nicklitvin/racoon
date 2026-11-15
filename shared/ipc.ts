@@ -1,7 +1,7 @@
 // Contract between the Electron main process and the renderer.
 // Imported by both sides; keep it free of Node, Electron and DOM dependencies.
 
-import type { AlarmieStatus, ChatResult } from './alarmie';
+import type { AlarmieStatus, ChatResult, SpokenClip } from './alarmie';
 import type { KeyboardStatus, Settings } from './settings';
 import type { UpdateStatus } from './update';
 
@@ -26,7 +26,7 @@ export const IPC = {
   openReleasesPage: 'racoon:open-releases-page',
   getAlarmie: 'racoon:get-alarmie',
   alarmieChanged: 'racoon:alarmie-changed',
-  openChat: 'racoon:open-chat',
+  setTalking: 'racoon:set-talking',
   sendChat: 'racoon:send-chat',
 } as const;
 
@@ -81,8 +81,11 @@ export interface HostBridge {
   /** Whether Alarmie is on this Mac to talk to (never on other systems). Looks again each time. */
   getAlarmie(): Promise<AlarmieStatus>;
   onAlarmieChanged(listener: (status: AlarmieStatus) => void): Unsubscribe;
-  /** The pet was clicked with the Alarmie chat on: opens the chat beside him (`beside`, on the pet's page). */
-  openChat(beside: Rect): void;
-  /** Sends a line of the chat to Alarmie's live talk and resolves with its answer. */
-  sendChat(message: string, conversationId: string | null): Promise<ChatResult>;
+  /**
+   * The pet's Alarmie bubble is open (true), so his page needs the keyboard, which it never
+   * takes otherwise; or it's closed (false), and the keyboard goes back.
+   */
+  setTalking(talking: boolean): void;
+  /** Sends what was typed in the bubble (or said into its mic) to Alarmie's live talk, and resolves with its answer. */
+  sendChat(message: string, conversationId: string | null, audio?: SpokenClip | null): Promise<ChatResult>;
 }

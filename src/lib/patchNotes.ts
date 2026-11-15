@@ -16,6 +16,14 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     date: '2026-11-15',
+    title: 'Your pet talks to Alarmie',
+    changes: [
+      'Talking to Alarmie happens in your pet’s own speech bubble now, not a separate chat window. Click your pet, type, and press Enter: your pet sits and thinks it over, and Alarmie’s answer comes back in the same bubble, with room under it to reply.',
+      'Press the mic in the bubble to say it instead of typing. Press it again (or Enter) to send what you said to Alarmie.',
+    ],
+  },
+  {
+    date: '2026-11-15',
     title: 'Talk to Alarmie',
     changes: [
       'On a Mac with Alarmie on it, a new setting lets you click your pet to talk to Alarmie: a chat opens beside your pet, connected to Alarmie’s live talk.',

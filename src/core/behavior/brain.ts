@@ -10,7 +10,13 @@ import { approach, brake2d, easeInOutSine, quadraticBezier, steer2d, steerArc } 
 export type Mode = 'idle' | 'walk' | 'sit' | 'sleep' | 'react';
 
 /** What the raccoon is reacting to, while in the "react" mode. */
-export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged' | 'petted' | 'zoomies' | 'play' | 'nap' | 'work' | 'away';
+export type Reaction = 'surprised' | 'chase' | 'pounce' | 'confused' | 'flee' | 'hide' | 'peek' | 'dragged' | 'petted' | 'zoomies' | 'play' | 'nap' | 'work' | 'away' | 'talk';
+
+/**
+ * Talking to Alarmie through him: listening while you type to it, thinking while it answers,
+ * and saying its answer.
+ */
+export type TalkPhase = 'listen' | 'think' | 'answer';
 
 /** Little symbol drawn above the raccoon's head. Only sleep shows one. */
 export type Emote = '' | 'z';
@@ -165,6 +171,15 @@ interface NapState {
   until: number;
 }
 
+/** Talking to Alarmie through him: he stays put, turned to you, until the talk is over. */
+interface TalkState {
+  mode: 'react';
+  reaction: 'talk';
+  phase: TalkPhase;
+  /** Called over from his desk: back to it afterwards. */
+  resume: WorkState | null;
+}
+
 type State =
   | { mode: 'idle'; until: number }
   | { mode: 'walk'; from: Point; via: Point; to: Point; elapsed: number; duration: number }
@@ -183,7 +198,8 @@ type State =
   | PlayState
   | NapState
   | WorkState
-  | AwayState;
+  | AwayState
+  | TalkState;
 
 const SUBSTEP_S = 1 / 60;
 const MAX_FRAME_MS = 1000;
@@ -404,6 +420,37 @@ export class Brain {
     this.state = { mode: 'react', reaction: 'petted', until: this.now + PETTED_MS, resume };
   }
 
+  /**
+   * Talking to Alarmie through him (clicked with the Alarmie chat on): he stops where he is,
+   * turned to you, and listens while you type (`listen`), thinks while Alarmie answers
+   * (`think`), and says the answer (`answer`). Null ends the talk: back to whatever he was
+   * doing (his desk, in work mode). Not while he's in your hand, or off the screen.
+   */
+  talk(phase: TalkPhase | null): void {
+    const s = this.state;
+    if (phase === null) {
+      if (s.mode !== 'react' || s.reaction !== 'talk') return;
+      if (s.resume && this.input.desk) this.state = { ...s.resume, phase: 'go', until: this.now + DESK_GO_MS };
+      else this.idle(1500, 3000);
+      return;
+    }
+    if (s.mode === 'react' && s.reaction === 'talk') {
+      s.phase = phase;
+      return;
+    }
+    if (this.reaction === 'dragged' || this.reaction === 'away') return;
+    this.speak(null);
+    this.calmMs = 0;
+    const resume = s.mode === 'react' && s.reaction === 'work' ? s : s.mode === 'react' && s.reaction === 'petted' ? s.resume : null;
+    this.state = { mode: 'react', reaction: 'talk', phase, resume };
+  }
+
+  /** Talking to Alarmie through him, and at which point of it. */
+  get talking(): TalkPhase | null {
+    const s = this.state;
+    return s.mode === 'react' && s.reaction === 'talk' ? s.phase : null;
+  }
+
   /** The pointer moving over him while he's being petted: he enjoys it for longer. */
   stroke(): void {
     const s = this.state;
@@ -440,7 +487,7 @@ export class Brain {
   toyThrown(id: number): void {
     const s = this.state;
     const r = this.reaction;
-    if (this.mode !== 'play' || s.mode === 'sleep' || r === 'dragged' || r === 'peek' || r === 'hide' || !this.toys.get(id)) return;
+    if (this.mode !== 'play' || s.mode === 'sleep' || r === 'dragged' || r === 'peek' || r === 'hide' || r === 'talk' || !this.toys.get(id)) return;
     if (s.mode === 'react' && s.reaction === 'play' && s.toy === id) {
       this.playPhase(s, 'go', GO_MS);
       s.excited = true;
@@ -497,8 +544,9 @@ export class Brain {
     const s = this.state;
     const r = this.reaction;
     // Only playing does he chase the pointer, watch you type, or run off from it. Working,
-    // sleeping or hiding, nothing distracts him (except being picked up, or a pat).
-    if (this.mode !== 'play') {
+    // sleeping or hiding, nothing distracts him (except being picked up, or a pat); nor
+    // while he's talking to Alarmie for you.
+    if (this.mode !== 'play' || r === 'talk') {
       this.calmMs = 0;
       this.cursorWasNear = cursor !== null && dist(cursor, this.center) < this.config.reactions.fleeRadius;
       return;
@@ -624,6 +672,10 @@ export class Brain {
 
       case 'work':
         this.work(s, dt);
+        return;
+
+      case 'talk':
+        this.brake(dt);
         return;
 
       case 'away':
@@ -1023,6 +1075,8 @@ export class Brain {
     const s = this.state;
     const r = this.reaction;
     if (r === 'dragged') return;
+    // Talking to Alarmie, he stays to hear it out (unless he's to go off the screen).
+    if (r === 'talk' && mode !== 'hide') return;
     const away = s.mode === 'react' && s.reaction === 'away' ? s : null;
     if (mode === 'hide') {
       if (!away || away.phase === 'back') this.leave();
@@ -1813,6 +1867,11 @@ export class Brain {
             phase = s.phase;
             animation = s.phase === 'gone' ? 'idle' : 'run';
             break;
+          case 'talk':
+            // Sat listening, looking at you; his head tilting one way and the other, thinking.
+            phase = s.phase;
+            animation = s.phase === 'think' ? 'confused' : 'sit';
+            break;
         }
         break;
     }
@@ -1826,6 +1885,7 @@ export class Brain {
           (s.reaction === 'peek' && s.phase === 'watch') ||
           (s.reaction === 'hide' && s.phase === 'wait') ||
           (s.reaction === 'work' && s.phase === 'type') ||
+          s.reaction === 'talk' ||
           (s.reaction === 'away' && s.phase === 'gone')));
 
     let aim: number | null = null;
@@ -1851,6 +1911,8 @@ export class Brain {
     // Watching you carry his desk off.
     if (s.mode === 'react' && s.reaction === 'work' && s.phase === 'angry' && this.deskHeld && desk) lookAt = desk.screen;
     if (s.mode === 'react' && s.reaction === 'peek' && s.phase === 'beg') aim = this.facing > 0 ? 0.6 : Math.PI - 0.6;
+    // Talking with you, turned three-quarters towards you.
+    if (s.mode === 'react' && s.reaction === 'talk' && speed < 25) aim = this.facing > 0 ? 0.6 : Math.PI - 0.6;
     const say = this.speech && this.now < this.speech.until ? this.speech.text : null;
     const screen = s.mode === 'react' && s.reaction === 'work' && s.phase === 'type' && desk ? s.task : null;
 

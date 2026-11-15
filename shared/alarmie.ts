@@ -25,15 +25,22 @@ export interface AlarmieStatus {
 
 export const NO_ALARMIE: AlarmieStatus = { installed: false, reachable: false, available: false };
 
-/** One line of the chat. */
-export interface ChatMessage {
-  from: 'me' | 'alarmie';
-  text: string;
+/** A spoken message, recorded from the mic: the sound, base64-encoded, and its type. */
+export interface SpokenClip {
+  data: string;
+  mimeType: string;
 }
+
+/** Longest recording, and the most of it (base64) that's sent. */
+export const MAX_RECORDING_MS = 60_000;
+const MAX_AUDIO_BASE64 = 12_000_000;
 
 /** What's sent to the endpoint, as JSON. */
 export interface LiveTalkRequest {
+  /** What was typed; empty when it was said into the mic instead. */
   message: string;
+  /** What was said into the mic, for Alarmie to hear and answer. */
+  audio?: SpokenClip;
   /** Alarmie's id for the conversation so far, from its last reply; null to start a new one. */
   conversationId: string | null;
   /** Who's asking, so Alarmie can tell the pet from its own app. */
@@ -55,8 +62,17 @@ export function cleanEndpoint(raw: unknown): string | null {
   }
 }
 
-export function liveTalkRequest(message: string, conversationId: string | null): LiveTalkRequest {
-  return { message: message.slice(0, MAX_MESSAGE_LENGTH), conversationId, client: 'my-pet' };
+export function liveTalkRequest(message: string, conversationId: string | null, audio?: SpokenClip | null): LiveTalkRequest {
+  return { message: message.slice(0, MAX_MESSAGE_LENGTH), ...(audio && { audio }), conversationId, client: 'my-pet' };
+}
+
+/** A recording fit to send (a short audio type, not too long), or null. */
+export function cleanClip(raw: unknown): SpokenClip | null {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  if (!r || typeof r.data !== 'string' || typeof r.mimeType !== 'string') return null;
+  if (!r.data || r.data.length > MAX_AUDIO_BASE64 || !/^[A-Za-z0-9+/=]+$/.test(r.data)) return null;
+  if (!/^audio\/[\w.+-]+(;[\w=.,+\- ]*)?$/.test(r.mimeType) || r.mimeType.length > 80) return null;
+  return { data: r.data, mimeType: r.mimeType };
 }
 
 /**

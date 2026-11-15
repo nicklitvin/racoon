@@ -758,3 +758,45 @@ describe('Brain: the goose', () => {
     expect(run(makeBrain(6), 120_000).some((s) => s.animation === 'attention')).toBe(false);
   });
 });
+
+describe('Brain: talking to Alarmie', () => {
+  it('stops where it is, turned to you, listens, thinks, says the answer, and then carries on', () => {
+    const brain = makeBrain(2);
+    place(brain, { x: 600, y: 700 });
+    run(brain, 3000);
+    brain.talk('listen');
+    let snaps = run(brain, 20_000, world({ cursor: { x: 640, y: 640 }, cursorExcited: true, typingActive: true }));
+    // Not distracted, even by a wild pointer or typing (that's you, typing to it).
+    expect(snaps.every((s) => s.reaction === 'talk' && s.phase === 'listen' && s.animation === 'sit')).toBe(true);
+    expect(snaps.at(-1)!.resting).toBe(true);
+    expect(Math.abs(snaps.at(-1)!.aim! - (snaps.at(-1)!.facing > 0 ? 0.6 : Math.PI - 0.6))).toBeLessThan(1e-9);
+    brain.talk('think');
+    snaps = run(brain, 2000);
+    expect(snaps.every((s) => s.animation === 'confused')).toBe(true);
+    brain.talk('answer');
+    expect(run(brain, 100).at(-1)!.animation).toBe('sit');
+    expect(brain.talking).toBe('answer');
+    brain.talk(null);
+    expect(brain.talking).toBe(null);
+    expect(run(brain, 100).at(-1)!.reaction).not.toBe('talk');
+  });
+
+  it('called over from its desk, goes back to work afterwards', () => {
+    const desk = { seat: { x: 1300, y: bottom }, facing: 1 as const, screen: { x: 1420, y: bottom - 80 } };
+    const atWork = world({ desk, mode: 'work' });
+    const brain = makeBrain(4);
+    runUntil(brain, (s) => s.phase === 'type', atWork, 20_000);
+    brain.talk('listen');
+    expect(run(brain, 5000, atWork).every((s) => s.reaction === 'talk')).toBe(true);
+    brain.talk(null);
+    runUntil(brain, (s) => s.phase === 'type', atWork, 10_000);
+  });
+
+  it('picked up, stops talking', () => {
+    const brain = makeBrain(2);
+    brain.talk('listen');
+    run(brain, 100);
+    brain.grab();
+    expect(brain.talking).toBe(null);
+  });
+});

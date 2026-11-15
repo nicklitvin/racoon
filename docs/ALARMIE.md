@@ -1,6 +1,6 @@
 # Talking to Alarmie
 
-On a Mac with Alarmie on it, My Pet's settings offer **Click your pet to talk to Alarmie**. With it on, clicking the pet opens a small chat window beside him, and everything typed there goes to Alarmie's live talk. This page is what Alarmie's side needs to do for that to work. Both the Electron app (`electron/alarmie.ts`, `shared/alarmie.ts`) and the Swift app (`mac/MyPet/Alarmie/`) speak it the same way.
+On a Mac with Alarmie on it, My Pet's settings offer **Click your pet to talk to Alarmie**. With it on, clicking the pet opens his speech bubble with a box to type in and a mic button. What you type (or say) goes to Alarmie's live talk; the pet thinks while Alarmie answers, and the answer comes back in the same bubble. This page is what Alarmie's side needs to do for that to work. Both the Electron app (`electron/alarmie.ts`, `shared/alarmie.ts`) and the Swift app (`mac/MyPet/Alarmie/`) speak it the same way.
 
 ## Finding Alarmie
 
@@ -27,8 +27,9 @@ Accept: application/json, text/plain
 { "message": "Wake me at 7", "conversationId": null, "client": "my-pet" }
 ```
 
-- `message`: what was typed, trimmed, at most 4000 characters.
-- `conversationId`: `null` for the first message in a chat window, then whatever Alarmie sent back last. Closing the window starts a new conversation.
+- `message`: what was typed, trimmed, at most 4000 characters. Empty when it was said into the mic instead.
+- `audio` (only when it was said into the mic): `{ "data": "<base64>", "mimeType": "audio/webm;codecs=opus" }`. Up to a minute of sound. From the Electron app it's Opus in WebM (or Ogg, or MP4 where that's what the system records); the Swift app turns speech into text on the Mac and sends it as `message`, so Alarmie only sees `audio` from the Electron app.
+- `conversationId`: `null` for the first message in a bubble, then whatever Alarmie sent back last. Closing the bubble starts a new conversation.
 - `client`: always `"my-pet"`, so Alarmie can tell the pet from its own app.
 
 Answer with JSON:
@@ -42,7 +43,7 @@ Answer with JSON:
 
 A `text/plain` body works too: the whole body is the reply, with no conversation id.
 
-Anything but a 2xx shows *"Alarmie couldn't answer (status)."* in the chat. Not answering at all shows *"Couldn't reach Alarmie. Is it open, with live talk on?"*. Alarmie has 60 seconds to answer.
+Anything but a 2xx shows *"Alarmie couldn't answer (status)."* in the bubble. Not answering at all shows *"Couldn't reach Alarmie. Is it open, with live talk on?"*. Alarmie has 60 seconds to answer.
 
 ### A minimal stand-in
 
@@ -62,8 +63,8 @@ require('http').createServer((req, res) => {
 }).listen(4318, '127.0.0.1');
 ```
 
-In development on Windows or Linux, `MY_PET_ALARMIE=1 npm start` offers the chat there too (it still needs something answering at the endpoint).
+In development on Windows or Linux, `MY_PET_ALARMIE=1 npm start` offers the bubble there too (it still needs something answering at the endpoint).
 
 ## Privacy
 
-Nothing goes to Alarmie except what you type into the chat. The pet only asks whether something is answering at the endpoint, and only on a Mac (when the settings open, and when the window comes to the front).
+Nothing goes to Alarmie except what you type into the bubble, or say after pressing its mic. The mic is only on from when you press it until you press it again (or Enter, or Escape to throw it away), a minute at most. The pet only asks whether something is answering at the endpoint, and only on a Mac (when the settings open, and when the window comes to the front).

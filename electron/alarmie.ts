@@ -16,6 +16,7 @@ import {
   readReply,
   type AlarmieStatus,
   type ChatResult,
+  type SpokenClip,
 } from '../shared/alarmie';
 
 /** How long the endpoint has to answer when we only want to know it's there. */
@@ -63,16 +64,16 @@ export async function findAlarmie(endpoint: string, anyOs = false): Promise<Alar
   return { installed, reachable, available: installed || reachable };
 }
 
-/** Sends one line of the chat and waits for Alarmie's answer. */
-export async function sendToAlarmie(endpoint: string, message: string, conversationId: string | null): Promise<ChatResult> {
+/** Sends what was typed (or said into the mic) and waits for Alarmie's answer. */
+export async function sendToAlarmie(endpoint: string, message: string, conversationId: string | null, audio: SpokenClip | null = null): Promise<ChatResult> {
   const text = message.trim();
-  if (!text) return { ok: false, error: 'Type something to say first.' };
+  if (!text && !audio) return { ok: false, error: 'Type something to say first.' };
   let response: Response;
   try {
     response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/plain' },
-      body: JSON.stringify(liveTalkRequest(text, conversationId)),
+      body: JSON.stringify(liveTalkRequest(text, conversationId, audio)),
       signal: AbortSignal.timeout(REPLY_MS),
     });
   } catch (error) {
