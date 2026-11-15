@@ -17,6 +17,9 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      # The Swift app has a workflow of its own (mac-app.yml).
+      - 'mac/**'
+      - '.github/workflows/mac-app.yml'
 
 # One at a time, in order: a push made while another is building waits its turn, so each
 # gets its own release.
