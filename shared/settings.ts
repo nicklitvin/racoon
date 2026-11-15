@@ -1,5 +1,7 @@
 // User settings, shared by the Electron main process (which stores them) and the renderer.
 
+import { ALARMIE_DEFAULT_ENDPOINT, cleanEndpoint } from './alarmie';
+
 /**
  * The pets to choose from, in pixel art: a raccoon, a cat and an otter, and in beta a bunny,
  * a hedgehog, and the floaties (little blobs that float about).
@@ -40,6 +42,10 @@ export interface Settings {
   mode: PetMode;
   /** Opt-in: try out the pets still in beta (switched on from the patch notes). */
   beta: boolean;
+  /** Opt-in, on a Mac with Alarmie: clicking the pet opens a chat with Alarmie's live talk. */
+  alarmieChat: boolean;
+  /** Where Alarmie's live talk listens (see docs/ALARMIE.md). */
+  alarmieEndpoint: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -50,6 +56,8 @@ export const DEFAULT_SETTINGS: Settings = {
   outfit: 'none',
   mode: 'play',
   beta: false,
+  alarmieChat: false,
+  alarmieEndpoint: ALARMIE_DEFAULT_ENDPOINT,
 };
 
 function isRaccoonType(value: unknown): value is RaccoonType {
@@ -84,6 +92,8 @@ export function normalizeSettings(raw: unknown): Settings {
     // Before there were modes, work mode was a switch of its own.
     mode: (PET_MODES as readonly unknown[]).includes(r.mode) ? (r.mode as PetMode) : r.workMode === true ? 'work' : 'play',
     beta,
+    alarmieChat: r.alarmieChat === true,
+    alarmieEndpoint: cleanEndpoint(r.alarmieEndpoint) ?? DEFAULT_SETTINGS.alarmieEndpoint,
   };
 }
 

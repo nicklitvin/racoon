@@ -1,7 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, screen, Tray, type WebContents } from 'electron';
 import path from 'node:path';
-import { IPC, type DisplayInfo } from '../shared/ipc';
+import { NO_ALARMIE, type AlarmieStatus } from '../shared/alarmie';
+import { IPC, type DisplayInfo, type Rect } from '../shared/ipc';
 import type { KeyboardStatus, Settings } from '../shared/settings';
+import { findAlarmie, sendToAlarmie } from './alarmie';
 import { CursorMonitor } from './cursorMonitor';
 import { KeyboardMonitor } from './keyboardMonitor';
 import { platform } from './platform';
@@ -15,9 +17,19 @@ const ASSETS = path.join(__dirname, '../assets');
 const AT_LOGIN = '--at-login';
 /** How long the pet keeps out of sight after the desktop switches: the slide takes about half a second. */
 const AWAY_AFTER_SWITCH_MS = 650;
+/** The Alarmie chat's size, and how far from the pet it opens. */
+const CHAT_SIZE = { width: 340, height: 460 };
+const CHAT_GAP = 24;
+/**
+ * Alarmie is a Mac app, so the chat is only offered there. MY_PET_ALARMIE=1 lets a development
+ * build offer it anywhere, to work on it (it still needs the endpoint to answer).
+ */
+const ALARMIE_ANY_OS = !app.isPackaged && process.env.MY_PET_ALARMIE === '1';
 
 let petWindow: BrowserWindow | null = null;
 let mainWindow: BrowserWindow | null = null;
+let chatWindow: BrowserWindow | null = null;
+let alarmie: AlarmieStatus = NO_ALARMIE;
 let tray: Tray | null = null;
 let interactive = false;
 /** Set once the app is really quitting (Quit picked, an update installing, Windows shutting down). */
@@ -36,8 +48,8 @@ const keyboardMonitor = new KeyboardMonitor(() => {
 
 // ---- Helpers --------------------------------------------------------------------------
 
-function loadRenderer(win: BrowserWindow, view: 'pet' | 'settings') {
-  const hash = view === 'settings' ? 'settings' : '';
+function loadRenderer(win: BrowserWindow, view: 'pet' | 'settings' | 'chat') {
+  const hash = view === 'pet' ? '' : view;
   if (DEV_SERVER_URL) void win.loadURL(hash ? `${DEV_SERVER_URL}#${hash}` : DEV_SERVER_URL);
   else void win.loadFile(path.join(__dirname, '../dist/index.html'), { hash });
 }
@@ -214,6 +226,8 @@ function createMainWindow({ minimised }: { minimised: boolean }) {
   // Coming back from System Settings is the natural moment to notice a newly granted permission.
   mainWindow.on('focus', () => {
     if (store.settings.keyboardReactions && keyboardStatus.access === 'denied') syncKeyboard({ prompt: false });
+    // Alarmie installed or started since: the settings offer the chat.
+    void refreshAlarmie();
   });
   mainWindow.on('close', (event) => {
     if (quitting) return;
@@ -281,6 +295,76 @@ function showMainWindow() {
   platform.presentWindow(app, mainWindow);
 }
 
+// ---- Alarmie chat ------------------------------------------------------------------------
+
+/** Looks for Alarmie again, and tells the windows if that's changed. */
+async function refreshAlarmie(): Promise<AlarmieStatus> {
+  const next = await findAlarmie(store.settings.alarmieEndpoint, ALARMIE_ANY_OS);
+  if (next.installed !== alarmie.installed || next.reachable !== alarmie.reachable || next.available !== alarmie.available) {
+    alarmie = next;
+    broadcast(IPC.alarmieChanged, next);
+  }
+  return alarmie;
+}
+
+/** The pet was clicked with the chat switched on: opens it beside him (or brings it back). */
+async function openChat(beside: Rect) {
+  if (!store.settings.alarmieChat) return;
+  if (chatWindow) {
+    platform.presentWindow(app, chatWindow);
+    return;
+  }
+  const status = alarmie.available ? alarmie : await refreshAlarmie();
+  if (!status.available || !petWindow || chatWindow) return;
+  chatWindow = new BrowserWindow({
+    ...chatBounds(beside),
+    title: 'Talk to Alarmie',
+    ...(!app.isPackaged && { icon: path.join(ASSETS, 'tray.png') }),
+    minWidth: 280,
+    minHeight: 300,
+    maximizable: false,
+    fullscreenable: false,
+    autoHideMenuBar: true,
+    show: false,
+    webPreferences: {
+      preload: PRELOAD,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  chatWindow.setMenu(null);
+  // Stays up with the pet while you switch to another app to check something.
+  chatWindow.setAlwaysOnTop(true, 'floating');
+  lockDown(chatWindow.webContents);
+  chatWindow.once('ready-to-show', () => chatWindow && platform.presentWindow(app, chatWindow));
+  chatWindow.on('closed', () => {
+    chatWindow = null;
+  });
+  loadRenderer(chatWindow, 'chat');
+}
+
+/**
+ * Beside him on screen, clear of him: to his right, or his left if there's no room there, level
+ * with him as far as the screen allows.
+ */
+function chatBounds(pet: Rect) {
+  const origin = petWindow?.getBounds() ?? { x: 0, y: 0 };
+  const left = origin.x + pet.x;
+  const right = left + pet.width;
+  const middle = { x: Math.round(left + pet.width / 2), y: Math.round(origin.y + pet.y + pet.height / 2) };
+  const area = screen.getDisplayNearestPoint(middle).workArea;
+  const { width, height } = CHAT_SIZE;
+  const x = right + CHAT_GAP + width <= area.x + area.width ? right + CHAT_GAP : left - CHAT_GAP - width;
+  const y = middle.y - height / 2;
+  return {
+    width,
+    height,
+    x: Math.round(Math.min(Math.max(x, area.x), area.x + area.width - width)),
+    y: Math.round(Math.min(Math.max(y, area.y), area.y + area.height - height)),
+  };
+}
+
 // ---- Settings and keyboard opt-in ------------------------------------------------------
 
 function setKeyboardStatus(status: KeyboardStatus) {
@@ -331,6 +415,8 @@ function onSettingsChanged(previous: Settings, next: Settings) {
   broadcast(IPC.settingsChanged, next);
   if (previous.keyboardReactions !== next.keyboardReactions) syncKeyboard({ prompt: next.keyboardReactions });
   if (previous.launchAtLogin !== next.launchAtLogin) applyLoginItem(next);
+  if (previous.alarmieEndpoint !== next.alarmieEndpoint) void refreshAlarmie();
+  if (!next.alarmieChat) chatWindow?.close();
 }
 
 // ---- IPC -------------------------------------------------------------------------------
@@ -357,6 +443,21 @@ function registerIpc() {
   ipcMain.handle(IPC.checkForUpdate, () => updater.check());
   ipcMain.handle(IPC.installUpdate, () => updater.install());
   ipcMain.on(IPC.openReleasesPage, () => updater.openReleasesPage());
+  ipcMain.handle(IPC.getAlarmie, () => refreshAlarmie());
+  ipcMain.on(IPC.openChat, (event, beside: unknown) => {
+    if (event.sender !== petWindow?.webContents) return;
+    const r = beside && typeof beside === 'object' ? (beside as Record<string, unknown>) : {};
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+    void openChat({ x: num(r.x), y: num(r.y), width: Math.max(0, num(r.width)), height: Math.max(0, num(r.height)) });
+  });
+  ipcMain.handle(IPC.sendChat, (event, message: unknown, conversationId: unknown) => {
+    if (event.sender !== chatWindow?.webContents) return { ok: false, error: 'Not from the chat.' };
+    return sendToAlarmie(
+      store.settings.alarmieEndpoint,
+      typeof message === 'string' ? message : '',
+      typeof conversationId === 'string' && conversationId ? conversationId : null,
+    );
+  });
 }
 
 // ---- Startup ---------------------------------------------------------------------------
@@ -387,6 +488,7 @@ if (!app.requestSingleInstanceLock()) {
     // Silent check at startup: never prompt for permissions the user didn't just ask for.
     syncKeyboard({ prompt: false });
     updater.start();
+    void refreshAlarmie();
 
     screen.on('display-metrics-changed', refitToPrimaryDisplay);
     screen.on('display-added', refitToPrimaryDisplay);

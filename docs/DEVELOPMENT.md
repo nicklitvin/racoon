@@ -26,6 +26,7 @@ electron/                 Electron main process (Node side)
   keyboardMonitor.ts      Opt-in key-press counter (uiohook-napi). Never reads which key.
   settingsStore.ts        Settings as JSON in the app's user-data folder
   updater.ts              Checks GitHub Releases for a newer build, downloads and installs it
+  alarmie.ts              Finds Alarmie on a Mac and talks to its live talk (see ALARMIE.md)
   platform/               Everything OS-specific, behind one PlatformAdapter interface
     windows.ts            App id, z-order level
     zOrder.ts             Keeps the overlay in front of every other window (via koffi)
@@ -35,6 +36,7 @@ shared/                   Used by both the main process and the page
   ipc.ts                  IPC channel names and the HostBridge API type
   settings.ts             Settings type, defaults, ranges and validation
   update.ts               Reading the latest GitHub release and telling whether it's newer
+  alarmie.ts              What's sent to Alarmie's live talk and how its replies are read
 src/                      The page (React). Runs in Electron and in a browser
   core/                   Plain TypeScript: no React, no DOM, no Electron. All unit-tested
     behavior/brain.ts     The behaviour state machine and movement
@@ -87,6 +89,10 @@ Two rules keep this portable and testable: **`src/core` never imports React, the
 ### The main window
 
 Closing it asks first (`askBeforeClosing` in `main.ts`): **Hide window** (the default) hides it and leaves the pet out, **Quit** quits, **Cancel** keeps it open. A hidden window comes back from the tray icon by the clock (Open My Pet, or Quit), from opening My Pet again (the single-instance lock hands over to the copy that's running), or from the Dock on macOS. Quitting from the tray, an update installing, or Windows signing out or shutting down quits without asking (`quitting`, set in `before-quit` and on `query-session-end`).
+
+### Talking to Alarmie (macOS)
+
+With Alarmie on the Mac (installed, or its live talk answering), the settings offer **Click your pet to talk to Alarmie**. A click on the pet (not a drag) then still pokes him, and also opens a chat window beside him (`openChat` in `main.ts`, the `#chat` view, `src/components/AlarmieChat.tsx`). The main process does the talking (`electron/alarmie.ts`), to the endpoint in the settings. What the endpoint takes and gives back is in [ALARMIE.md](ALARMIE.md).
 
 ### Behaviour
 

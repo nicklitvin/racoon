@@ -15,6 +15,13 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-11-15',
+    title: 'Talk to Alarmie',
+    changes: [
+      'On a Mac with Alarmie on it, a new setting lets you click your pet to talk to Alarmie: a chat opens beside your pet, connected to Alarmie’s live talk.',
+    ],
+  },
+  {
     date: '2026-11-14',
     title: 'Always on top',
     changes: [

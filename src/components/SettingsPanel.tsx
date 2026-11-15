@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ALARMIE_DEFAULT_ENDPOINT, NO_ALARMIE, cleanEndpoint, type AlarmieStatus } from '../../shared/alarmie';
 import { BETA_TYPES, HATS, OUTFITS, PET_MODES, RACCOON_TYPES, type Hat, type KeyboardStatus, type Outfit, type PetMode, type RaccoonType, type Settings } from '../../shared/settings';
 import type { Host } from '../host';
 import { RACCOON_STYLES } from '../sprites';
@@ -30,6 +31,21 @@ function useHostState(host: Host) {
   }, [host]);
 
   return { settings, keyboard };
+}
+
+/** Whether Alarmie is here to talk to: looked for when the settings open, and kept up to date. */
+function useAlarmie(host: Host) {
+  const [status, setStatus] = useState<AlarmieStatus>(NO_ALARMIE);
+  useEffect(() => {
+    let alive = true;
+    void host.getAlarmie().then((s) => alive && setStatus(s));
+    const off = host.onAlarmieChanged(setStatus);
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [host]);
+  return status;
 }
 
 /** "Pixel raccoon" is just "Raccoon" on its tile: they're all pixel pets. */
@@ -183,8 +199,57 @@ function Switch({ label, checked, onChange, title, children }: { label: string; 
   );
 }
 
+/** Where Alarmie's live talk is: changed when you leave the box or press Enter. */
+function EndpointField({ value, onChange }: { value: string; onChange: (endpoint: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const valid = cleanEndpoint(draft) !== null;
+  const commit = () => {
+    const endpoint = cleanEndpoint(draft);
+    if (endpoint && endpoint !== value) onChange(endpoint);
+  };
+  return (
+    <details className="privacy">
+      <summary>Connection</summary>
+      <label className="endpoint">
+        <span>Live talk address</span>
+        <input
+          type="url"
+          value={draft}
+          spellCheck={false}
+          aria-invalid={!valid}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+        />
+      </label>
+      {!valid && <p className="hint error">That isn’t an http:// or https:// address.</p>}
+      {value !== ALARMIE_DEFAULT_ENDPOINT && (
+        <button type="button" className="text-button" onClick={() => onChange(ALARMIE_DEFAULT_ENDPOINT)}>
+          Back to the usual address
+        </button>
+      )}
+    </details>
+  );
+}
+
+/** Talking to Alarmie by clicking the pet: only offered on a Mac with Alarmie on it. */
+function AlarmieRow({ settings, status, onChange }: { settings: Settings; status: AlarmieStatus; onChange: (patch: Partial<Settings>) => void }) {
+  return (
+    <Switch label="Click your pet to talk to Alarmie" checked={settings.alarmieChat} onChange={(alarmieChat) => onChange({ alarmieChat })}>
+      <p className={status.reachable ? 'hint ok' : 'hint'}>
+        {status.reachable
+          ? 'Opens a chat with Alarmie’s live talk beside your pet.'
+          : 'Alarmie is here, but its live talk isn’t answering yet. Open Alarmie and turn live talk on.'}
+      </p>
+      <EndpointField value={settings.alarmieEndpoint} onChange={(alarmieEndpoint) => onChange({ alarmieEndpoint })} />
+    </Switch>
+  );
+}
+
 export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
   const { settings, keyboard } = useHostState(host);
+  const alarmie = useAlarmie(host);
   const updates = useUpdateStatus(host);
   const [notes, setNotes] = useState(false);
   if (!settings) return null;
@@ -284,6 +349,14 @@ export function SettingsPanel({ host, onClose }: SettingsPanelProps) {
               title="Applies to the installed app, not to development builds."
             />
             <UpdateRow host={host} status={updates} />
+          </div>
+        </Section>
+      )}
+
+      {desktop && alarmie.available && (
+        <Section title="Alarmie">
+          <div className="switch-list">
+            <AlarmieRow settings={settings} status={alarmie} onChange={update} />
           </div>
         </Section>
       )}

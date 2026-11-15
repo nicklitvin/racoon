@@ -296,6 +296,8 @@ export class PetRuntime {
       this.brain.release();
     } else {
       this.brain.poke();
+      // A click, with the Alarmie chat on: the chat opens beside him (where there's Alarmie).
+      if (this.settings.alarmieChat) this.host.openChat(this.hitRect() ?? { x: e.clientX, y: e.clientY, width: 0, height: 0 });
     }
     this.wake();
     this.clickThrough.dragEnded({ x: e.clientX, y: e.clientY }, this.grabRects());

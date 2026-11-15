@@ -32,6 +32,10 @@ const bridge: HostBridge = {
   checkForUpdate: () => ipcRenderer.invoke(IPC.checkForUpdate),
   installUpdate: () => ipcRenderer.invoke(IPC.installUpdate),
   openReleasesPage: () => ipcRenderer.send(IPC.openReleasesPage),
+  getAlarmie: () => ipcRenderer.invoke(IPC.getAlarmie),
+  onAlarmieChanged: (listener) => subscribe(IPC.alarmieChanged, listener),
+  openChat: (beside) => ipcRenderer.send(IPC.openChat, beside),
+  sendChat: (message, conversationId) => ipcRenderer.invoke(IPC.sendChat, message, conversationId),
 };
 
 contextBridge.exposeInMainWorld('racoonHost', bridge);

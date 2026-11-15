@@ -1,3 +1,4 @@
+import { NO_ALARMIE } from '../../shared/alarmie';
 import type { DisplayInfo, HostBridge, Point } from '../../shared/ipc';
 import { normalizeSettings, type KeyboardStatus, type Settings } from '../../shared/settings';
 import { INITIAL_UPDATE_STATUS, type UpdateStatus } from '../../shared/update';
@@ -116,6 +117,11 @@ function webHost(): Host {
     checkForUpdate: () => Promise.resolve(noUpdates),
     installUpdate: () => Promise.resolve(noUpdates),
     openReleasesPage() {},
+    // Alarmie is a Mac app: a tab has nothing to talk to.
+    getAlarmie: () => Promise.resolve(NO_ALARMIE),
+    onAlarmieChanged: () => () => {},
+    openChat() {},
+    sendChat: () => Promise.resolve({ ok: false, error: 'Alarmie is only on the Mac app.' }),
   };
 }
 
