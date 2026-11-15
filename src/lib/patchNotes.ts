@@ -15,6 +15,13 @@ export interface PatchNote {
 // entry at the top when you ship something worth noticing.
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: '2026-11-14',
+    title: 'Always on top',
+    changes: [
+      'Your pet stays in front of every other window. Apps that keep themselves on top used to cover it for up to 3 seconds after they came up; now it’s back in front of them straight away.',
+    ],
+  },
+  {
     date: '2026-11-09',
     title: 'Staying put',
     changes: [

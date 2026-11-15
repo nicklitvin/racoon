@@ -15,8 +15,6 @@ const ASSETS = path.join(__dirname, '../assets');
 const AT_LOGIN = '--at-login';
 /** How long the pet keeps out of sight after the desktop switches: the slide takes about half a second. */
 const AWAY_AFTER_SWITCH_MS = 650;
-/** How often the pet's window goes back in front of windows that made themselves always on top since. */
-const RAISE_EVERY_MS = 3000;
 
 let petWindow: BrowserWindow | null = null;
 let mainWindow: BrowserWindow | null = null;
@@ -158,14 +156,13 @@ function createPetWindow() {
     cursorMonitor.start();
   });
   const stopWatchingDesktops = platform.watchDesktopSwitches?.(desktopSwitched) ?? null;
-  const raising = setInterval(() => {
-    if (petWindow && !away) platform.raiseWindow(petWindow);
-  }, RAISE_EVERY_MS);
+  // In front of every other window, including ones that make themselves always on top too.
+  const stopKeepingInFront = platform.keepInFront(petWindow);
   petWindow.on('closed', () => {
     petWindow = null;
     cursorMonitor.stop();
     stopWatchingDesktops?.();
-    clearInterval(raising);
+    stopKeepingInFront();
     clearTimeout(awayTimer);
   });
 

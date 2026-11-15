@@ -13,6 +13,11 @@ export const macPlatform: PlatformAdapter = {
   raiseWindow(win) {
     win.moveTop();
   },
+  keepInFront(win) {
+    // No telling what's stacked above it here, so it just goes back in front now and then.
+    const timer = setInterval(() => !win.isDestroyed() && win.moveTop(), 3000);
+    return () => clearInterval(timer);
+  },
   presentWindow(app, win) {
     win.show();
     app.focus({ steal: true });

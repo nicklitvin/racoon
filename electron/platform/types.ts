@@ -22,6 +22,8 @@ export interface PlatformAdapter {
    * itself always on top since), without taking focus from the app you're using.
    */
   raiseWindow(win: BrowserWindow): void;
+  /** Keeps the pet's window in front of every other window from now on. Returns a function that stops. */
+  keepInFront(win: BrowserWindow): () => void;
   /** Shows a normal window (the main window) and brings it to the front. */
   presentWindow(app: App, win: BrowserWindow): void;
   keyboardAccess: {
